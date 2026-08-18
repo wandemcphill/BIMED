@@ -25,5 +25,26 @@ Ireland-based candidates: info@bimedhealthcare.com
 4. `npm run dev`
 5. Admin: `/admin`
 
+## Render deployment
+This project is prepared for a Render Web Service.
+
+- Blueprint: [`render.yaml`](/D:/BIMED/bimed-recruitment-portal/render.yaml)
+- Build command: `npm run build`
+- Start command: `npm run start`
+- Health check: `GET /api/health`
+- Primary domain: `recruitment.bimedhealthcare.com`
+
+Required environment variables on Render:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `ADMIN_PASSWORD`
+- `ADMIN_NOTIFICATION_EMAIL`
+- `NEXT_PUBLIC_APP_URL`
+
+Optional Supabase connection strings are documented in [`.env.example`](/D:/BIMED/bimed-recruitment-portal/.env.example) and [docs/RENDER_DEPLOYMENT.md](/D:/BIMED/bimed-recruitment-portal/docs/RENDER_DEPLOYMENT.md).
+
 ## Production hardening before launch
 Replace the MVP admin password with proper authenticated admin access/MFA; add rate limiting, audit logs, GDPR privacy/retention controls, backups/monitoring, and Bimed-approved legal/HR content. Put it on a Bimed-controlled subdomain.
