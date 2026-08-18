@@ -1,10 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashToken, makeToken } from '@/lib/token';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { isAdminRequestAuthenticated } from '@/lib/admin-session';
+import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 
 export async function POST(request: NextRequest) {
-  if (request.headers.get('x-admin-password') !== process.env.ADMIN_PASSWORD) {
+  if (!isAdminRequestAuthenticated(request)) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+  }
+
+  const rateLimit = checkRateLimit({
+    key: 'admin-invite',
+    limit: 20,
+    windowMs: 60 * 60 * 1000,
+    request,
+  });
+
+  if (!rateLimit.allowed) {
+    const init: ResponseInit = { status: 429 };
+    if (rateLimit.retryAfterSeconds) {
+      init.headers = {
+        'Retry-After': String(rateLimit.retryAfterSeconds),
+      };
+    }
+
+    return NextResponse.json({ error: 'Too many invitation requests. Please try again later.' }, init);
   }
 
   const body = await request.json();
@@ -30,6 +51,17 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await recordRecruitmentAudit(client, {
+    inviteId: data.id,
+    eventType: 'invite_created',
+    actor: 'admin',
+    metadata: {
+      candidate_email: body.email,
+      role: body.role || null,
+      expires_at: body.expiryDate || null,
+    },
+  });
 
   return NextResponse.json({
     invite: data,

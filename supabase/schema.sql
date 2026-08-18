@@ -49,6 +49,16 @@ create table if not exists recruitment_applications (
   updated_at timestamptz default now()
 );
 
+create table if not exists recruitment_audit_log (
+  id uuid primary key default gen_random_uuid(),
+  application_id uuid references recruitment_applications(id),
+  invite_id uuid references recruitment_invites(id),
+  event_type text not null,
+  actor text not null,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
 alter table if exists recruitment_applications add column if not exists professional_experience text;
 alter table if exists recruitment_applications add column if not exists living_in_ireland text;
 alter table if exists recruitment_applications add column if not exists current_country text;
@@ -59,3 +69,5 @@ alter table if exists recruitment_applications add column if not exists admin_no
 alter table if exists recruitment_applications add column if not exists updated_at timestamptz default now();
 
 create index if not exists applications_submitted_idx on recruitment_applications(submitted_at desc);
+create index if not exists recruitment_audit_log_application_idx on recruitment_audit_log(application_id, created_at desc);
+create index if not exists recruitment_audit_log_invite_idx on recruitment_audit_log(invite_id, created_at desc);

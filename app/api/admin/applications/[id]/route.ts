@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { recruitmentStatuses } from '@/lib/recruitment-config';
+import { isAdminRequestAuthenticated } from '@/lib/admin-session';
+import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 
 type RouteContext = {
   params: Promise<{
@@ -9,7 +11,7 @@ type RouteContext = {
 };
 
 export async function GET(request: NextRequest, context: RouteContext) {
-  if (request.headers.get('x-admin-password') !== process.env.ADMIN_PASSWORD) {
+  if (!isAdminRequestAuthenticated(request)) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
   }
 
@@ -31,11 +33,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
     .eq('id', application.invite_id)
     .maybeSingle();
 
-  return NextResponse.json({ application, invite });
+  const auditQuery = client.from('recruitment_audit_log').select('*').order('created_at', { ascending: false }).limit(20);
+  const { data: auditLog } = application.invite_id
+    ? await auditQuery.or(`application_id.eq.${application.id},invite_id.eq.${application.invite_id}`)
+    : await auditQuery.eq('application_id', application.id);
+
+  return NextResponse.json({ application, invite, auditLog: auditLog || [] });
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  if (request.headers.get('x-admin-password') !== process.env.ADMIN_PASSWORD) {
+  if (!isAdminRequestAuthenticated(request)) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
   }
 
@@ -73,6 +80,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await recordRecruitmentAudit(client, {
+    applicationId,
+    inviteId: data.invite_id,
+    eventType: 'admin_application_updated',
+    actor: 'admin',
+    metadata: {
+      status: body.status || data.status,
+      notes_updated: typeof body.notes === 'string',
+    },
+  });
 
   return NextResponse.json({ application: data });
 }

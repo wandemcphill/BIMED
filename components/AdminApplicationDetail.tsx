@@ -2,11 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import {
-  candidateSupportDocuments,
-  recruitmentStatuses,
-  isInternationalCandidate,
-} from '@/lib/recruitment-config';
+import { candidateSupportDocuments, recruitmentStatuses, isInternationalCandidate } from '@/lib/recruitment-config';
 
 type ApplicationRecord = {
   id: string;
@@ -43,6 +39,15 @@ type ApplicationRecord = {
   admin_notes: string | null;
   submitted_at: string;
   updated_at: string | null;
+  invite_id: string | null;
+};
+
+type AuditLogEntry = {
+  id: string;
+  event_type: string;
+  actor: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 };
 
 type ApplicationPayload = {
@@ -54,9 +59,8 @@ type ApplicationPayload = {
     expires_at?: string | null;
     used_at?: string | null;
   };
+  auditLog?: AuditLogEntry[];
 };
-
-const storageKey = 'bimed-admin-password';
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -89,36 +93,26 @@ export default function AdminApplicationDetail({
 }: {
   applicationId: string;
 }) {
-  const [password, setPassword] = useState('');
+  const [bootstrapping, setBootstrapping] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [message, setMessage] = useState('');
   const [payload, setPayload] = useState<ApplicationPayload | null>(null);
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
 
-  const loadApplication = async (overridePassword?: string) => {
-    const adminPassword = overridePassword || password;
-
-    if (!adminPassword) {
-      setMessage('Enter the admin password to view candidate details.');
-      return;
-    }
-
-    setLoading(true);
-    setMessage('');
-
-    const response = await fetch(`/api/admin/applications/${applicationId}`, {
-      headers: {
-        'x-admin-password': adminPassword,
-      },
-    });
+  const loadApplication = async () => {
+    const response = await fetch(`/api/admin/applications/${applicationId}`);
 
     if (!response.ok) {
-      setAuthenticated(false);
-      setMessage('Incorrect admin password or application unavailable.');
-      localStorage.removeItem(storageKey);
-      setLoading(false);
+      if (response.status === 401) {
+        setAuthenticated(false);
+      }
+
+      setMessage('Unable to load the candidate record.');
+      setPayload(null);
+      setBootstrapping(false);
       return;
     }
 
@@ -127,24 +121,62 @@ export default function AdminApplicationDetail({
     setStatus(nextPayload.application.status);
     setNotes(nextPayload.application.admin_notes || '');
     setAuthenticated(true);
-    localStorage.setItem(storageKey, adminPassword);
-    setLoading(false);
+    setBootstrapping(false);
+  };
+
+  const checkSession = async () => {
+    const response = await fetch('/api/admin/session');
+    const payload = await response.json();
+
+    if (payload.authenticated) {
+      await loadApplication();
+    } else {
+      setAuthenticated(false);
+      setBootstrapping(false);
+    }
   };
 
   useEffect(() => {
-    const storedPassword = localStorage.getItem(storageKey);
-    if (storedPassword) {
-      setPassword(storedPassword);
-      void loadApplication(storedPassword);
-    }
+    void checkSession();
   }, []);
+
+  const login = async () => {
+    setLoginError('');
+
+    const response = await fetch('/api/admin/session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok) {
+      setLoginError(payload.error || 'Incorrect admin password.');
+      return;
+    }
+
+    setPassword('');
+    setAuthenticated(true);
+    await loadApplication();
+  };
+
+  const logout = async () => {
+    await fetch('/api/admin/session', { method: 'DELETE' });
+    setAuthenticated(false);
+    setPayload(null);
+    setPassword('');
+    setLoginError('');
+    setMessage('');
+  };
 
   const saveChanges = async () => {
     const response = await fetch(`/api/admin/applications/${applicationId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-password': password,
       },
       body: JSON.stringify({
         status,
@@ -155,6 +187,10 @@ export default function AdminApplicationDetail({
     const nextPayload = await response.json();
 
     if (!response.ok) {
+      if (response.status === 401) {
+        setAuthenticated(false);
+      }
+
       setMessage(nextPayload.error || 'Unable to update application.');
       return;
     }
@@ -170,11 +206,20 @@ export default function AdminApplicationDetail({
     setMessage('Candidate record updated.');
   };
 
+  if (bootstrapping) {
+    return (
+      <section className="card auth-card">
+        <h1>Candidate record</h1>
+        <p className="muted">Checking your admin session...</p>
+      </section>
+    );
+  }
+
   if (!authenticated || !payload) {
     return (
       <section className="card auth-card">
         <h1>Candidate record</h1>
-        <p className="muted">Open the private application record with the current admin password.</p>
+        <p className="muted">Sign in to view the private candidate record.</p>
         <Field label="Admin password">
           <input
             type="password"
@@ -182,16 +227,15 @@ export default function AdminApplicationDetail({
             onChange={(event) => setPassword(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
-                void loadApplication();
+                void login();
               }
             }}
           />
         </Field>
-        <button className="primary" onClick={() => void loadApplication()}>
-          Open record
+        <button className="primary" onClick={() => void login()}>
+          Sign in
         </button>
-        {loading && <p className="muted">Loading candidate record...</p>}
-        {message && <div className="error">{message}</div>}
+        {loginError && <div className="error">{loginError}</div>}
       </section>
     );
   }
@@ -210,9 +254,14 @@ export default function AdminApplicationDetail({
             {formatDate(application.submitted_at)}
           </p>
         </div>
-        <a className="secondary link-button" href="/admin">
-          Back to dashboard
-        </a>
+        <div className="toolbar">
+          <a className="secondary link-button" href="/admin">
+            Back to dashboard
+          </a>
+          <button className="secondary" onClick={() => void logout()}>
+            Sign out
+          </button>
+        </div>
       </div>
 
       <section className="subcard">
@@ -232,10 +281,7 @@ export default function AdminApplicationDetail({
             <input value={formatDate(application.updated_at)} readOnly />
           </Field>
           <Field label="Application source">
-            <input
-              value={payload.invite?.candidate_email || application.email}
-              readOnly
-            />
+            <input value={payload.invite?.candidate_email || application.email} readOnly />
           </Field>
         </div>
         <Field label="Admin notes" full>
@@ -310,7 +356,10 @@ export default function AdminApplicationDetail({
         <h2>Supporting documents</h2>
         <div className="document-list">
           {candidateSupportDocuments.map((documentName) => (
-            <span className={application.supporting_documents.includes(documentName) ? 'document-tag selected' : 'document-tag'} key={documentName}>
+            <span
+              className={application.supporting_documents.includes(documentName) ? 'document-tag selected' : 'document-tag'}
+              key={documentName}
+            >
               {documentName}
             </span>
           ))}
@@ -320,6 +369,28 @@ export default function AdminApplicationDetail({
       <section className="subcard">
         <h2>Consent</h2>
         <DetailRow label="Consent given" value={application.consent ? 'Yes' : 'No'} />
+      </section>
+
+      <section className="subcard">
+        <h2>Activity log</h2>
+        {payload.auditLog?.length ? (
+          <div className="activity-list">
+            {payload.auditLog.map((entry) => (
+              <article className="activity-item" key={entry.id}>
+                <div className="activity-heading">
+                  <strong>{entry.event_type}</strong>
+                  <span>{formatDate(entry.created_at)}</span>
+                </div>
+                <p className="muted">Actor: {entry.actor}</p>
+                {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+                  <pre className="activity-metadata">{JSON.stringify(entry.metadata, null, 2)}</pre>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">No activity recorded yet.</p>
+        )}
       </section>
     </section>
   );

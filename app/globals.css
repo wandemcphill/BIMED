@@ -319,6 +319,12 @@ button:disabled {
   gap: 16px;
 }
 
+.toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .auth-card {
   max-width: 560px;
   margin: 40px auto 0;
@@ -369,6 +375,40 @@ button:disabled {
   background: var(--success-bg);
   border-color: var(--success-line);
   color: #2a6a3d;
+}
+
+.activity-list {
+  display: grid;
+  gap: 12px;
+}
+
+.activity-item {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: #fbfcfc;
+}
+
+.activity-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.activity-heading span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.activity-metadata {
+  margin: 10px 0 0;
+  padding: 12px;
+  overflow-x: auto;
+  background: #f7fafb;
+  border-radius: 10px;
+  border: 1px solid #e4eaee;
+  white-space: pre-wrap;
 }
 
 .breakword {

@@ -2,11 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  recruitmentCopy,
-  recruitmentRoles,
-  isInternationalCandidate,
-} from '@/lib/recruitment-config';
+import { recruitmentCopy, recruitmentRoles, isInternationalCandidate } from '@/lib/recruitment-config';
 
 type ApplicationSummary = {
   id: string;
@@ -26,7 +22,12 @@ type InviteForm = {
   expiryDate: string;
 };
 
-const storageKey = 'bimed-admin-password';
+const emptyInviteForm: InviteForm = {
+  name: '',
+  email: '',
+  role: 'Support Worker',
+  expiryDate: '',
+};
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString('en-GB', {
@@ -51,58 +52,54 @@ function Card({
 }
 
 export default function AdminDashboard() {
-  const [password, setPassword] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [bootstrapping, setBootstrapping] = useState(true);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [dashboardError, setDashboardError] = useState('');
+  const [loadingApplications, setLoadingApplications] = useState(false);
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
-  const [message, setMessage] = useState('');
   const [inviteLink, setInviteLink] = useState('');
-  const [inviteForm, setInviteForm] = useState<InviteForm>({
-    name: '',
-    email: '',
-    role: 'Support Worker',
-    expiryDate: '',
-  });
+  const [inviteForm, setInviteForm] = useState<InviteForm>(emptyInviteForm);
 
-  const loadApplications = async (overridePassword?: string) => {
-    const adminPassword = overridePassword || password;
+  const loadApplications = async () => {
+    setLoadingApplications(true);
+    setDashboardError('');
 
-    if (!adminPassword) {
-      setMessage('Enter the admin password to open the dashboard.');
-      return;
-    }
-
-    setLoading(true);
-    setMessage('');
-
-    const response = await fetch('/api/admin/applications', {
-      headers: {
-        'x-admin-password': adminPassword,
-      },
-    });
+    const response = await fetch('/api/admin/applications');
 
     if (!response.ok) {
-      setAuthenticated(false);
+      if (response.status === 401) {
+        setAuthenticated(false);
+      }
+
       setApplications([]);
-      setMessage('Incorrect admin password.');
-      localStorage.removeItem(storageKey);
-      setLoading(false);
+      setDashboardError('Unable to load applications.');
+      setLoadingApplications(false);
       return;
     }
 
     const payload = await response.json();
     setApplications(payload.applications || []);
-    setAuthenticated(true);
-    localStorage.setItem(storageKey, adminPassword);
-    setLoading(false);
+    setLoadingApplications(false);
+  };
+
+  const checkSession = async () => {
+    const response = await fetch('/api/admin/session');
+    const payload = await response.json();
+
+    if (payload.authenticated) {
+      setAuthenticated(true);
+      await loadApplications();
+    } else {
+      setAuthenticated(false);
+    }
+
+    setBootstrapping(false);
   };
 
   useEffect(() => {
-    const storedPassword = localStorage.getItem(storageKey);
-    if (storedPassword) {
-      setPassword(storedPassword);
-      void loadApplications(storedPassword);
-    }
+    void checkSession();
   }, []);
 
   const metrics = useMemo(() => {
@@ -124,12 +121,44 @@ export default function AdminDashboard() {
     };
   }, [applications]);
 
+  const login = async () => {
+    setLoginError('');
+
+    const response = await fetch('/api/admin/session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password: loginPassword }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok) {
+      setLoginError(payload.error || 'Incorrect admin password.');
+      return;
+    }
+
+    setLoginPassword('');
+    setAuthenticated(true);
+    await loadApplications();
+  };
+
+  const logout = async () => {
+    await fetch('/api/admin/session', { method: 'DELETE' });
+    setAuthenticated(false);
+    setApplications([]);
+    setInviteLink('');
+    setLoginPassword('');
+    setLoginError('');
+    setDashboardError('');
+  };
+
   const createInvite = async () => {
     const response = await fetch('/api/admin/invites', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-password': password,
       },
       body: JSON.stringify(inviteForm),
     });
@@ -137,36 +166,51 @@ export default function AdminDashboard() {
     const payload = await response.json();
 
     if (!response.ok) {
-      setMessage(payload.error || 'Unable to create invitation.');
+      if (response.status === 401) {
+        setAuthenticated(false);
+      }
+
+      setDashboardError(payload.error || 'Unable to create invitation.');
       return;
     }
 
     setInviteLink(payload.link);
+    setInviteForm(emptyInviteForm);
   };
+
+  if (bootstrapping) {
+    return (
+      <main className="wrap">
+        <section className="card auth-card">
+          <h1>Recruitment Admin</h1>
+          <p className="muted">Checking your admin session...</p>
+        </section>
+      </main>
+    );
+  }
 
   if (!authenticated) {
     return (
       <main className="wrap">
         <section className="card auth-card">
           <h1>Recruitment Admin</h1>
-          <p className="muted">Open the private recruitment dashboard with the current admin password.</p>
+          <p className="muted">Sign in to open the private recruitment dashboard.</p>
           <Field label="Admin password">
             <input
               type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              value={loginPassword}
+              onChange={(event) => setLoginPassword(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
-                  void loadApplications();
+                  void login();
                 }
               }}
             />
           </Field>
-          <button className="primary" onClick={() => void loadApplications()}>
-            Open dashboard
+          <button className="primary" onClick={() => void login()}>
+            Sign in
           </button>
-          {loading && <p className="muted">Loading dashboard...</p>}
-          {message && <div className="error">{message}</div>}
+          {loginError && <div className="error">{loginError}</div>}
         </section>
       </main>
     );
@@ -181,9 +225,14 @@ export default function AdminDashboard() {
             <h1>Recruitment Dashboard</h1>
             <p className="muted">{recruitmentCopy.invitationOnly}</p>
           </div>
-          <button className="secondary" onClick={() => void loadApplications()}>
-            Refresh
-          </button>
+          <div className="toolbar">
+            <button className="secondary" onClick={() => void loadApplications()}>
+              Refresh
+            </button>
+            <button className="secondary" onClick={() => void logout()}>
+              Sign out
+            </button>
+          </div>
         </div>
 
         <div className="metrics-grid">
@@ -250,7 +299,7 @@ export default function AdminDashboard() {
             <ul className="notes-list">
               <li>{recruitmentCopy.supportingDocuments}</li>
               <li>Candidate detail records are available from each row in the table below.</li>
-              <li>Status labels are configurable and can be refined once Bimed confirms the final workflow.</li>
+              <li>Status labels remain configurable and can be refined once Bimed confirms the final workflow.</li>
             </ul>
           </section>
         </div>
@@ -294,9 +343,10 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+        {loadingApplications && <p className="muted">Loading applications...</p>}
       </section>
 
-      {message && <div className="error" style={{ marginTop: 20 }}>{message}</div>}
+      {dashboardError && <div className="error" style={{ marginTop: 20 }}>{dashboardError}</div>}
     </main>
   );
 }

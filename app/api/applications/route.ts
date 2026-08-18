@@ -3,9 +3,29 @@ import { db } from '@/lib/db';
 import { hashToken } from '@/lib/token';
 import { isInternationalCandidate } from '@/lib/recruitment-config';
 import { sendRecruitmentEmails } from '@/lib/email';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimit = checkRateLimit({
+      key: 'candidate-application',
+      limit: 12,
+      windowMs: 60 * 60 * 1000,
+      request: req,
+    });
+
+    if (!rateLimit.allowed) {
+      const init: ResponseInit = { status: 429 };
+      if (rateLimit.retryAfterSeconds) {
+        init.headers = {
+          'Retry-After': String(rateLimit.retryAfterSeconds),
+        };
+      }
+
+      return NextResponse.json({ error: 'Too many submissions from this network. Please try again later.' }, init);
+    }
+
     const body = await req.json();
 
     if (!body.token) {
@@ -96,6 +116,18 @@ export async function POST(req: NextRequest) {
     if (markUsedError) {
       throw markUsedError;
     }
+
+    await recordRecruitmentAudit(client, {
+      applicationId: application.id,
+      inviteId: invite.id,
+      eventType: 'application_submitted',
+      actor: 'candidate',
+      metadata: {
+        country_of_residence: application.country_of_residence,
+        role_applied: application.role_applied,
+        living_in_ireland: application.living_in_ireland,
+      },
+    });
 
     await sendRecruitmentEmails(application);
 

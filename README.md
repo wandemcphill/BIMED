@@ -41,10 +41,11 @@ Required environment variables on Render:
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 - `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
 - `ADMIN_NOTIFICATION_EMAIL`
 - `NEXT_PUBLIC_APP_URL`
 
 Optional Supabase connection strings are documented in [`.env.example`](/D:/BIMED/bimed-recruitment-portal/.env.example) and [docs/RENDER_DEPLOYMENT.md](/D:/BIMED/bimed-recruitment-portal/docs/RENDER_DEPLOYMENT.md).
 
 ## Production hardening before launch
-Replace the MVP admin password with proper authenticated admin access/MFA; add rate limiting, audit logs, GDPR privacy/retention controls, backups/monitoring, and Bimed-approved legal/HR content. Put it on a Bimed-controlled subdomain.
+Replace the MVP password-based admin session with proper authenticated admin access/MFA; finalize Bimed-approved legal/HR content; confirm backups, monitoring, and retention controls; and keep the portal on a Bimed-controlled subdomain.

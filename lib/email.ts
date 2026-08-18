@@ -42,7 +42,7 @@ export async function sendRecruitmentEmails(application: {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
-  const adminRecordUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin?application=${application.id}`;
+  const adminRecordUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin/applications/${application.id}`;
 
   await Promise.allSettled([
     resend.emails.send({
