@@ -81,6 +81,19 @@ Notes:
 - No Supabase secrets should be committed to Git.
 - The app uses Supabase directly from server routes, not from the public client bundle.
 
+Optional Postgres connection URLs, if you later add a raw SQL client, migration job, or ORM:
+
+- `SUPABASE_DB_DIRECT_URL`
+- `SUPABASE_DB_SESSION_URL`
+- `SUPABASE_DB_TRANSACTION_URL`
+
+Recommended usage:
+
+- Use the direct connection URL for long-running server processes and maintenance tasks.
+- Use the session pooler URL if your environment is IPv4-only and direct connections are not available.
+- Use the transaction pooler URL for serverless or highly transient workloads.
+- For this Render Web Service, you do not need a raw Postgres connection URL today because the app uses `@supabase/supabase-js` with the service-role key.
+
 ## 8. Resend configuration
 
 Use Resend for transactional email.
