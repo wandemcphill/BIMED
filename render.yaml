@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: bimed-recruitment-portal
+    runtime: node
+    plan: starter
+    autoDeployTrigger: commit
+    buildCommand: npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: Bimed Healthcare <info@bimedhealthcare.com>
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_NOTIFICATION_EMAIL
+        value: info@bimedhealthcare.com
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://recruitment.bimedhealthcare.com
