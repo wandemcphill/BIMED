@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -330,27 +331,45 @@ export default function CandidateForm({
   if (done) {
     return (
       <section className="card success-card">
-        <span className="pill">SUBMITTED</span>
-        <h1>Application submitted</h1>
-        <p className="muted">
-          Thank you. Your application has been received by Bimed Healthcare and the recruitment team can now review it.
-        </p>
-        <div className="success-steps">
-          <article>
-            <strong>1. Send supporting documents</strong>
-            <p>Email them separately to <b>{destinationEmail}</b> and include your full name in the subject line.</p>
-          </article>
-          <article>
-            <strong>2. Watch your inbox</strong>
-            <p>The team will contact you if they need anything else or if they move you to the next stage.</p>
-          </article>
-          <article>
-            <strong>3. Keep your record</strong>
-            <p>Save the confirmation email and keep a copy of your documents for your own records.</p>
-          </article>
-        </div>
-        <div className="notice">
-          <b>Need help?</b> Contact the Bimed recruitment team at <b>{recruitmentContacts.admin}</b>.
+        <div className="success-layout">
+          <div className="success-copy">
+            <span className="pill">SUBMITTED</span>
+            <h1>Application submitted</h1>
+            <p className="muted">
+              Thank you. Your application has been received by Bimed Healthcare and the recruitment team can now review it.
+            </p>
+            <div className="success-steps">
+              <article>
+                <strong>1. Send supporting documents</strong>
+                <p>Email them separately to <b>{destinationEmail}</b> and include your full name in the subject line.</p>
+              </article>
+              <article>
+                <strong>2. Watch your inbox</strong>
+                <p>The team will contact you if they need anything else or if they move you to the next stage.</p>
+              </article>
+              <article>
+                <strong>3. Keep your record</strong>
+                <p>Save the confirmation email and keep a copy of your documents for your own records.</p>
+              </article>
+            </div>
+            <div className="notice">
+              <b>Need help?</b> Contact the Bimed recruitment team at <b>{recruitmentContacts.admin}</b>.
+            </div>
+          </div>
+          <aside className="success-visual">
+            <div className="success-image">
+              <Image
+                src="/bimed/photos/activity-garden.png"
+                alt="Bimed staff and residents gardening together outdoors"
+                fill
+                sizes="(max-width: 700px) 100vw, 360px"
+              />
+            </div>
+            <div className="success-caption">
+              <strong>Warm welcome</strong>
+              <p>Your application is now with the Bimed recruitment team, who will review it with care.</p>
+            </div>
+          </aside>
         </div>
       </section>
     );

@@ -207,6 +207,59 @@ h2 {
   margin-top: 20px;
 }
 
+.success-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 360px);
+  gap: 20px;
+  align-items: start;
+}
+
+.success-copy {
+  min-width: 0;
+}
+
+.success-visual {
+  display: grid;
+  gap: 12px;
+  align-self: stretch;
+}
+
+.success-image {
+  position: relative;
+  min-height: 340px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #dbe8ec;
+  box-shadow: 0 12px 28px rgba(23, 50, 77, 0.08);
+  background: #dfeaf0;
+}
+
+.success-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.success-caption {
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f9fcfd 0%, #eef6f8 100%);
+  border: 1px solid #dbe8ec;
+}
+
+.success-caption strong {
+  display: block;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+
+.success-caption p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+}
+
 .progress {
   height: 8px;
   background: linear-gradient(90deg, #e8eef1, #f2f6f8);
@@ -426,6 +479,80 @@ button:disabled {
 .notes-list li::marker {
   color: var(--teal);
   font-weight: 700;
+}
+
+.life-section {
+  margin-top: 18px;
+}
+
+.life-gallery {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 110px;
+  grid-auto-flow: dense;
+  gap: 14px;
+}
+
+.life-card {
+  position: relative;
+  margin: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #dbe8ec;
+  background: #dfeaf0;
+  box-shadow: 0 12px 26px rgba(23, 50, 77, 0.08);
+}
+
+.life-card.hero {
+  grid-column: span 7;
+  grid-row: span 2;
+  min-height: 234px;
+}
+
+.life-card.tall {
+  grid-column: span 5;
+  grid-row: span 2;
+  min-height: 234px;
+}
+
+.life-card.wide {
+  grid-column: span 6;
+  grid-row: span 1;
+  min-height: 110px;
+}
+
+.life-card.compact {
+  grid-column: span 6;
+  grid-row: span 1;
+  min-height: 110px;
+}
+
+.life-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.life-card figcaption {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: grid;
+  gap: 4px;
+  padding: 16px 16px 14px;
+  background: linear-gradient(180deg, rgba(9, 20, 31, 0) 0%, rgba(9, 20, 31, 0.82) 100%);
+  color: #fff;
+}
+
+.life-card figcaption strong {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.life-card figcaption span {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .detail-row {
@@ -1031,6 +1158,35 @@ button:disabled {
   .stepper {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .life-gallery {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-auto-rows: 120px;
+  }
+
+  .life-card.hero {
+    grid-column: 1 / -1;
+    min-height: 360px;
+  }
+
+  .life-card.tall {
+    grid-column: span 3;
+    min-height: 240px;
+  }
+
+  .life-card.wide,
+  .life-card.compact {
+    grid-column: span 3;
+    min-height: 120px;
+  }
+
+  .success-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .success-image {
+    min-height: 240px;
+  }
 }
 
 @media (max-width: 700px) {
@@ -1046,11 +1202,13 @@ button:disabled {
 
   .top {
     padding: 14px 18px;
+    flex-direction: column;
     align-items: flex-start;
   }
 
   .brand {
     gap: 10px;
+    width: 100%;
   }
 
   .brand img {
@@ -1068,6 +1226,25 @@ button:disabled {
 
   .card {
     padding: 20px;
+  }
+
+  .life-gallery {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+
+  .life-card,
+  .life-card.hero,
+  .life-card.tall,
+  .life-card.wide,
+  .life-card.compact {
+    grid-column: auto;
+    grid-row: auto;
+    min-height: 220px;
+  }
+
+  .success-image {
+    min-height: 220px;
   }
 
   .section-heading {
@@ -1092,6 +1269,7 @@ button:disabled {
 
   .tag {
     text-align: left;
+    width: 100%;
   }
 
   .candidate-summary,
