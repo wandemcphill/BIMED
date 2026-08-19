@@ -1089,6 +1089,14 @@ button:disabled {
   padding: 18px;
 }
 
+.contract-callout {
+  margin-bottom: 18px;
+}
+
+.contract-callout .contract-bullets {
+  margin-top: 10px;
+}
+
 .contract-callout p,
 .contract-body p {
   margin: 8px 0 0;
@@ -1100,6 +1108,88 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin: 18px 0;
+}
+
+.contract-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contract-field {
+  border: 1px solid #dbe8ec;
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfc 100%);
+  display: grid;
+  gap: 6px;
+}
+
+.contract-field span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.contract-field strong {
+  color: var(--navy);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.contract-field small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.contract-placeholder {
+  display: inline;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #ecf8fb;
+  box-shadow: inset 0 0 0 1px #cae7ef;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.contract-schedules {
+  margin-top: 18px;
+}
+
+.contract-schedule-list {
+  display: grid;
+  gap: 16px;
+}
+
+.contract-schedule {
+  border: 1px solid #dbe8ec;
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfc 100%);
+}
+
+.contract-schedule h3 {
+  margin: 0 0 10px;
+  color: var(--navy);
+}
+
+.contract-schedule p:first-of-type {
+  margin-top: 0;
+}
+
+.contract-schedule .contract-bullets {
+  margin-top: 10px;
+}
+
+.contract-schedule .contract-bullets li,
+.contract-callout .contract-bullets li {
+  line-height: 1.55;
+}
+
+.contract-body .contract-intro {
+  margin-bottom: 12px;
 }
 
 .contract-panel h2 {
@@ -1316,6 +1406,10 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .contract-field-grid {
+    grid-template-columns: 1fr;
+  }
+
   .contract-sheet {
     padding: 22px 18px 26px;
   }
@@ -1353,5 +1447,11 @@ button:disabled {
   .contract-callout,
   .contract-panel {
     break-inside: avoid;
+  }
+
+  /* Unfilled blanks must stay obvious on a printed draft. */
+  .contract-placeholder {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
