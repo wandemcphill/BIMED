@@ -12,6 +12,8 @@ Built around Bimed's shortlist-first recruitment workflow: CV arrives by email, 
 - Supporting-document checklist
 - Submission + candidate confirmation email + Bimed notification email
 - Admin dashboard for creating private links and viewing submissions
+- Interview scheduling with invitation, reschedule and cancellation emails
+- Candidate status-update emails and admin password recovery
 - Supabase persistence
 - DB-backed admin accounts and distributed rate limiting
 
@@ -21,12 +23,29 @@ International candidate notifications: overseas@bimedhealthcare.com
 Manager notifications: manager@bimedhealthcare.com
 Admin notifications: info@bimedhealthcare.com
 
+## Transactional email
+Resend is the only outbound email provider and runs server-side only. `RESEND_API_KEY` is
+read exclusively in `lib/email/transport.ts` and must never be exposed through a
+`NEXT_PUBLIC_` variable or committed to Git. See
+[docs/RESEND_EMAIL.md](/D:/BIMED/bimed-recruitment-portal/docs/RESEND_EMAIL.md) for the full
+integration, password-recovery flow, testing and troubleshooting guide.
+
+Without `RESEND_API_KEY` the portal still runs: sends are skipped and logged rather than
+failing a submission.
+
 ## Setup
 1. Create Supabase project and run `supabase/schema.sql`.
 2. Copy `.env.example` to `.env.local` and fill values.
 3. `npm install`
 4. `npm run dev`
 5. Admin: `/admin`
+
+## Checks
+```bash
+npm run typecheck
+npm test
+npm run build
+```
 
 ## Render deployment
 This project is prepared for a Render Web Service.
@@ -50,6 +69,7 @@ Required environment variables on Render:
 - `BIMED_OVERSEAS_RECRUITMENT_EMAIL`
 - `BIMED_MANAGER_EMAIL`
 - `BIMED_ADMIN_EMAIL`
+- `RECRUITMENT_ADMIN_EMAIL` (optional extra internal recipient)
 - `ADMIN_BOOTSTRAP_EMAIL`
 - `ADMIN_BOOTSTRAP_PASSWORD`
 - `ADMIN_BOOTSTRAP_NAME`

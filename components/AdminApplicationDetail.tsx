@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { candidateSupportDocuments, recruitmentStatuses, isInternationalCandidate } from '@/lib/recruitment-config';
+import AdminInterviewPanel from '@/components/AdminInterviewPanel';
 
 type ApplicationRecord = {
   id: string;
@@ -212,7 +213,22 @@ export default function AdminApplicationDetail({
           }
         : current
     );
-    setMessage('Candidate record updated.');
+
+    // Tell the admin whether the status change actually reached the candidate.
+    const statusEmail = nextPayload.statusEmail as { status?: string; reason?: string } | null | undefined;
+    let emailNote = '';
+
+    if (statusEmail?.status === 'sent') {
+      emailNote = ' The candidate has been emailed about the new status.';
+    } else if (statusEmail?.status === 'skipped' && statusEmail.reason === 'not_configured') {
+      emailNote = ' No candidate email was sent: RESEND_API_KEY is not configured.';
+    } else if (statusEmail?.status === 'skipped' && statusEmail.reason === 'duplicate') {
+      emailNote = ' A matching status email was already sent recently, so it was not repeated.';
+    } else if (statusEmail?.status === 'failed') {
+      emailNote = ' The record was saved, but the candidate status email could not be delivered. Check the server logs.';
+    }
+
+    setMessage(`Candidate record updated.${emailNote}`);
   };
 
   if (bootstrapping) {
@@ -257,6 +273,9 @@ export default function AdminApplicationDetail({
           Sign in
         </button>
         {loginError && <div className="error">{loginError}</div>}
+        <p className="muted" style={{ marginTop: 16 }}>
+          <a href="/admin/forgot-password">Forgot your password?</a>
+        </p>
       </section>
     );
   }
@@ -314,6 +333,8 @@ export default function AdminApplicationDetail({
         </button>
         {message && <div className="success" style={{ marginTop: 12 }}>{message}</div>}
       </section>
+
+      <AdminInterviewPanel applicationId={applicationId} onStatusChanged={() => void loadApplication()} />
 
       <div className="detail-grid">
         <section className="subcard">

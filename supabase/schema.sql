@@ -143,3 +143,66 @@ begin
   return next;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Transactional email support (Resend)
+-- ---------------------------------------------------------------------------
+
+-- Single-use, short-lived password reset tokens for admin accounts.
+-- Only the SHA-256 hash of the token is stored, mirroring recruitment_invites.
+create table if not exists recruitment_admin_password_resets (
+  id uuid primary key default gen_random_uuid(),
+  admin_user_id uuid not null references recruitment_admin_users(id) on delete cascade,
+  token_hash text unique not null,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  requested_ip text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists recruitment_admin_password_resets_user_idx
+  on recruitment_admin_password_resets(admin_user_id, created_at desc);
+create index if not exists recruitment_admin_password_resets_expiry_idx
+  on recruitment_admin_password_resets(expires_at);
+
+-- Interview scheduling for the existing "Interview" application status.
+-- One row per interview; rescheduling updates the row and bumps reschedule_count.
+create table if not exists recruitment_interviews (
+  id uuid primary key default gen_random_uuid(),
+  application_id uuid not null references recruitment_applications(id) on delete cascade,
+  scheduled_at timestamptz not null,
+  duration_minutes integer,
+  location text,
+  meeting_link text,
+  interviewer text,
+  candidate_instructions text,
+  status text not null default 'Scheduled',
+  reschedule_count integer not null default 0,
+  cancelled_at timestamptz,
+  cancellation_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists recruitment_interviews_application_idx
+  on recruitment_interviews(application_id, scheduled_at desc);
+
+-- Delivery log used both for observability and for duplicate-send protection.
+-- dedupe_key is unique: a repeated request claiming the same key does not resend.
+create table if not exists recruitment_email_log (
+  id uuid primary key default gen_random_uuid(),
+  dedupe_key text unique not null,
+  email_type text not null,
+  application_id uuid references recruitment_applications(id) on delete set null,
+  recipient_hint text,
+  status text not null default 'pending',
+  provider_message_id text,
+  error_message text,
+  attempts integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists recruitment_email_log_type_idx on recruitment_email_log(email_type, created_at desc);
+create index if not exists recruitment_email_log_application_idx on recruitment_email_log(application_id, created_at desc);
+create index if not exists recruitment_email_log_status_idx on recruitment_email_log(status, created_at desc);

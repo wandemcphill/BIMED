@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { recruitmentStatuses } from '@/lib/recruitment-config';
-import { isAdminRequestAuthenticated } from '@/lib/admin-session';
+import { getAdminSession, isAdminRequestAuthenticated } from '@/lib/admin-session';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
+import { sendApplicationStatusUpdateEmails } from '@/lib/email';
 
 type RouteContext = {
   params: Promise<{
@@ -42,7 +43,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  if (!isAdminRequestAuthenticated(request)) {
+  const session = getAdminSession(request);
+  if (!session) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
   }
 
@@ -54,6 +56,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   const client = db();
+
+  // Read the current status first so a status email is only sent on an actual change.
+  const { data: before } = await client
+    .from('recruitment_applications')
+    .select('status')
+    .eq('id', applicationId)
+    .maybeSingle();
+
+  const previousStatus = before?.status || null;
+
   const updatePayload: Record<string, string> = {
     updated_at: new Date().toISOString(),
   };
@@ -85,12 +97,41 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     applicationId,
     inviteId: data.invite_id,
     eventType: 'admin_application_updated',
-    actor: 'admin',
+    actor: session.email,
     metadata: {
       status: body.status || data.status,
+      previous_status: previousStatus,
       notes_updated: typeof body.notes === 'string',
     },
   });
 
-  return NextResponse.json({ application: data });
+  // Notify only on a real status transition. The record is already saved, so an email
+  // problem is logged by the email service and never fails this request.
+  let statusEmail = null;
+  if (body.status && previousStatus && body.status !== previousStatus) {
+    try {
+      const emails = await sendApplicationStatusUpdateEmails(
+        {
+          application: data,
+          previousStatus,
+          status: body.status,
+          actor: session.email,
+          notifyCandidate: body.notify_candidate !== false,
+        },
+        client
+      );
+      statusEmail = emails.candidate;
+    } catch (emailError) {
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          event: 'email.status_update_unhandled',
+          application_id: applicationId,
+          reason: emailError instanceof Error ? emailError.message : 'unknown',
+        })
+      );
+    }
+  }
+
+  return NextResponse.json({ application: data, statusEmail });
 }

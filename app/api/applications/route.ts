@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashToken } from '@/lib/token';
 import { isInternationalCandidate } from '@/lib/recruitment-config';
-import { sendRecruitmentEmails } from '@/lib/email';
+import { sendApplicationReceivedEmails } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 
@@ -129,7 +129,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await sendRecruitmentEmails(application);
+    // The application is already stored. Email delivery must never fail the submission,
+    // so failures are logged inside the email service and swallowed here.
+    try {
+      await sendApplicationReceivedEmails(application, client);
+    } catch (emailError) {
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          event: 'email.application_received_unhandled',
+          application_id: application.id,
+          reason: emailError instanceof Error ? emailError.message : 'unknown',
+        })
+      );
+    }
 
     return NextResponse.json({ ok: true, id: application.id });
   } catch (error) {

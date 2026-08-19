@@ -233,6 +233,9 @@ export default function AdminDashboard() {
             Sign in
           </button>
           {loginError && <div className="error">{loginError}</div>}
+          <p className="muted" style={{ marginTop: 16 }}>
+            <a href="/admin/forgot-password">Forgot your password?</a>
+          </p>
         </section>
       </main>
     );

@@ -46,6 +46,7 @@ Set these in the Render dashboard:
 - `BIMED_OVERSEAS_RECRUITMENT_EMAIL`
 - `BIMED_MANAGER_EMAIL`
 - `BIMED_ADMIN_EMAIL`
+- `RECRUITMENT_ADMIN_EMAIL` (optional)
 - `ADMIN_BOOTSTRAP_EMAIL`
 - `ADMIN_BOOTSTRAP_PASSWORD`
 - `ADMIN_BOOTSTRAP_NAME`
@@ -111,20 +112,27 @@ Recommended usage:
 
 ## 8. Resend configuration
 
-Use Resend for transactional email.
+Use Resend for transactional email. Full detail lives in
+[RESEND_EMAIL.md](/D:/BIMED/bimed-recruitment-portal/docs/RESEND_EMAIL.md); the deployment
+essentials are:
 
-Required setup:
+1. Store the "BIMED Recruitment Portal" API key in `RESEND_API_KEY` (marked `sync: false`, so
+   Render prompts for it and it is never committed).
+2. Store the sender identity in `RESEND_FROM_EMAIL`, e.g. `noreply@bimedhealthcare.com`.
+3. Set `NEXT_PUBLIC_APP_URL` to the production URL — admin record links and admin
+   password-reset links are built from it.
+4. Optionally set `RECRUITMENT_ADMIN_EMAIL` to add one more internal recipient to every
+   recruitment notification.
 
-1. Create a Resend API key.
-2. Store it in `RESEND_API_KEY`.
-3. Store the sender identity in `RESEND_FROM_EMAIL`.
-4. Verify the `bimedhealthcare.com` sending domain in Resend if Bimed wants mail to come from that domain.
+The `bimedhealthcare.com` sending domain is already verified in Resend (DKIM, SPF MX and SPF
+TXT verified), so no further DNS work is required for sending.
 
 Important:
 
-- Domain verification will require DNS changes under Bimed's control.
+- `RESEND_API_KEY` is server-only. Never prefix it with `NEXT_PUBLIC_`, never commit it, and
+  never place the real value in documentation.
 - Do not change any unrelated DNS records or the existing website.
-- If DNS is not yet approved, keep the sender configurable and use a verified fallback sender for staging.
+- Without the key the portal still runs; email sends are skipped and logged.
 
 ## 9. Custom-domain configuration
 
