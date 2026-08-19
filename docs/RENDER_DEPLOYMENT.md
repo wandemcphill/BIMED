@@ -37,19 +37,33 @@ Set these in the Render dashboard:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_DB_DIRECT_URL`
+- `SUPABASE_DB_SESSION_URL`
+- `SUPABASE_DB_TRANSACTION_URL`
 - `RESEND_API_KEY`
-- `EMAIL_FROM`
-- `ADMIN_PASSWORD`
+- `RESEND_FROM_EMAIL`
+- `BIMED_LOCAL_RECRUITMENT_EMAIL`
+- `BIMED_OVERSEAS_RECRUITMENT_EMAIL`
+- `BIMED_MANAGER_EMAIL`
+- `BIMED_ADMIN_EMAIL`
+- `ADMIN_BOOTSTRAP_EMAIL`
+- `ADMIN_BOOTSTRAP_PASSWORD`
+- `ADMIN_BOOTSTRAP_NAME`
 - `ADMIN_SESSION_SECRET`
-- `ADMIN_NOTIFICATION_EMAIL`
 - `NEXT_PUBLIC_APP_URL`
 
 The Blueprint in [render.yaml](/D:/BIMED/bimed-recruitment-portal/render.yaml) marks the sensitive values with `sync: false`, so Render will prompt for them during initial Blueprint creation instead of storing secrets in Git.
 
 Recommended values:
 
-- `EMAIL_FROM=Bimed Healthcare <info@bimedhealthcare.com>`
-- `ADMIN_NOTIFICATION_EMAIL=info@bimedhealthcare.com`
+- `RESEND_FROM_EMAIL=noreply@bimedhealthcare.com`
+- `BIMED_LOCAL_RECRUITMENT_EMAIL=recruitment@bimedhealthcare.com`
+- `BIMED_OVERSEAS_RECRUITMENT_EMAIL=overseas@bimedhealthcare.com`
+- `BIMED_MANAGER_EMAIL=manager@bimedhealthcare.com`
+- `BIMED_ADMIN_EMAIL=info@bimedhealthcare.com`
+- `ADMIN_BOOTSTRAP_EMAIL=admin@bimedhealthcare.com`
+- `ADMIN_BOOTSTRAP_PASSWORD=<strong temporary bootstrap password>`
+- `ADMIN_BOOTSTRAP_NAME=Bimed Administrator`
 - `NEXT_PUBLIC_APP_URL=https://recruitment.bimedhealthcare.com`
 
 Render already provides `PORT` and `NODE_ENV=production` at runtime.
@@ -103,7 +117,7 @@ Required setup:
 
 1. Create a Resend API key.
 2. Store it in `RESEND_API_KEY`.
-3. Confirm the sender identity in `EMAIL_FROM`.
+3. Store the sender identity in `RESEND_FROM_EMAIL`.
 4. Verify the `bimedhealthcare.com` sending domain in Resend if Bimed wants mail to come from that domain.
 
 Important:
@@ -129,8 +143,9 @@ This keeps the recruitment portal separate from the main Bimed website.
 
 - Keep all secrets in Render environment variables.
 - Never commit `.env.local` or service-role keys.
-- Use a strong, unique `ADMIN_PASSWORD` for the MVP.
-- Replace the password gate with proper authentication before public launch.
+- Use a strong, unique `ADMIN_BOOTSTRAP_PASSWORD` for initial admin creation.
+- Change or remove bootstrap credentials after the first admin account is created.
+- Keep `ADMIN_SESSION_SECRET` long and random.
 - Verify the Supabase service-role key is only used server-side.
 - Keep the health endpoint free of sensitive information.
 - Confirm the Resend sender domain before production mail is enabled.
@@ -147,3 +162,72 @@ Recommended follow-up:
 
 - Add structured logging if Bimed wants audit trails.
 - Review production logs after the first real applications are submitted.
+
+## 12. Render setup checklist
+
+Use this as the exact order to configure the Render Web Service.
+
+### Step 1: Create the service
+
+- Create a new **Web Service** in Render.
+- Connect the GitHub repository.
+- Choose the `render.yaml` Blueprint when prompted.
+
+### Step 2: Confirm runtime settings
+
+- Runtime: **Node**
+- Build command: `npm run build`
+- Start command: `npm run start`
+- Health check path: `/api/health`
+- Region: choose the closest supported region for Bimed's user base
+
+### Step 3: Enter environment variables in this order
+
+Use the same order as the Blueprint below so the dashboard setup stays easy to verify:
+
+1. `NEXT_PUBLIC_SUPABASE_URL`
+2. `SUPABASE_SERVICE_ROLE_KEY`
+3. `SUPABASE_DB_DIRECT_URL`
+4. `SUPABASE_DB_SESSION_URL`
+5. `SUPABASE_DB_TRANSACTION_URL`
+6. `RESEND_API_KEY`
+7. `RESEND_FROM_EMAIL`
+8. `BIMED_LOCAL_RECRUITMENT_EMAIL`
+9. `BIMED_OVERSEAS_RECRUITMENT_EMAIL`
+10. `BIMED_MANAGER_EMAIL`
+11. `BIMED_ADMIN_EMAIL`
+12. `ADMIN_BOOTSTRAP_EMAIL`
+13. `ADMIN_BOOTSTRAP_PASSWORD`
+14. `ADMIN_BOOTSTRAP_NAME`
+15. `ADMIN_SESSION_SECRET`
+16. `NEXT_PUBLIC_APP_URL`
+
+### Step 4: Use these recommended values
+
+- `RESEND_FROM_EMAIL=noreply@bimedhealthcare.com`
+- `BIMED_LOCAL_RECRUITMENT_EMAIL=recruitment@bimedhealthcare.com`
+- `BIMED_OVERSEAS_RECRUITMENT_EMAIL=overseas@bimedhealthcare.com`
+- `BIMED_MANAGER_EMAIL=manager@bimedhealthcare.com`
+- `BIMED_ADMIN_EMAIL=info@bimedhealthcare.com`
+- `ADMIN_BOOTSTRAP_EMAIL=admin@bimedhealthcare.com`
+- `ADMIN_BOOTSTRAP_PASSWORD=<strong temporary bootstrap password>`
+- `ADMIN_BOOTSTRAP_NAME=Bimed Administrator`
+- `NEXT_PUBLIC_APP_URL=https://recruitment.bimedhealthcare.com`
+
+### Step 5: Run the database setup
+
+- Run `supabase/schema.sql` in the Supabase project before the first production deployment.
+- Confirm the admin users table and rate-limit table were created successfully.
+
+### Step 6: Configure the custom domain
+
+- Add `recruitment.bimedhealthcare.com` in Render after the service is created.
+- Keep Bimed's main website unchanged.
+- Allow Render to provision HTTPS after DNS verification.
+
+### Step 7: Final production checks
+
+- Confirm the service builds successfully in Render.
+- Confirm the health check reports `ok: true`.
+- Confirm candidate emails and internal notifications are sent from the configured Resend sender.
+- Confirm all secrets are stored only in Render environment variables.

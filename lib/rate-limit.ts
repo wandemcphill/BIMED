@@ -1,3 +1,5 @@
+import { db } from '@/lib/db';
+
 type RateLimitResult = {
   allowed: boolean;
   remaining: number;
@@ -13,19 +15,6 @@ type RateLimitOptions = {
   };
 };
 
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
-
-declare global {
-  // eslint-disable-next-line no-var
-  var __bimedRateLimitStore: Map<string, RateLimitEntry> | undefined;
-}
-
-const store = globalThis.__bimedRateLimitStore || new Map<string, RateLimitEntry>();
-globalThis.__bimedRateLimitStore = store;
-
 function getClientIp(headers: Headers) {
   const forwardedFor = headers.get('x-forwarded-for');
   if (forwardedFor) {
@@ -35,38 +24,34 @@ function getClientIp(headers: Headers) {
   return headers.get('x-real-ip') || headers.get('cf-connecting-ip') || 'unknown';
 }
 
-export function checkRateLimit(options: RateLimitOptions): RateLimitResult {
+export async function checkRateLimit(options: RateLimitOptions): Promise<RateLimitResult> {
   const clientIp = getClientIp(options.request.headers);
   const bucketKey = `${options.key}:${clientIp}`;
-  const now = Date.now();
-  const existing = store.get(bucketKey);
 
-  if (!existing || existing.resetAt <= now) {
-    store.set(bucketKey, {
-      count: 1,
-      resetAt: now + options.windowMs,
+  try {
+    const client = db();
+    const { data, error } = await client.rpc('check_recruitment_rate_limit', {
+      bucket_key: bucketKey,
+      max_requests: options.limit,
+      window_seconds: Math.max(Math.ceil(options.windowMs / 1000), 1),
     });
 
+    if (error) {
+      throw error;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    return {
+      allowed: Boolean(row?.allowed),
+      remaining: Number(row?.remaining ?? 0),
+      retryAfterSeconds: row?.retry_after_seconds ?? null,
+    };
+  } catch (error) {
+    console.error('Rate limit check failed', error);
     return {
       allowed: true,
-      remaining: Math.max(options.limit - 1, 0),
+      remaining: options.limit,
       retryAfterSeconds: null,
     };
   }
-
-  if (existing.count >= options.limit) {
-    return {
-      allowed: false,
-      remaining: 0,
-      retryAfterSeconds: Math.max(Math.ceil((existing.resetAt - now) / 1000), 1),
-    };
-  }
-
-  existing.count += 1;
-
-  return {
-    allowed: true,
-    remaining: Math.max(options.limit - existing.count, 0),
-    retryAfterSeconds: null,
-  };
 }

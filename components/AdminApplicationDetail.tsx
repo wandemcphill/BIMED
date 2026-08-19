@@ -95,12 +95,14 @@ export default function AdminApplicationDetail({
 }) {
   const [bootstrapping, setBootstrapping] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [message, setMessage] = useState('');
   const [payload, setPayload] = useState<ApplicationPayload | null>(null);
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
 
   const loadApplication = async () => {
     const response = await fetch(`/api/admin/applications/${applicationId}`);
@@ -108,6 +110,7 @@ export default function AdminApplicationDetail({
     if (!response.ok) {
       if (response.status === 401) {
         setAuthenticated(false);
+        setAdminEmail('');
       }
 
       setMessage('Unable to load the candidate record.');
@@ -129,9 +132,11 @@ export default function AdminApplicationDetail({
     const payload = await response.json();
 
     if (payload.authenticated) {
+      setAdminEmail(payload.email || '');
       await loadApplication();
     } else {
       setAuthenticated(false);
+      setAdminEmail('');
       setBootstrapping(false);
     }
   };
@@ -148,16 +153,18 @@ export default function AdminApplicationDetail({
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ email: loginEmail, password }),
     });
 
     const payload = await response.json();
 
     if (!response.ok) {
-      setLoginError(payload.error || 'Incorrect admin password.');
+      setLoginError(payload.error || 'Incorrect admin credentials.');
       return;
     }
 
+    setAdminEmail(payload.email || loginEmail);
+    setLoginEmail('');
     setPassword('');
     setAuthenticated(true);
     await loadApplication();
@@ -167,6 +174,8 @@ export default function AdminApplicationDetail({
     await fetch('/api/admin/session', { method: 'DELETE' });
     setAuthenticated(false);
     setPayload(null);
+    setAdminEmail('');
+    setLoginEmail('');
     setPassword('');
     setLoginError('');
     setMessage('');
@@ -216,10 +225,22 @@ export default function AdminApplicationDetail({
   }
 
   if (!authenticated || !payload) {
-    return (
+      return (
       <section className="card auth-card">
         <h1>Candidate record</h1>
         <p className="muted">Sign in to view the private candidate record.</p>
+        <Field label="Admin email">
+          <input
+            type="email"
+            value={loginEmail}
+            onChange={(event) => setLoginEmail(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                void login();
+              }
+            }}
+          />
+        </Field>
         <Field label="Admin password">
           <input
             type="password"
@@ -255,6 +276,7 @@ export default function AdminApplicationDetail({
           </p>
         </div>
         <div className="toolbar">
+          {adminEmail && <span className="muted">Signed in as {adminEmail}</span>}
           <a className="secondary link-button" href="/admin">
             Back to dashboard
           </a>

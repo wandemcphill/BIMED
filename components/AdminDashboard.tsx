@@ -54,6 +54,7 @@ function Card({
 export default function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(true);
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [dashboardError, setDashboardError] = useState('');
@@ -61,6 +62,7 @@ export default function AdminDashboard() {
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
   const [inviteLink, setInviteLink] = useState('');
   const [inviteForm, setInviteForm] = useState<InviteForm>(emptyInviteForm);
+  const [adminEmail, setAdminEmail] = useState('');
 
   const loadApplications = async () => {
     setLoadingApplications(true);
@@ -71,6 +73,7 @@ export default function AdminDashboard() {
     if (!response.ok) {
       if (response.status === 401) {
         setAuthenticated(false);
+        setAdminEmail('');
       }
 
       setApplications([]);
@@ -90,9 +93,11 @@ export default function AdminDashboard() {
 
     if (payload.authenticated) {
       setAuthenticated(true);
+      setAdminEmail(payload.email || '');
       await loadApplications();
     } else {
       setAuthenticated(false);
+      setAdminEmail('');
     }
 
     setBootstrapping(false);
@@ -129,16 +134,18 @@ export default function AdminDashboard() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ password: loginPassword }),
+      body: JSON.stringify({ email: loginEmail, password: loginPassword }),
     });
 
     const payload = await response.json();
 
     if (!response.ok) {
-      setLoginError(payload.error || 'Incorrect admin password.');
+      setLoginError(payload.error || 'Incorrect admin credentials.');
       return;
     }
 
+    setAdminEmail(payload.email || loginEmail);
+    setLoginEmail('');
     setLoginPassword('');
     setAuthenticated(true);
     await loadApplications();
@@ -149,6 +156,8 @@ export default function AdminDashboard() {
     setAuthenticated(false);
     setApplications([]);
     setInviteLink('');
+    setAdminEmail('');
+    setLoginEmail('');
     setLoginPassword('');
     setLoginError('');
     setDashboardError('');
@@ -168,6 +177,7 @@ export default function AdminDashboard() {
     if (!response.ok) {
       if (response.status === 401) {
         setAuthenticated(false);
+        setAdminEmail('');
       }
 
       setDashboardError(payload.error || 'Unable to create invitation.');
@@ -194,7 +204,19 @@ export default function AdminDashboard() {
       <main className="wrap">
         <section className="card auth-card">
           <h1>Recruitment Admin</h1>
-          <p className="muted">Sign in to open the private recruitment dashboard.</p>
+          <p className="muted">Sign in with your admin account to open the private recruitment dashboard.</p>
+          <Field label="Admin email">
+            <input
+              type="email"
+              value={loginEmail}
+              onChange={(event) => setLoginEmail(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  void login();
+                }
+              }}
+            />
+          </Field>
           <Field label="Admin password">
             <input
               type="password"
@@ -224,6 +246,7 @@ export default function AdminDashboard() {
             <span className="pill">ADMIN DASHBOARD</span>
             <h1>Recruitment Dashboard</h1>
             <p className="muted">{recruitmentCopy.invitationOnly}</p>
+            {adminEmail && <p className="muted">Signed in as {adminEmail}</p>}
           </div>
           <div className="toolbar">
             <button className="secondary" onClick={() => void loadApplications()}>
@@ -300,6 +323,38 @@ export default function AdminDashboard() {
               <li>{recruitmentCopy.supportingDocuments}</li>
               <li>Candidate detail records are available from each row in the table below.</li>
               <li>Status labels remain configurable and can be refined once Bimed confirms the final workflow.</li>
+            </ul>
+          </section>
+        </div>
+
+        <div className="split-grid" style={{ marginTop: 18 }}>
+          <section className="subcard">
+            <h2>Contract templates</h2>
+            <p className="muted">
+              Open the printable role-specific contract shells from the administration area.
+            </p>
+            <div className="stack-links">
+              <a className="secondary link-button" href="/contract-letterhead">
+                Open contract hub
+              </a>
+              <a className="secondary link-button" href="/contract-letterhead/support-worker">
+                Support worker
+              </a>
+              <a className="secondary link-button" href="/contract-letterhead/healthcare-assistant">
+                Healthcare assistant
+              </a>
+              <a className="secondary link-button" href="/contract-letterhead/senior-support-worker">
+                Senior support worker
+              </a>
+            </div>
+          </section>
+
+          <section className="subcard">
+            <h2>Document handling</h2>
+            <ul className="notes-list">
+              <li>Use the printable templates only after Bimed approves the final legal wording.</li>
+              <li>Keep the contract text editable until the final role terms are confirmed.</li>
+              <li>Save each document as PDF before issuing it to a candidate.</li>
             </ul>
           </section>
         </div>

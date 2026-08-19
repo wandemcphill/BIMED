@@ -10,7 +10,7 @@ This note maps the current MVP to the Bimed brief and isolates the pieces that s
 - Ireland vs international branching in the form.
 - No document upload flow.
 - Separate supporting-document email instructions.
-- Basic admin password gate.
+- DB-backed admin accounts and signed admin sessions.
 - Supabase persistence.
 - Candidate confirmation and internal notification emails.
 
@@ -111,7 +111,7 @@ These are the decisions and inputs that should come from Bimed before they are h
 
 - Which recruitment personnel should receive application notifications.
 - Who should have dashboard access.
-- Whether admin access stays password-based for MVP or moves to proper authentication now.
+- Whether extra admin roles beyond the default administrator should be created.
 
 ### 11. Email content
 
@@ -142,6 +142,5 @@ When we start implementing, the safest order is:
 1. Move role and status data into configuration.
 2. Add candidate detail views and editable status updates.
 3. Expand the application data model to match the brief.
-4. Replace the temporary admin password flow with proper authentication later.
+4. Expand admin roles or SSO later if Bimed needs more than one administrator class.
 5. Keep all Bimed-specific wording editable until Bimed confirms it.
-

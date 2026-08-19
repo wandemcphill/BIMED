@@ -20,13 +20,23 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
-      - key: EMAIL_FROM
-        value: Bimed Healthcare <info@bimedhealthcare.com>
-      - key: ADMIN_PASSWORD
+      - key: RESEND_FROM_EMAIL
+        value: noreply@bimedhealthcare.com
+      - key: BIMED_LOCAL_RECRUITMENT_EMAIL
+        value: recruitment@bimedhealthcare.com
+      - key: BIMED_OVERSEAS_RECRUITMENT_EMAIL
+        value: overseas@bimedhealthcare.com
+      - key: BIMED_MANAGER_EMAIL
+        value: manager@bimedhealthcare.com
+      - key: BIMED_ADMIN_EMAIL
+        value: info@bimedhealthcare.com
+      - key: ADMIN_BOOTSTRAP_EMAIL
         sync: false
+      - key: ADMIN_BOOTSTRAP_PASSWORD
+        sync: false
+      - key: ADMIN_BOOTSTRAP_NAME
+        value: Bimed Administrator
       - key: ADMIN_SESSION_SECRET
         sync: false
-      - key: ADMIN_NOTIFICATION_EMAIL
-        value: info@bimedhealthcare.com
       - key: NEXT_PUBLIC_APP_URL
         value: https://recruitment.bimedhealthcare.com

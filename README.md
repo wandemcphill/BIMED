@@ -13,10 +13,13 @@ Built around Bimed's shortlist-first recruitment workflow: CV arrives by email, 
 - Submission + candidate confirmation email + Bimed notification email
 - Admin dashboard for creating private links and viewing submissions
 - Supabase persistence
+- DB-backed admin accounts and distributed rate limiting
 
 ## Email routing
-International candidates: overseas@bimedhealthcare.com
-Ireland-based candidates: info@bimedhealthcare.com
+Local candidate notifications: recruitment@bimedhealthcare.com
+International candidate notifications: overseas@bimedhealthcare.com
+Manager notifications: manager@bimedhealthcare.com
+Admin notifications: info@bimedhealthcare.com
 
 ## Setup
 1. Create Supabase project and run `supabase/schema.sql`.
@@ -38,14 +41,22 @@ Required environment variables on Render:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_DB_DIRECT_URL`
+- `SUPABASE_DB_SESSION_URL`
+- `SUPABASE_DB_TRANSACTION_URL`
 - `RESEND_API_KEY`
-- `EMAIL_FROM`
-- `ADMIN_PASSWORD`
+- `RESEND_FROM_EMAIL`
+- `BIMED_LOCAL_RECRUITMENT_EMAIL`
+- `BIMED_OVERSEAS_RECRUITMENT_EMAIL`
+- `BIMED_MANAGER_EMAIL`
+- `BIMED_ADMIN_EMAIL`
+- `ADMIN_BOOTSTRAP_EMAIL`
+- `ADMIN_BOOTSTRAP_PASSWORD`
+- `ADMIN_BOOTSTRAP_NAME`
 - `ADMIN_SESSION_SECRET`
-- `ADMIN_NOTIFICATION_EMAIL`
 - `NEXT_PUBLIC_APP_URL`
 
 Optional Supabase connection strings are documented in [`.env.example`](/D:/BIMED/bimed-recruitment-portal/.env.example) and [docs/RENDER_DEPLOYMENT.md](/D:/BIMED/bimed-recruitment-portal/docs/RENDER_DEPLOYMENT.md).
 
 ## Production hardening before launch
-Replace the MVP password-based admin session with proper authenticated admin access/MFA; finalize Bimed-approved legal/HR content; confirm backups, monitoring, and retention controls; and keep the portal on a Bimed-controlled subdomain.
+Finalize Bimed-approved legal/HR content; confirm backups, monitoring, and retention controls; verify the Resend sending domain; and keep the portal on a Bimed-controlled subdomain.

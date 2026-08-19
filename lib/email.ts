@@ -1,7 +1,8 @@
 import { Resend } from 'resend';
 import {
-  recruitmentContacts,
   recruitmentCopy,
+  getInternalRecruitmentRecipients,
+  getResendFromEmail,
   supportingDocumentsEmail,
   isInternationalCandidate,
 } from '@/lib/recruitment-config';
@@ -36,17 +37,18 @@ export async function sendRecruitmentEmails(application: {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const international = isInternationalCandidate(application);
   const supportEmail = supportingDocumentsEmail(application);
-  const adminTo = process.env.ADMIN_NOTIFICATION_EMAIL || recruitmentContacts.ireland;
+  const internalRecipients = getInternalRecruitmentRecipients(application);
   const submittedAt = application.submitted_at ? new Date(application.submitted_at) : new Date();
   const submittedLabel = submittedAt.toLocaleString('en-GB', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
   const adminRecordUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin/applications/${application.id}`;
+  const from = getResendFromEmail();
 
   await Promise.allSettled([
     resend.emails.send({
-      from: process.env.EMAIL_FROM || 'Bimed Healthcare <info@bimedhealthcare.com>',
+      from,
       to: application.email,
       subject: recruitmentCopy.candidateConfirmation.subject,
       html: `
@@ -60,24 +62,26 @@ export async function sendRecruitmentEmails(application: {
         <p>Kind regards,<br/>Bimed Healthcare Recruitment Team</p>
       `,
     }),
-    resend.emails.send({
-      from: process.env.EMAIL_FROM || 'Bimed Healthcare <info@bimedhealthcare.com>',
-      to: adminTo,
-      subject: `${recruitmentCopy.adminNotification.subjectPrefix} ${application.full_name}`,
-      html: `
-        <p>New application received in the recruitment portal.</p>
-        <ul>
-          <li><strong>Candidate:</strong> ${escapeHtml(application.full_name)}</li>
-          <li><strong>Email:</strong> ${escapeHtml(application.email)}</li>
-          <li><strong>Phone:</strong> ${escapeHtml(application.phone || '')}</li>
-          <li><strong>Position:</strong> ${escapeHtml(application.role_applied || '')}</li>
-          <li><strong>Country of residence:</strong> ${escapeHtml(application.country_of_residence || '')}</li>
-          <li><strong>Pathway:</strong> ${international ? 'International' : 'Ireland-based'}</li>
-          <li><strong>Work permission:</strong> ${escapeHtml(application.work_permission || '')}</li>
-          <li><strong>Submitted:</strong> ${escapeHtml(submittedLabel)}</li>
-        </ul>
-        <p><strong>Admin record:</strong> <a href="${adminRecordUrl}">${adminRecordUrl}</a></p>
-      `,
-    }),
+    ...internalRecipients.map((to) =>
+      resend.emails.send({
+        from,
+        to,
+        subject: `${recruitmentCopy.adminNotification.subjectPrefix} ${application.full_name}`,
+        html: `
+          <p>New application received in the recruitment portal.</p>
+          <ul>
+            <li><strong>Candidate:</strong> ${escapeHtml(application.full_name)}</li>
+            <li><strong>Email:</strong> ${escapeHtml(application.email)}</li>
+            <li><strong>Phone:</strong> ${escapeHtml(application.phone || '')}</li>
+            <li><strong>Position:</strong> ${escapeHtml(application.role_applied || '')}</li>
+            <li><strong>Country of residence:</strong> ${escapeHtml(application.country_of_residence || '')}</li>
+            <li><strong>Pathway:</strong> ${international ? 'International' : 'Ireland-based'}</li>
+            <li><strong>Work permission:</strong> ${escapeHtml(application.work_permission || '')}</li>
+            <li><strong>Submitted:</strong> ${escapeHtml(submittedLabel)}</li>
+          </ul>
+          <p><strong>Admin record:</strong> <a href="${adminRecordUrl}">${adminRecordUrl}</a></p>
+        `,
+      })
+    ),
   ]);
 }

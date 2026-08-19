@@ -8,7 +8,7 @@ import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimit = checkRateLimit({
+    const rateLimit = await checkRateLimit({
       key: 'candidate-application',
       limit: 12,
       windowMs: 60 * 60 * 1000,
