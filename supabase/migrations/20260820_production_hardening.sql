@@ -108,6 +108,7 @@ declare
   deleted_reset_count integer := 0;
   deleted_rate_count integer := 0;
 begin
+  -- Remove audit records first so application/invite deletion remains FK-safe.
   delete from recruitment_audit_log
   where application_id in (
     select id from recruitment_applications
@@ -115,9 +116,17 @@ begin
       and coalesce(updated_at, submitted_at, now()) < now() - interval '24 months'
   )
   or invite_id in (
-    select id from recruitment_invites
-    where ((used_at is not null and used_at < now() - interval '90 days')
-       or (used_at is null and expires_at is not null and expires_at < now() - interval '90 days'))
+    select i.id
+    from recruitment_invites i
+    where (
+      (i.used_at is not null and i.used_at < now() - interval '90 days')
+      or (i.used_at is null and i.expires_at is not null and i.expires_at < now() - interval '90 days')
+    )
+    and not exists (
+      select 1
+      from recruitment_applications a
+      where a.invite_id = i.id
+    )
   );
 
   delete from recruitment_applications
@@ -125,9 +134,17 @@ begin
     and coalesce(updated_at, submitted_at, now()) < now() - interval '24 months';
   get diagnostics deleted_application_count = row_count;
 
-  delete from recruitment_invites
-  where (used_at is not null and used_at < now() - interval '90 days')
-     or (used_at is null and expires_at is not null and expires_at < now() - interval '90 days');
+  -- Never delete an invitation that is still referenced by a surviving application.
+  delete from recruitment_invites i
+  where (
+    (i.used_at is not null and i.used_at < now() - interval '90 days')
+    or (i.used_at is null and i.expires_at is not null and i.expires_at < now() - interval '90 days')
+  )
+  and not exists (
+    select 1
+    from recruitment_applications a
+    where a.invite_id = i.id
+  );
   get diagnostics deleted_invite_count = row_count;
 
   delete from recruitment_email_log
