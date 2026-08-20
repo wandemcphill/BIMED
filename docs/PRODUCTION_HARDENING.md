@@ -10,6 +10,19 @@ Run `supabase/schema.sql` first, then run:
 
 The migration adds atomic invitation/application creation, administrator session-version revocation, restrictive RLS, and the retention purge function. The application assumes the migration has been applied before deployment.
 
+## Verifying the migration
+
+After applying it, run [supabase/verify_production_hardening.sql](../supabase/verify_production_hardening.sql)
+in the Supabase SQL editor. It is read-only and creates, alters and deletes
+nothing. It returns 24 rows covering the `session_version` column, the three
+RPCs, RLS on all eight recruitment tables, and the RPC grants.
+
+**Every row must report PASS.** Against a database with only `schema.sql`
+applied it reports 22 failures, including `check_recruitment_rate_limit` still
+being executable by `anon`, `authenticated` and `public` — Postgres grants
+EXECUTE to PUBLIC by default, and the migration is what revokes it. A run that
+is not all-PASS means the portal must not be treated as live.
+
 ## Retention policy implemented
 
 The scheduled purge job currently uses these defaults:
@@ -36,7 +49,7 @@ No Resend key is required by the retention service.
 Before treating the portal as live:
 
 1. Apply the database migration in the production Supabase project.
-2. Confirm RLS is enabled on all recruitment tables.
+2. Run `supabase/verify_production_hardening.sql` and confirm all 24 rows report PASS (this covers RLS on every recruitment table and the RPC grants).
 3. Confirm the Render web service has the production environment variables.
 4. Confirm the retention cron service is created and completes successfully.
 5. Confirm Resend sender/domain verification remains active.
