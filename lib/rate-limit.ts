@@ -49,9 +49,10 @@ export async function checkRateLimit(options: RateLimitOptions): Promise<RateLim
   } catch (error) {
     console.error('Rate limit check failed', error);
     return {
-      allowed: true,
-      remaining: options.limit,
-      retryAfterSeconds: null,
+      // Do not silently disable abuse protection during a database outage.
+      allowed: false,
+      remaining: 0,
+      retryAfterSeconds: 60,
     };
   }
 }
