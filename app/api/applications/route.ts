@@ -1,125 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashToken } from '@/lib/token';
-import { isInternationalCandidate } from '@/lib/recruitment-config';
 import { sendApplicationReceivedEmails } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
+import { MAX_JSON_BYTES, readJsonBody, validateCandidateApplication } from '@/lib/request-validation';
+
+function databaseInviteError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  if (message.includes('INVITATION_USED')) return { error: 'This invitation has already been used.', status: 409 };
+  if (message.includes('INVITATION_EXPIRED')) return { error: 'This invitation has expired.', status: 410 };
+  if (message.includes('INVITATION_NOT_FOUND')) return { error: 'Invitation not found.', status: 404 };
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimit = await checkRateLimit({
-      key: 'candidate-application',
-      limit: 12,
-      windowMs: 60 * 60 * 1000,
-      request: req,
-    });
-
+    const rateLimit = await checkRateLimit({ key: 'candidate-application', limit: 12, windowMs: 60 * 60 * 1000, request: req });
     if (!rateLimit.allowed) {
-      const init: ResponseInit = { status: 429 };
-      if (rateLimit.retryAfterSeconds) {
-        init.headers = {
-          'Retry-After': String(rateLimit.retryAfterSeconds),
-        };
-      }
-
-      return NextResponse.json({ error: 'Too many submissions from this network. Please try again later.' }, init);
+      return NextResponse.json(
+        { error: 'Too many submissions from this network. Please try again later.' },
+        { status: 429, headers: rateLimit.retryAfterSeconds ? { 'Retry-After': String(rateLimit.retryAfterSeconds) } : undefined },
+      );
     }
 
-    const body = await req.json();
+    const bodyResult = await readJsonBody(req, MAX_JSON_BYTES.candidateApplication);
+    if (!bodyResult.ok) return NextResponse.json({ error: bodyResult.error }, { status: 400 });
 
-    if (!body.token) {
-      return NextResponse.json({ error: 'Invalid invitation.' }, { status: 400 });
-    }
+    const validation = validateCandidateApplication(bodyResult.data);
+    if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
 
     const client = db();
-    const { data: invite, error: inviteError } = await client
-      .from('recruitment_invites')
-      .select('*')
-      .eq('token_hash', hashToken(body.token))
-      .single();
+    const payload = validation.data;
+    const { data: application, error: applicationError } = await client.rpc('create_recruitment_application', {
+      p_token_hash: hashToken(String(payload.token)),
+      p_payload: payload,
+    });
 
-    if (inviteError || !invite) {
-      return NextResponse.json({ error: 'Invitation not found.' }, { status: 404 });
-    }
-
-    if (invite.used_at) {
-      return NextResponse.json({ error: 'This invitation has already been used.' }, { status: 409 });
-    }
-
-    if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
-      return NextResponse.json({ error: 'This invitation has expired.' }, { status: 410 });
-    }
-
-    if (!body.full_name || !body.email || !body.country_of_residence || !body.role_applied || !body.living_in_ireland || !body.consent) {
-      return NextResponse.json({ error: 'Required fields are missing.' }, { status: 400 });
-    }
-
-    const international = isInternationalCandidate(body);
-
-    if (international) {
-      if (!body.current_country || !body.work_permission || !body.requires_employment_permit || !body.relocation_readiness) {
-        return NextResponse.json({ error: 'International pathway questions are incomplete.' }, { status: 400 });
-      }
-    }
-
-    const payload = {
-      invite_id: invite.id,
-      full_name: body.full_name,
-      preferred_name: body.preferred_name || null,
-      email: body.email,
-      phone: body.phone || null,
-      date_of_birth: body.date_of_birth || null,
-      nationality: body.nationality || null,
-      country_of_residence: body.country_of_residence || null,
-      address: body.address || null,
-      role_applied: body.role_applied,
-      employment_type: body.employment_type || null,
-      availability: body.availability || null,
-      start_date: body.start_date || null,
-      driving_licence: body.driving_licence || null,
-      vehicle_access: body.vehicle_access || null,
-      care_experience: body.care_experience || null,
-      qualifications: body.qualifications || null,
-      training: body.training || null,
-      professional_experience: body.professional_experience || null,
-      employment_history: body.employment_history || null,
-      employment_gaps: body.employment_gaps || null,
-      professional_references: body.references || null,
-      living_in_ireland: body.living_in_ireland || null,
-      current_country: body.current_country || null,
-      work_permission: body.work_permission || null,
-      requires_employment_permit: body.requires_employment_permit || null,
-      international_experience: body.international_experience || null,
-      relocation_readiness: body.relocation_readiness || null,
-      supporting_documents: body.supporting_documents || [],
-      consent: true,
-      status: 'Submitted',
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data: application, error: applicationError } = await client
-      .from('recruitment_applications')
-      .insert(payload)
-      .select('*')
-      .single();
-
-    if (applicationError) {
-      throw applicationError;
-    }
-
-    const { error: markUsedError } = await client
-      .from('recruitment_invites')
-      .update({ used_at: new Date().toISOString() })
-      .eq('id', invite.id);
-
-    if (markUsedError) {
-      throw markUsedError;
+    if (applicationError || !application) {
+      const mapped = databaseInviteError(applicationError);
+      if (mapped) return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+      throw applicationError || new Error('Application creation failed.');
     }
 
     await recordRecruitmentAudit(client, {
       applicationId: application.id,
-      inviteId: invite.id,
+      inviteId: application.invite_id,
       eventType: 'application_submitted',
       actor: 'candidate',
       metadata: {
@@ -129,19 +55,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // The application is already stored. Email delivery must never fail the submission,
-    // so failures are logged inside the email service and swallowed here.
     try {
       await sendApplicationReceivedEmails(application, client);
     } catch (emailError) {
-      console.error(
-        JSON.stringify({
-          level: 'error',
-          event: 'email.application_received_unhandled',
-          application_id: application.id,
-          reason: emailError instanceof Error ? emailError.message : 'unknown',
-        })
-      );
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'email.application_received_unhandled',
+        application_id: application.id,
+        reason: emailError instanceof Error ? emailError.message : 'unknown',
+      }));
     }
 
     return NextResponse.json({ ok: true, id: application.id });
