@@ -4,63 +4,41 @@ import { hashToken, makeToken } from '@/lib/token';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { isAdminRequestAuthenticated } from '@/lib/admin-session';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
+import { readJsonBody, validateInvite } from '@/lib/input-validation';
 
 export async function POST(request: NextRequest) {
-  if (!isAdminRequestAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
-  }
+  if (!(await isAdminRequestAuthenticated(request))) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
 
-  const rateLimit = await checkRateLimit({
-    key: 'admin-invite',
-    limit: 20,
-    windowMs: 60 * 60 * 1000,
-    request,
-  });
-
+  const rateLimit = await checkRateLimit({ key: 'admin-invite', limit: 20, windowMs: 60 * 60 * 1000, request });
   if (!rateLimit.allowed) {
-    const init: ResponseInit = { status: 429 };
-    if (rateLimit.retryAfterSeconds) {
-      init.headers = {
-        'Retry-After': String(rateLimit.retryAfterSeconds),
-      };
-    }
-
-    return NextResponse.json({ error: 'Too many invitation requests. Please try again later.' }, init);
+    return NextResponse.json({ error: 'Too many invitation requests. Please try again later.' }, {
+      status: 429,
+      headers: rateLimit.retryAfterSeconds ? { 'Retry-After': String(rateLimit.retryAfterSeconds) } : undefined,
+    });
   }
 
-  const body = await request.json();
-
-  if (!body.email) {
-    return NextResponse.json({ error: 'Candidate email is required.' }, { status: 400 });
-  }
+  const parsed = await readJsonBody(request, 16 * 1024);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const validation = validateInvite(parsed.value);
+  if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
 
   const token = makeToken();
   const client = db();
-  const { data, error } = await client
-    .from('recruitment_invites')
-    .insert({
-      token_hash: hashToken(token),
-      candidate_email: body.email,
-      candidate_name: body.name || null,
-      role: body.role || null,
-      expires_at: body.expiryDate || null,
-    })
-    .select('*')
-    .single();
+  const { data, error } = await client.from('recruitment_invites').insert({
+    token_hash: hashToken(token),
+    candidate_email: validation.value.email,
+    candidate_name: validation.value.name,
+    role: validation.value.role,
+    expires_at: validation.value.expiryDate ? `${validation.value.expiryDate}T23:59:59.999Z` : null,
+  }).select('*').single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: 'Unable to create invitation.' }, { status: 500 });
 
   await recordRecruitmentAudit(client, {
     inviteId: data.id,
     eventType: 'invite_created',
     actor: 'admin',
-    metadata: {
-      candidate_email: body.email,
-      role: body.role || null,
-      expires_at: body.expiryDate || null,
-    },
+    metadata: { role: validation.value.role, expires_at: validation.value.expiryDate || null },
   });
 
   return NextResponse.json({
