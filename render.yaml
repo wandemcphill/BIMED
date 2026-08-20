@@ -42,3 +42,15 @@ services:
         sync: false
       - key: NEXT_PUBLIC_APP_URL
         value: https://recruitment.bimedhealthcare.com
+
+  - type: cron
+    name: bimed-recruitment-retention
+    runtime: node
+    schedule: "0 3 * * *"
+    buildCommand: npm ci
+    startCommand: node scripts/run-retention.mjs
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
