@@ -8,6 +8,7 @@ type AdminUser = {
   display_name: string | null;
   role: string;
   active: boolean;
+  session_version: number;
 };
 
 type BootstrapCredentials = {
@@ -32,24 +33,15 @@ export function hashAdminPassword(password: string, salt = crypto.randomBytes(16
 
 export function verifyAdminPassword(password: string, storedHash: string) {
   const [algorithm, iterationsRaw, salt, derivedKey] = storedHash.split('$');
-
-  if (algorithm !== HASH_ALGORITHM || !iterationsRaw || !salt || !derivedKey) {
-    return false;
-  }
+  if (algorithm !== HASH_ALGORITHM || !iterationsRaw || !salt || !derivedKey) return false;
 
   const iterations = Number.parseInt(iterationsRaw, 10);
-  if (!Number.isFinite(iterations) || iterations <= 0) {
-    return false;
-  }
+  if (!Number.isFinite(iterations) || iterations <= 0) return false;
 
   const expectedKey = crypto.pbkdf2Sync(password, salt, iterations, HASH_KEY_LENGTH, HASH_DIGEST).toString('base64url');
   const expectedBuffer = Buffer.from(expectedKey);
   const derivedBuffer = Buffer.from(derivedKey);
-
-  if (expectedBuffer.length !== derivedBuffer.length) {
-    return false;
-  }
-
+  if (expectedBuffer.length !== derivedBuffer.length) return false;
   return crypto.timingSafeEqual(expectedBuffer, derivedBuffer);
 }
 
@@ -57,16 +49,8 @@ export function getBootstrapAdminCredentials(): BootstrapCredentials | null {
   const email = process.env.ADMIN_BOOTSTRAP_EMAIL?.trim();
   const password = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim();
   const displayName = process.env.ADMIN_BOOTSTRAP_NAME?.trim() || 'Bimed Administrator';
-
-  if (!email || !password) {
-    return null;
-  }
-
-  return {
-    email: normalizeEmail(email),
-    password,
-    displayName,
-  };
+  if (!email || !password) return null;
+  return { email: normalizeEmail(email), password, displayName };
 }
 
 async function createBootstrapAdmin(client: SupabaseClient, credentials: BootstrapCredentials) {
@@ -82,10 +66,7 @@ async function createBootstrapAdmin(client: SupabaseClient, credentials: Bootstr
     .select('*')
     .single();
 
-  if (error) {
-    throw error;
-  }
-
+  if (error) throw error;
   return data as AdminUser;
 }
 
@@ -97,23 +78,18 @@ export async function authenticateAdminUser(client: SupabaseClient, email: strin
     .eq('email', normalizedEmail)
     .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
   if (adminUser && adminUser.active && verifyAdminPassword(password, adminUser.password_hash)) {
     await client
       .from('recruitment_admin_users')
       .update({ last_login_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', adminUser.id);
-
     return adminUser as AdminUser;
   }
 
   const { data: existingAdmins, error: countError } = await client.from('recruitment_admin_users').select('id').limit(1);
-  if (countError) {
-    throw countError;
-  }
+  if (countError) throw countError;
 
   const bootstrapCredentials = getBootstrapAdminCredentials();
   if (

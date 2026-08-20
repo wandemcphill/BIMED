@@ -1,9 +1,7 @@
 name: CI
 
-# Validation only. Deployment is handled by Render's own commit trigger
-# (see render.yaml autoDeployTrigger), so this workflow deliberately does not deploy.
-# It also never sends email: the test suite stubs the Resend transport and no
-# RESEND_API_KEY is provided to this job.
+# Validation only. Deployment is handled by Render's own commit trigger.
+# The test suite stubs the Resend transport and does not receive a live API key.
 
 on:
   push:
@@ -24,7 +22,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Typecheck
         run: npm run typecheck

@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import type { NextRequest, NextResponse } from 'next/server';
+import { db } from './db';
 
 const COOKIE_NAME = 'bimed_admin_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
@@ -8,6 +9,7 @@ export type AdminSession = {
   admin_user_id: string;
   email: string;
   role: string;
+  session_version: number;
   exp: number;
   nonce: string;
 };
@@ -31,73 +33,79 @@ function signPayload(encodedPayload: string, secret: string) {
 function safeEqual(left: string, right: string) {
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
-
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
-
+  if (leftBuffer.length !== rightBuffer.length) return false;
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-export function createAdminSessionToken(admin: Pick<AdminSession, 'admin_user_id' | 'email' | 'role'>) {
+export function createAdminSessionToken(
+  admin: Pick<AdminSession, 'admin_user_id' | 'email' | 'role' | 'session_version'>,
+) {
   const secret = getSessionSecret();
-
-  if (!secret) {
-    throw new Error('ADMIN_SESSION_SECRET is required.');
-  }
+  if (!secret) throw new Error('ADMIN_SESSION_SECRET is required.');
 
   const payload: AdminSession = {
     admin_user_id: admin.admin_user_id,
     email: admin.email,
     role: admin.role,
+    session_version: admin.session_version,
     exp: Date.now() + SESSION_TTL_SECONDS * 1000,
     nonce: crypto.randomBytes(16).toString('base64url'),
   };
 
   const encodedPayload = encodePayload(payload);
-  const signature = signPayload(encodedPayload, secret);
-
-  return `${encodedPayload}.${signature}`;
+  return `${encodedPayload}.${signPayload(encodedPayload, secret)}`;
 }
 
 export function verifyAdminSessionToken(token: string | undefined | null) {
-  if (!token) {
-    return null;
-  }
-
+  if (!token) return null;
   const secret = getSessionSecret();
-  if (!secret) {
-    return null;
-  }
+  if (!secret) return null;
 
   const [encodedPayload, signature] = token.split('.');
-  if (!encodedPayload || !signature) {
-    return null;
-  }
+  if (!encodedPayload || !signature) return null;
 
-  const expectedSignature = signPayload(encodedPayload, secret);
-  if (!safeEqual(signature, expectedSignature)) {
-    return null;
-  }
+  if (!safeEqual(signature, signPayload(encodedPayload, secret))) return null;
 
   try {
     const payload = decodePayload(encodedPayload);
-    if (payload.role !== 'admin' || payload.exp <= Date.now()) {
+    if (
+      payload.role !== 'admin' ||
+      payload.exp <= Date.now() ||
+      !Number.isInteger(payload.session_version) ||
+      payload.session_version < 1
+    ) {
       return null;
     }
-
     return payload;
   } catch {
     return null;
   }
 }
 
-export function getAdminSession(request: NextRequest) {
-  return verifyAdminSessionToken(request.cookies.get(COOKIE_NAME)?.value);
+export async function getAdminSession(request: NextRequest) {
+  const tokenSession = verifyAdminSessionToken(request.cookies.get(COOKIE_NAME)?.value);
+  if (!tokenSession) return null;
+
+  try {
+    const { data: account, error } = await db()
+      .from('recruitment_admin_users')
+      .select('id,email,role,active,session_version')
+      .eq('id', tokenSession.admin_user_id)
+      .maybeSingle();
+
+    if (error || !account || !account.active) return null;
+    if (account.role !== 'admin') return null;
+    if (account.email !== tokenSession.email) return null;
+    if (account.session_version !== tokenSession.session_version) return null;
+
+    return tokenSession;
+  } catch {
+    return null;
+  }
 }
 
-export function isAdminRequestAuthenticated(request: NextRequest) {
-  return Boolean(getAdminSession(request));
+export async function isAdminRequestAuthenticated(request: NextRequest) {
+  return Boolean(await getAdminSession(request));
 }
 
 export function setAdminSessionCookie(response: NextResponse, token: string) {

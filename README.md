@@ -17,6 +17,18 @@ Built around Bimed's shortlist-first recruitment workflow: CV arrives by email, 
 - Supabase persistence
 - DB-backed admin accounts and distributed rate limiting
 
+## Production hardening
+The `production-hardening` branch adds:
+- atomic invitation consumption and application creation
+- fail-closed rate limiting
+- bounded JSON request bodies and server-side input validation
+- server-side admin account-state checks and session-version revocation
+- restrictive RLS on recruitment tables
+- production security headers
+- scheduled recruitment-data retention cleanup
+
+Before deployment, apply `supabase/schema.sql` and then `supabase/migrations/20260820_production_hardening.sql` to the production Supabase project. See `docs/PRODUCTION_HARDENING.md` for the launch gate and retention periods.
+
 ## Email routing
 Local candidate notifications: recruitment@bimedhealthcare.com
 International candidate notifications: overseas@bimedhealthcare.com
@@ -35,10 +47,11 @@ failing a submission.
 
 ## Setup
 1. Create Supabase project and run `supabase/schema.sql`.
-2. Copy `.env.example` to `.env.local` and fill values.
-3. `npm install`
-4. `npm run dev`
-5. Admin: `/admin`
+2. Run `supabase/migrations/20260820_production_hardening.sql`.
+3. Copy `.env.example` to `.env.local` and fill values.
+4. `npm install`
+5. `npm run dev`
+6. Admin: `/admin`
 
 ## Checks
 ```bash
@@ -48,15 +61,16 @@ npm run build
 ```
 
 ## Render deployment
-This project is prepared for a Render Web Service.
+This project is prepared for a Render Web Service plus a daily retention Cron Job.
 
 - Blueprint: [`render.yaml`](/D:/BIMED/bimed-recruitment-portal/render.yaml)
-- Build command: `npm run build`
-- Start command: `npm run start`
+- Web build command: `npm run build`
+- Web start command: `npm run start`
 - Health check: `GET /api/health`
 - Primary domain: `recruitment.bimedhealthcare.com`
+- Retention schedule: `03:00 UTC` daily
 
-Required environment variables on Render:
+Required environment variables on the web service:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
@@ -76,7 +90,12 @@ Required environment variables on Render:
 - `ADMIN_SESSION_SECRET`
 - `NEXT_PUBLIC_APP_URL`
 
+The retention Cron Job requires:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
 Optional Supabase connection strings are documented in [`.env.example`](/D:/BIMED/bimed-recruitment-portal/.env.example) and [docs/RENDER_DEPLOYMENT.md](/D:/BIMED/bimed-recruitment-portal/docs/RENDER_DEPLOYMENT.md).
 
 ## Production hardening before launch
-Finalize Bimed-approved legal/HR content; confirm backups, monitoring, and retention controls; verify the Resend sending domain; and keep the portal on a Bimed-controlled subdomain.
+Finalize Bimed-approved legal/HR content; confirm the approved recruitment-data retention periods; verify backups and monitoring; verify the Resend sending domain; apply the production database migration; confirm the retention Cron Job succeeds; and keep the portal on a Bimed-controlled subdomain.
