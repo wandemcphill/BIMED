@@ -4,6 +4,7 @@ Built around Bimed's shortlist-first recruitment workflow: CV arrives by email, 
 
 ## MVP features
 - Private invitation tokens, hashed in database
+- Atomic single-use invitation consumption
 - Mobile-first Bimed-styled candidate portal
 - Seven-step guided application
 - Ireland vs international pathway
@@ -14,8 +15,10 @@ Built around Bimed's shortlist-first recruitment workflow: CV arrives by email, 
 - Admin dashboard for creating private links and viewing submissions
 - Interview scheduling with invitation, reschedule and cancellation emails
 - Candidate status-update emails and admin password recovery
-- Supabase persistence
-- DB-backed admin accounts and distributed rate limiting
+- Supabase persistence with RLS defense-in-depth
+- Database-backed admin sessions with revocation and account-state checking
+- Distributed rate limiting that fails closed
+- Server-side request schemas and bounded request payloads
 
 ## Email routing
 Local candidate notifications: recruitment@bimedhealthcare.com
@@ -34,7 +37,8 @@ Without `RESEND_API_KEY` the portal still runs: sends are skipped and logged rat
 failing a submission.
 
 ## Setup
-1. Create Supabase project and run `supabase/schema.sql`.
+1. Create Supabase project and run `supabase/schema.sql`. Re-run it after upgrades so the
+   transactional invitation function, RLS, admin sessions and retention procedure are applied.
 2. Copy `.env.example` to `.env.local` and fill values.
 3. `npm install`
 4. `npm run dev`
@@ -47,16 +51,27 @@ npm test
 npm run build
 ```
 
-## Render deployment
-This project is prepared for a Render Web Service.
+## Data retention
+The production policy retains recruitment applications and related records for 730 days by
+default. Email delivery logs are retained for 180 days, expired password-reset records for 30
+days, rate-limit buckets for 3 days and used/expired invitations for 90 days. A Render cron job runs
+the Supabase `purge_recruitment_data` function daily at 03:00 UTC.
 
-- Blueprint: [`render.yaml`](/D:/BIMED/bimed-recruitment-portal/render.yaml)
+Set `RECRUITMENT_RETENTION_DAYS` only to an approved Bimed policy value between 30 and 3650 days.
+Do not enable automated deletion before Bimed has approved the retention period for its legal and
+HR requirements.
+
+## Render deployment
+This project is prepared for a Render Web Service plus a scheduled retention Cron Job.
+
+- Web blueprint: [`render.yaml`](/D:/BIMED/bimed-recruitment-portal/render.yaml)
 - Build command: `npm run build`
 - Start command: `npm run start`
 - Health check: `GET /api/health`
 - Primary domain: `recruitment.bimedhealthcare.com`
+- Retention schedule: daily at `03:00 UTC`
 
-Required environment variables on Render:
+Required environment variables on the web service:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
@@ -76,7 +91,22 @@ Required environment variables on Render:
 - `ADMIN_SESSION_SECRET`
 - `NEXT_PUBLIC_APP_URL`
 
-Optional Supabase connection strings are documented in [`.env.example`](/D:/BIMED/bimed-recruitment-portal/.env.example) and [docs/RENDER_DEPLOYMENT.md](/D:/BIMED/bimed-recruitment-portal/docs/RENDER_DEPLOYMENT.md).
+The retention Cron Job additionally requires:
 
-## Production hardening before launch
-Finalize Bimed-approved legal/HR content; confirm backups, monitoring, and retention controls; verify the Resend sending domain; and keep the portal on a Bimed-controlled subdomain.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `RECRUITMENT_RETENTION_DAYS`
+
+## Production hardening and validation
+Before first launch, apply `supabase/schema.sql` to the production Supabase database, confirm the
+Resend sending domain, confirm the approved retention period, and verify backups and monitoring.
+
+CI must pass `npm ci`, typecheck, tests and production build. After deployment, verify:
+
+1. `/api/health` responds successfully.
+2. Admin login creates a session and logout revokes it.
+3. A candidate invitation can be used exactly once, including under concurrent submission attempts.
+4. A complete candidate submission creates the application and expected email notifications.
+5. Status and interview notifications work.
+6. Password recovery works and old sessions are invalidated after password reset.
+7. The retention cron can execute the database purge function successfully.
