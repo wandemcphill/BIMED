@@ -8,9 +8,10 @@ import {
 import { authenticateAdminUser } from '@/lib/admin-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { db } from '@/lib/db';
+import { MAX_JSON_BYTES, readJsonBody, validateAdminLogin } from '@/lib/request-validation';
 
 export async function GET(request: NextRequest) {
-  const session = getAdminSession(request);
+  const session = await getAdminSession(request);
   return NextResponse.json({
     authenticated: Boolean(session),
     email: session?.email || null,
@@ -20,41 +21,29 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const rateLimit = await checkRateLimit({
-      key: 'admin-session',
-      limit: 8,
-      windowMs: 60 * 60 * 1000,
-      request,
-    });
-
+    const rateLimit = await checkRateLimit({ key: 'admin-session', limit: 8, windowMs: 60 * 60 * 1000, request });
     if (!rateLimit.allowed) {
-      const init: ResponseInit = { status: 429 };
-      if (rateLimit.retryAfterSeconds) {
-        init.headers = {
-          'Retry-After': String(rateLimit.retryAfterSeconds),
-        };
-      }
-
-      return NextResponse.json({ error: 'Too many login attempts. Please try again later.' }, init);
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429, headers: rateLimit.retryAfterSeconds ? { 'Retry-After': String(rateLimit.retryAfterSeconds) } : undefined },
+      );
     }
 
-    const body = await request.json();
+    const bodyResult = await readJsonBody(request, MAX_JSON_BYTES.admin);
+    if (!bodyResult.ok) return NextResponse.json({ error: bodyResult.error }, { status: 400 });
 
-    if (!body.email || !body.password) {
-      return NextResponse.json({ error: 'Admin email and password are required.' }, { status: 400 });
-    }
+    const validation = validateAdminLogin(bodyResult.data);
+    if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
 
-    const admin = await authenticateAdminUser(db(), body.email, body.password);
-
-    if (!admin) {
-      return NextResponse.json({ error: 'Incorrect admin email or password.' }, { status: 401 });
-    }
+    const admin = await authenticateAdminUser(db(), validation.data.email, validation.data.password);
+    if (!admin) return NextResponse.json({ error: 'Incorrect admin email or password.' }, { status: 401 });
 
     const response = NextResponse.json({ ok: true, email: admin.email });
     const token = createAdminSessionToken({
       admin_user_id: admin.id,
       email: admin.email,
       role: admin.role,
+      session_version: admin.session_version,
     });
     setAdminSessionCookie(response, token);
     return response;
