@@ -4,7 +4,7 @@ The Bimed recruitment portal should be deployed as a **Render Web Service**, not
 
 Repository-managed Blueprint:
 
-- [render.yaml](/D:/BIMED/bimed-recruitment-portal/render.yaml)
+- [render.yaml](../render.yaml)
 
 Expected public domain:
 
@@ -53,7 +53,7 @@ Set these in the Render dashboard:
 - `ADMIN_SESSION_SECRET`
 - `NEXT_PUBLIC_APP_URL`
 
-The Blueprint in [render.yaml](/D:/BIMED/bimed-recruitment-portal/render.yaml) marks the sensitive values with `sync: false`, so Render will prompt for them during initial Blueprint creation instead of storing secrets in Git.
+The Blueprint in [render.yaml](../render.yaml) marks the sensitive values with `sync: false`, so Render will prompt for them during initial Blueprint creation instead of storing secrets in Git.
 
 Recommended values:
 
@@ -113,7 +113,7 @@ Recommended usage:
 ## 8. Resend configuration
 
 Use Resend for transactional email. Full detail lives in
-[RESEND_EMAIL.md](/D:/BIMED/bimed-recruitment-portal/docs/RESEND_EMAIL.md); the deployment
+[RESEND_EMAIL.md](RESEND_EMAIL.md); the deployment
 essentials are:
 
 1. Store the "BIMED Recruitment Portal" API key in `RESEND_API_KEY` (marked `sync: false`, so
