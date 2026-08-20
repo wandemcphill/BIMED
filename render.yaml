@@ -47,7 +47,7 @@ services:
     name: bimed-recruitment-retention
     runtime: node
     schedule: "0 3 * * *"
-    buildCommand: npm ci
+    buildCommand: npm ci --legacy-peer-deps
     startCommand: node scripts/run-retention.mjs
     envVars:
       - key: NEXT_PUBLIC_SUPABASE_URL
