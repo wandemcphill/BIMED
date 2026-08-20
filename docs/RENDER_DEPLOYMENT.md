@@ -22,8 +22,14 @@ Do not change Bimed's main website or DNS configuration beyond the records requi
 ## 2. Build command
 
 ```bash
-npm run build
+npm ci --legacy-peer-deps && npm run build
 ```
+
+Render does not install dependencies for you. Its build command "performs all
+compilation and dependency installation that's necessary for your service to
+run", so a build command of `npm run build` alone fails: `next` is not on disk
+yet. Keep the install step in the command, and keep it identical to the CI
+install so production resolves the same dependency tree.
 
 ## 3. Start command
 
