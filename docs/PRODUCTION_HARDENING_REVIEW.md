@@ -13,7 +13,7 @@ This repo now builds successfully and is suitable for a Render deployment, but a
 - Candidate detail view with editable status and notes.
 - Render blueprint and health check endpoint.
 - Server-only Resend integration with retries, timeouts, structured logging and DB-backed
-  duplicate-send protection (see [RESEND_EMAIL.md](/D:/BIMED/bimed-recruitment-portal/docs/RESEND_EMAIL.md)).
+  duplicate-send protection (see [RESEND_EMAIL.md](RESEND_EMAIL.md)).
 - Candidate emails for submission, status change, and interview invitation/reschedule/cancellation.
 - Interview scheduling against the existing `Interview` status.
 - Single-use, short-lived admin password recovery with no account enumeration.

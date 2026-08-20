@@ -16,12 +16,14 @@ This note maps the current MVP to the Bimed brief and isolates the pieces that s
 
 Relevant files:
 
-- [app/api/applications/route.ts](/D:/BIMED/bimed-recruitment-portal/app/api/applications/route.ts)
-- [app/api/admin/invites/route.ts](/D:/BIMED/bimed-recruitment-portal/app/api/admin/invites/route.ts)
-- [app/api/admin/applications/route.ts](/D:/BIMED/bimed-recruitment-portal/app/api/admin/applications/route.ts)
-- [components/CandidateForm.tsx](/D:/BIMED/bimed-recruitment-portal/components/CandidateForm.tsx)
-- [lib/email.ts](/D:/BIMED/bimed-recruitment-portal/lib/email.ts)
-- [supabase/schema.sql](/D:/BIMED/bimed-recruitment-portal/supabase/schema.sql)
+- [app/api/applications/route.ts](../app/api/applications/route.ts)
+- [app/api/admin/invites/route.ts](../app/api/admin/invites/route.ts)
+- [app/api/admin/applications/route.ts](../app/api/admin/applications/route.ts)
+- [components/CandidateForm.tsx](../components/CandidateForm.tsx)
+- [lib/email/index.ts](../lib/email/index.ts)
+- [lib/email/templates.ts](../lib/email/templates.ts)
+- [lib/email/transport.ts](../lib/email/transport.ts)
+- [supabase/schema.sql](../supabase/schema.sql)
 
 ## Bimed-specific information still required
 

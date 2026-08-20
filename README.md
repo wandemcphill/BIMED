@@ -39,7 +39,7 @@ Admin notifications: info@bimedhealthcare.com
 Resend is the only outbound email provider and runs server-side only. `RESEND_API_KEY` is
 read exclusively in `lib/email/transport.ts` and must never be exposed through a
 `NEXT_PUBLIC_` variable or committed to Git. See
-[docs/RESEND_EMAIL.md](/D:/BIMED/bimed-recruitment-portal/docs/RESEND_EMAIL.md) for the full
+[docs/RESEND_EMAIL.md](docs/RESEND_EMAIL.md) for the full
 integration, password-recovery flow, testing and troubleshooting guide.
 
 Without `RESEND_API_KEY` the portal still runs: sends are skipped and logged rather than
@@ -63,7 +63,7 @@ npm run build
 ## Render deployment
 This project is prepared for a Render Web Service plus a daily retention Cron Job.
 
-- Blueprint: [`render.yaml`](/D:/BIMED/bimed-recruitment-portal/render.yaml)
+- Blueprint: [`render.yaml`](render.yaml)
 - Web build command: `npm run build`
 - Web start command: `npm run start`
 - Health check: `GET /api/health`
@@ -95,7 +95,7 @@ The retention Cron Job requires:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-Optional Supabase connection strings are documented in [`.env.example`](/D:/BIMED/bimed-recruitment-portal/.env.example) and [docs/RENDER_DEPLOYMENT.md](/D:/BIMED/bimed-recruitment-portal/docs/RENDER_DEPLOYMENT.md).
+Optional Supabase connection strings are documented in [`.env.example`](.env.example) and [docs/RENDER_DEPLOYMENT.md](docs/RENDER_DEPLOYMENT.md).
 
 ## Production hardening before launch
 Finalize Bimed-approved legal/HR content; confirm the approved recruitment-data retention periods; verify backups and monitoring; verify the Resend sending domain; apply the production database migration; confirm the retention Cron Job succeeds; and keep the portal on a Bimed-controlled subdomain.
