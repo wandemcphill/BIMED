@@ -76,7 +76,6 @@ alter table if exists recruitment_applications add column if not exists professi
 alter table if exists recruitment_applications add column if not exists admin_notes text;
 alter table if exists recruitment_applications add column if not exists updated_at timestamptz default now();
 
--- Normalize existing audit FKs so retention can remove aged recruitment data safely.
 alter table if exists recruitment_audit_log drop constraint if exists recruitment_audit_log_application_id_fkey;
 alter table if exists recruitment_audit_log drop constraint if exists recruitment_audit_log_invite_id_fkey;
 alter table if exists recruitment_audit_log add constraint recruitment_audit_log_application_id_fkey foreign key (application_id) references recruitment_applications(id) on delete set null;
@@ -134,7 +133,9 @@ begin
   return application_id;
 end; $$;
 revoke all on function consume_and_create_recruitment_application(text, jsonb) from public;
+grant execute on function consume_and_create_recruitment_application(text, jsonb) to service_role;
 revoke all on function check_recruitment_rate_limit(text, integer, integer) from public;
+grant execute on function check_recruitment_rate_limit(text, integer, integer) to service_role;
 
 create or replace function purge_recruitment_data(
   p_application_retention_days integer default 730, p_email_log_retention_days integer default 180,
@@ -156,3 +157,4 @@ begin
   return jsonb_build_object('applications_deleted', applications_deleted, 'invites_deleted', invites_deleted, 'audit_deleted', audit_deleted, 'interviews_deleted', interviews_deleted, 'email_logs_deleted', email_logs_deleted, 'sessions_deleted', sessions_deleted, 'password_resets_deleted', resets_deleted, 'rate_limits_deleted', rate_limits_deleted);
 end; $$;
 revoke all on function purge_recruitment_data(integer, integer, integer, integer, integer) from public;
+grant execute on function purge_recruitment_data(integer, integer, integer, integer, integer) to service_role;
