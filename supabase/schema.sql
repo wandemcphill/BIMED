@@ -94,9 +94,9 @@ create index if not exists recruitment_admin_users_email_idx on recruitment_admi
 create index if not exists recruitment_rate_limits_updated_idx on recruitment_rate_limits(updated_at desc);
 
 create or replace function check_recruitment_rate_limit(
-  bucket_key text,
-  max_requests integer,
-  window_seconds integer
+  p_bucket_key text,
+  p_max_requests integer,
+  p_window_seconds integer
 )
 returns table (
   allowed boolean,
@@ -111,10 +111,12 @@ declare
   now_ts timestamptz := now();
   current_window_start timestamptz;
   current_count integer;
-  window_interval interval := make_interval(secs => greatest(window_seconds, 1));
+  window_interval interval := make_interval(secs => greatest(p_window_seconds, 1));
 begin
+  -- Parameters are p_-prefixed: naming one `bucket_key` collided with the column of
+  -- the same name and made `on conflict (bucket_key)` ambiguous (SQLSTATE 42702).
   insert into recruitment_rate_limits (bucket_key, window_start, request_count, updated_at)
-  values (bucket_key, now_ts, 1, now_ts)
+  values (p_bucket_key, now_ts, 1, now_ts)
   on conflict (bucket_key) do update
   set request_count = case
     when recruitment_rate_limits.window_start < now_ts - window_interval then 1
@@ -128,8 +130,8 @@ begin
   returning window_start, request_count
   into current_window_start, current_count;
 
-  allowed := current_count <= greatest(max_requests, 1);
-  remaining := greatest(greatest(max_requests, 1) - current_count, 0);
+  allowed := current_count <= greatest(p_max_requests, 1);
+  remaining := greatest(greatest(p_max_requests, 1) - current_count, 0);
 
   if allowed then
     retry_after_seconds := null;
