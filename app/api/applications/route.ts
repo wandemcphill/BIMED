@@ -6,8 +6,20 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { MAX_JSON_BYTES, readJsonBody, validateCandidateApplication } from '@/lib/request-validation';
 
-function databaseInviteError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error || '');
+// Supabase RPC errors are PostgrestError objects ({ code, message, details, hint }),
+// never instances of the JS Error class, so `error instanceof Error` never matches
+// them here -- every invitation-state error fell through to a generic 500 instead
+// of the intended 409/410/404.
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && typeof (error as { message?: unknown }).message === 'string') {
+    return (error as { message: string }).message;
+  }
+  return String(error || '');
+}
+
+export function databaseInviteError(error: unknown) {
+  const message = errorMessage(error);
   if (message.includes('INVITATION_USED')) return { error: 'This invitation has already been used.', status: 409 };
   if (message.includes('INVITATION_EXPIRED')) return { error: 'This invitation has expired.', status: 410 };
   if (message.includes('INVITATION_NOT_FOUND')) return { error: 'Invitation not found.', status: 404 };
