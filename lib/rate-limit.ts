@@ -30,10 +30,12 @@ export async function checkRateLimit(options: RateLimitOptions): Promise<RateLim
 
   try {
     const client = db();
+    // Parameter names are p_-prefixed: the unprefixed `bucket_key` collided with the
+    // column of the same name and made every call fail with SQLSTATE 42702.
     const { data, error } = await client.rpc('check_recruitment_rate_limit', {
-      bucket_key: bucketKey,
-      max_requests: options.limit,
-      window_seconds: Math.max(Math.ceil(options.windowMs / 1000), 1),
+      p_bucket_key: bucketKey,
+      p_max_requests: options.limit,
+      p_window_seconds: Math.max(Math.ceil(options.windowMs / 1000), 1),
     });
 
     if (error) {
