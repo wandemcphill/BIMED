@@ -8,7 +8,7 @@ export default function EmploymentContractDocument({ template }: { template: Con
     <EmploymentContractLetterhead>
       <section className="contract-section">
         <div className="contract-actions">
-          <span className="pill">WORKING TEMPLATE</span>
+          <span className="pill">CONTRACT OF EMPLOYMENT</span>
           <PrintContractButton />
         </div>
 
@@ -27,15 +27,15 @@ export default function EmploymentContractDocument({ template }: { template: Con
           </div>
           <div>
             <span>Version</span>
-            <strong>Draft for Bimed review</strong>
+            <strong>Final</strong>
           </div>
         </div>
 
-        <h1>{template.roleLabel} Employment Contract Template</h1>
+        <h1>{template.roleLabel} Employment Contract</h1>
         <p className="contract-intro">{template.intro}</p>
 
         <div className="contract-callout">
-          <strong>Drafting notes</strong>
+          <strong>Notes</strong>
           <ul className="contract-bullets">
             {template.templateNotes.map((note) => (
               <li key={note}>{withPlaceholders(note)}</li>
@@ -45,7 +45,7 @@ export default function EmploymentContractDocument({ template }: { template: Con
 
         <div className="contract-grid">
           <div className="contract-panel">
-            <h2>How to use this template</h2>
+            <h2>How this document is issued</h2>
             <ul className="contract-bullets">
               {template.howToUse.map((point) => (
                 <li key={point}>{withPlaceholders(point)}</li>
@@ -54,7 +54,7 @@ export default function EmploymentContractDocument({ template }: { template: Con
           </div>
 
           <div className="contract-panel">
-            <h2>Editable fields</h2>
+            <h2>Employee details</h2>
             <div className="contract-field-grid">
               {template.editableFields.map((field) => (
                 <div className="contract-field" key={field.label}>
@@ -116,18 +116,25 @@ export default function EmploymentContractDocument({ template }: { template: Con
         <section className="contract-signatures">
           <div>
             <span>For Bimed Healthcare Limited</span>
-            <div className="signature-line" />
-            <strong>Authorised signatory</strong>
+            <div className="signature-line signature-line-signed">{template.employerSignatory.name}</div>
+            <strong>{template.employerSignatory.name}</strong>
+            <small>{template.employerSignatory.title}</small>
+            <small>Dated: {formatSignatureDate()}</small>
           </div>
           <div>
             <span>Employee</span>
             <div className="signature-line" />
             <strong>{withPlaceholders('[Insert employee name]')}</strong>
+            <small>Dated: [Insert date signed]</small>
           </div>
         </section>
       </section>
     </EmploymentContractLetterhead>
   );
+}
+
+function formatSignatureDate(): string {
+  return new Date().toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 const placeholderPattern = /(\[[^[\]]+\])/g;

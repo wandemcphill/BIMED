@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: 'Print-ready support worker contract template for Bimed Healthcare',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function SupportWorkerContractPage() {
   const template = getContractTemplate('support-worker');
   if (!template) {

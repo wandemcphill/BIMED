@@ -381,8 +381,10 @@ button,
   min-height: 44px;
 }
 
-button.primary {
+button.primary,
+a.primary.link-button {
   background: var(--blue);
+  color: #fff;
 }
 
 button.secondary,
@@ -1229,6 +1231,21 @@ button:disabled {
   border-bottom: 1px solid #9db3bd;
   height: 30px;
   margin: 6px 0 8px;
+}
+
+.signature-line-signed {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 4px;
+  font-family: 'Brush Script MT', cursive;
+  font-size: 22px;
+  color: var(--navy);
+}
+
+.contract-signatures small {
+  display: block;
+  color: #5b7480;
+  margin-top: 2px;
 }
 
 @media (max-width: 920px) {

@@ -10,6 +10,11 @@ export type ContractSection = {
   bullets?: string[];
 };
 
+export type ContractSignatory = {
+  name: string;
+  title: string;
+};
+
 export type ContractTemplate = {
   roleSlug: string;
   roleLabel: string;
@@ -22,6 +27,7 @@ export type ContractTemplate = {
   sections: ContractSection[];
   schedules: ContractSection[];
   closingNote: string;
+  employerSignatory: ContractSignatory;
 };
 
 const section = (heading: string, paragraphs: string[], bullets?: string[]): ContractSection => ({
@@ -30,24 +36,56 @@ const section = (heading: string, paragraphs: string[], bullets?: string[]): Con
   bullets,
 });
 
-function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): ContractTemplate {
+// All employment contracts are signed on behalf of Bimed Healthcare Limited by this signatory.
+// The signature block auto-fills the name and today's date - see EmploymentContractDocument.
+const employerSignatory: ContractSignatory = {
+  name: 'Dezou Maurice',
+  title: 'Authorised Signatory, Bimed Healthcare Limited',
+};
+
+type RoleTerms = {
+  workLocation: string;
+  workLocationShort: string;
+  contractedHours: string;
+  workingSchedule: string;
+  overtime: string;
+  pay: string;
+  payFrequency: string;
+};
+
+function buildTemplate(
+  roleLabel: string,
+  roleSlug: string,
+  roleGroup: string,
+  roleTerms?: RoleTerms
+): ContractTemplate {
+  const workLocation =
+    roleTerms?.workLocation ??
+    'a Bimed-assigned client home or care facility within the Dublin area';
+  const workLocationShort = roleTerms?.workLocationShort ?? 'Dublin, Ireland (assigned client location)';
+  const contractedHours = roleTerms?.contractedHours ?? '39 hours per week';
+  const workingSchedule =
+    roleTerms?.workingSchedule ??
+    'rostered shifts according to the requirements of the assigned client or facility, which may include mornings, afternoons, evenings, nights, weekends and public holidays';
+  const overtime =
+    roleTerms?.overtime ??
+    'any overtime is subject to the applicable employment contract, roster requirements and Irish employment legislation; where overtime or premium rates apply, these will be clearly stated in the employment contract';
+  const pay = roleTerms?.pay ?? '[Insert pay rate for this role]';
+  const payFrequency = roleTerms?.payFrequency ?? 'monthly';
+
   return {
     roleSlug,
     roleLabel,
-    documentTitle: 'Contract of Employment - Template',
+    documentTitle: 'Contract of Employment',
     effectiveDate: '18 August 2026',
-    intro: 'Republic of Ireland - Care & Support Worker Roles - Drafted 18 August 2026',
+    intro: 'Republic of Ireland - Care & Support Worker Roles',
     templateNotes: [
-      'This is a working template, not a finished, signable contract.',
-      'Fields shown in bracketed text need to be completed or confirmed by Bimed before use.',
-      'It is built around the statutory minimum entitlements that apply in Ireland today and standard care-sector practice.',
-      'SOLICITOR REVIEW RECOMMENDED: Bimed should have an Irish employment solicitor review and sign off the final version before issue, especially Clause 24 and Schedule 1.',
-      'Irish law requires a Day 5 Statement of core terms within 5 days of an employee starting work, and the fuller statement within 1 month. In practice, most employers issue the full contract on or before day one.',
+      'This contract is built around the statutory minimum entitlements that apply in Ireland today and standard care-sector practice.',
+      'Irish law requires a Day 5 Statement of core terms within 5 days of an employee starting work, and the fuller statement within 1 month. This contract is issued on or before day one.',
     ],
     howToUse: [
-      'Every fill-in-the-blank is wrapped in square brackets and highlighted on screen. Complete or confirm each one for the role or employee before issue, and remove the brackets once filled in.',
-      'This template is designed to satisfy the Terms of Employment (Information) Acts 1994-2015, as amended by the Employment (Miscellaneous Provisions) Act 2018 and the European Union (Transparent and Predictable Working Conditions) Regulations 2022.',
-      'Replace the bracketed fields below before issue and keep the final signed copy on file.',
+      'This document is designed to satisfy the Terms of Employment (Information) Acts 1994-2015, as amended by the Employment (Miscellaneous Provisions) Act 2018 and the European Union (Transparent and Predictable Working Conditions) Regulations 2022.',
+      'Complete the employee-specific fields below before issue and keep the final signed copy on file.',
     ],
     editableFields: [
       { label: 'Employee name', value: '[Insert employee name]', note: 'Replace with the employee full legal name.' },
@@ -55,10 +93,10 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
       { label: 'Job title', value: roleLabel, note: 'Use the agreed role title.' },
       { label: 'Line manager', value: '[Insert line manager name/title]', note: 'Replace with the reporting line.' },
       { label: 'Start date', value: '[Insert start date]', note: 'Confirm the commencement date.' },
-      { label: 'Work location', value: '[Insert work location]', note: 'Use the normal place of work or main client area.' },
-      { label: 'Contracted hours', value: '[XX hours per week]', note: 'Confirm the weekly hours before issue.' },
-      { label: 'Pay', value: '[Insert pay rate]', note: 'Add hourly or annual pay as agreed.' },
-      { label: 'Pay frequency', value: '[weekly / fortnightly / monthly]', note: 'Choose the actual payroll cycle.' },
+      { label: 'Work location', value: workLocationShort, note: 'Use the normal place of work or main client area.' },
+      { label: 'Contracted hours', value: contractedHours, note: 'Confirm the weekly hours before issue.' },
+      { label: 'Pay', value: pay, note: 'Add hourly or annual pay as agreed.' },
+      { label: 'Pay frequency', value: payFrequency, note: 'Choose the actual payroll cycle.' },
       { label: 'Role group', value: roleGroup, note: 'Internal role grouping for this template.' },
     ],
     sections: [
@@ -71,7 +109,7 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
         '1.2 You will report to [line manager name/title], or such other person as the Company may notify to you.',
         '1.3 Your duties are set out in Schedule 2 (Job Description) to this contract. The Company may reasonably amend your duties from time to time, consistent with your role, skills and grade, and will notify you of any material change in writing.',
         "1.4 You must carry out your duties to a professional and safe standard, consistent with Bimed's policies, relevant professional and regulatory standards, and the individual care plan of each client to whom you are assigned.",
-        '1.5 You must not carry out any duty outside the scope of your training, competence or role, including: [list any duties workers must not perform - e.g. administering injections, driving a client\'s own vehicle, handling a client\'s bank cards or PIN unsupervised].',
+        '1.5 You must not carry out any duty outside the scope of your training, competence or role, including administering injections, driving a client\'s own vehicle, or handling a client\'s bank cards or PIN unsupervised.',
       ]),
       section('2. Commencement of Employment and Probation', [
         '2.1 Your employment begins on [start date] ("the Commencement Date").',
@@ -81,48 +119,48 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
         '2.5 The Company will confirm the successful completion of your probation to you in writing.',
       ]),
       section('3. Place of Work', [
-        '3.1 Your normal place of work is [client homes / Bimed office address] within the [Dublin / Cork / Limerick] area, and any other location the Company may reasonably require, given the nature of home and domiciliary care work.',
-        '3.2 You may be required to travel between client locations in the course of your duties. [Confirm whether a mileage/travel allowance applies, and at what rate.]',
+        `3.1 Your normal place of work is ${workLocation}, and any other location the Company may reasonably require, given the nature of home and domiciliary care work.`,
+        '3.2 You may be required to travel between client locations in the course of your duties. No mileage or travel allowance applies unless separately agreed in writing.',
       ]),
       section('4. Hours of Work', [
-        '4.1 Your normal working hours are [XX hours per week], as set out in your work schedule, which may include early, late, weekend and night/sleepover shifts [if applicable].',
+        `4.1 Your normal working hours are ${contractedHours}, as set out in your work schedule, ${workingSchedule}.`,
         '4.2 Your hours of work will not exceed an average of 48 hours per week, calculated over a 4-month reference period, in accordance with the Organisation of Working Time Act 1997.',
         '4.3 You are entitled to a 15-minute break where you have worked more than 4.5 hours, and a 30-minute break (which may include the first) where you have worked more than 6 hours. You are entitled to 11 consecutive hours\' rest in each 24-hour period, and 24 consecutive hours\' rest (preceded by the 11-hour daily rest) in each 7-day period.',
         '4.4 Where your work pattern is wholly or mostly unpredictable, the Company will give you reasonable notice - at least 24 hours where reasonably practicable - of any work assignment. You may refuse a work assignment given with less than 24 hours\' notice, without penalty, except in genuine emergencies.',
         '4.5 Where the Company cancels a scheduled work assignment with less than 24 hours\' notice, you may be entitled to compensation under the Organisation of Working Time Act 1997 (as amended).',
         '4.6 If, over a 12-month reference period, the hours you actually work do not reflect the hours set out in this contract, you may be entitled to request to be placed in a band of hours that better reflects your actual pattern of work, under the Employment (Miscellaneous Provisions) Act 2018.',
-        '4.7 Overtime: [state Company overtime policy and rate, if any] - there is no statutory entitlement to overtime pay in Ireland, so this is the Company\'s choice.',
+        `4.7 Overtime: ${overtime}.`,
       ]),
       section('5. Remuneration', [
-        '5.1 Your pay is [EUR __ per hour / EUR __ per annum], payable [weekly / fortnightly / monthly] by bank transfer, on or before the [Xth] of each pay period.',
+        `5.1 Your pay is ${pay}, payable ${payFrequency} by bank transfer, on or before the last working day of each pay period.`,
         '5.2 Where you hold an employment permit for this Role, your pay will not be reduced below the minimum salary required to keep that permit valid (currently EUR 32,691 per annum for Healthcare Assistant / Home Support Worker roles) - see also Schedule 1.',
         '5.3 The Company will deduct PAYE, PRSI and USC as required by law. No other deduction will be made from your pay without your prior written consent, except as permitted by the Payment of Wages Act 1991.',
-        '5.4 Pay will be reviewed [annually / at the Company\'s discretion], but the Company does not guarantee any increase.',
+        '5.4 Pay is reviewed at the Company\'s discretion. The Company does not guarantee any increase.',
       ]),
       section('6. Annual Leave and Public Holidays', [
-        '6.1 Your annual leave entitlement is 4 working weeks (20 days) [or the Company\'s chosen higher amount] per leave year (1 January - 31 December), accruing in proportion to hours worked, under the Organisation of Working Time Act 1997.',
+        '6.1 Your annual leave entitlement is 4 working weeks (20 days) per leave year (1 January - 31 December), accruing in proportion to hours worked, under the Organisation of Working Time Act 1997.',
         '6.2 You are entitled to the 10 public holidays currently recognised in Ireland (New Year\'s Day, St Brigid\'s Day, St Patrick\'s Day, Easter Monday, the first Mondays of May, June and August, the October Bank Holiday, Christmas Day and St Stephen\'s Day). Where you are required to work on a public holiday, you will receive, at the Company\'s discretion, an additional day\'s pay, a paid day off in lieu, or an extra day of annual leave.',
-        '6.3 Annual leave requests must be submitted with at least [X] weeks\' notice and are subject to the Company\'s approval, taking account of client care needs and staffing levels.',
+        '6.3 Annual leave requests must be submitted with at least 4 weeks\' notice and are subject to the Company\'s approval, taking account of client care needs and staffing levels.',
         '6.4 Untaken annual leave may not normally be carried over beyond the leave year, except where required by law (for example, due to illness or other statutory leave).',
       ]),
       section('7. Sick Leave', [
-        '7.1 If you are unable to attend work due to illness, you must notify [manager/office contact] as early as possible, and in any event before [shift start time], and provide a medical certificate for absences of more than [X] days, or as otherwise required by the Company.',
+        '7.1 If you are unable to attend work due to illness, you must notify your line manager as early as possible, and in any event before the start of your shift, and provide a medical certificate for absences of more than 2 days, or as otherwise required by the Company.',
         '7.2 Provided you have at least 13 weeks of continuous service, you are entitled to statutory sick leave under the Sick Leave Act 2022: currently 5 paid sick days per calendar year, paid at 70% of normal daily earnings, capped at EUR 110 per day, and subject to medical certification.',
-        '7.3 [Confirm whether the Company offers only the statutory scheme above, or additional contractual sick pay - insert details.]',
+        '7.3 The Company offers the statutory sick leave scheme set out above and does not currently provide additional contractual sick pay.',
         '7.4 Given the nature of care work, you must not attend work, or attend a client, while suffering from an illness that could put a client at risk, and must follow the Company\'s infection control policy.',
       ]),
       section('8. Other Statutory Leave', [
-        '8.1 You may also be entitled to maternity, paternity, parental, adoptive, carer\'s, force majeure, domestic violence, and other statutory leave, in accordance with the relevant legislation in force from time to time. Details are available from [Office/HR contact] or in the Employee Handbook.',
+        '8.1 You may also be entitled to maternity, paternity, parental, adoptive, carer\'s, force majeure, domestic violence, and other statutory leave, in accordance with the relevant legislation in force from time to time. Details are available from the Company or in the Employee Handbook.',
       ]),
       section('9. Pension', [
-        '9.1 [Confirm the Company\'s current pension position - e.g. participation in the State\'s Automatic Enrolment Retirement Savings System once commenced, and/or any existing Company pension scheme.]',
+        '9.1 The Company participates in the State\'s Automatic Enrolment Retirement Savings System once commenced, and does not otherwise operate a separate Company pension scheme at this time.',
       ]),
       section('10. Training', [
         '10.1 The Company will provide any mandatory training you need to safely and lawfully carry out your Role (which may include manual handling, safeguarding, medication management, infection control, and any QQI-related training). Where such training is legally required for your job, it will be provided free of charge, will count as working time, and will be paid - and will take place during working hours where possible.',
         '10.2 You must complete all mandatory training within the timeframe notified to you and keep your certifications current.',
       ]),
       section('11. Notice and Termination', [
-        '11.1 After probation, the notice you must give the Company to resign is 1 week [or Company\'s chosen longer period]. The minimum notice the Company must give you, based on your length of continuous service, is set out below (Minimum Notice and Terms of Employment Acts 1973-2005).',
+        '11.1 After probation, the notice you must give the Company to resign is 1 week. The minimum notice the Company must give you, based on your length of continuous service, is set out below (Minimum Notice and Terms of Employment Acts 1973-2005).',
         '11.2 The Company may end your employment without notice or payment in lieu, in cases of gross misconduct, following a fair disciplinary process (see Clause 13).',
         '11.3 The Company may choose to pay you in lieu of notice, at its discretion.',
         '11.4 Where your right to work depends on an employment permit, your employment will also end automatically if that permit lapses, is revoked, or is not renewed - see Schedule 1.',
@@ -140,7 +178,7 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
       ]),
       section('14. Data Protection', [
         '14.1 The Company processes your personal data as data controller, under the GDPR and the Data Protection Act 2018, for purposes connected with your employment - including payroll, performance management, and compliance with legal obligations such as Garda vetting and, where relevant, employment permit compliance. Full details are in the Company\'s Employee Privacy Notice, provided to you separately.',
-        '14.2 You must comply with the Company\'s data protection policy at all times, including in relation to client personal data and special category data such as health information, and must report any actual or suspected data breach to [Office/DPO contact] immediately.',
+        '14.2 You must comply with the Company\'s data protection policy at all times, including in relation to client personal data and special category data such as health information, and must report any actual or suspected data breach to the Company immediately.',
       ]),
       section('15. Health and Safety', [
         '15.1 The Company will take all reasonably practicable steps to protect your safety, health and welfare at work, under the Safety, Health and Welfare at Work Act 2005.',
@@ -161,7 +199,7 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
       ]),
       section('19. Company Property and Uniform', [
         '19.1 Any equipment, keys, identification, uniform, or documentation given to you remains the Company\'s property and must be returned immediately on request or when your employment ends.',
-        '19.2 [Insert uniform/dress code details, if any apply.]',
+        '19.2 Where the Company issues a uniform, you must wear it while on duty and keep it clean and presentable.',
       ]),
       section('20. Outside Employment (Parallel Employment)', [
         '20.1 Under the European Union (Transparent and Predictable Working Conditions) Regulations 2022, the Company will not stop you taking up other employment outside your work schedule with the Company.',
@@ -177,8 +215,7 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
         '23.1 You have the right to make a protected disclosure about relevant wrongdoing under the Protected Disclosures Act 2014 (as amended by the Protected Disclosures (Amendment) Act 2022), without being penalised for doing so. Details of the Company\'s reporting channels are in the Employee Handbook.',
       ]),
       section('24. Restrictive Covenant (Non-Solicitation of Clients)', [
-        'DRAFTING NOTE - SOLICITOR REVIEW RECOMMENDED: The enforceability of any post-termination restriction depends on it protecting a genuine, legitimate business interest and being no wider than reasonably necessary in duration, geography and scope. This clause should be reviewed by a solicitor and tailored to the specific role before use, and may not be appropriate, or worth including, for lower-paid, non-managerial roles.',
-        '24.1 For [3-6] months after your employment ends, you must not solicit or accept the business of any Bimed client you personally provided care to in the 6 months before your employment ended, other than in a purely personal capacity unconnected with any new employer or agency.',
+        '24.1 For 3 months after your employment ends, you must not solicit or accept the business of any Bimed client you personally provided care to in the 6 months before your employment ended, other than in a purely personal capacity unconnected with any new employer or agency.',
       ]),
       section('25. Variation', [
         '25.1 The Company may make reasonable changes to your terms of employment from time to time (for example, to reflect changes in the law, client needs, or business requirements), and will notify you of any material change in writing, in accordance with the Terms of Employment (Information) Acts 1994-2015.',
@@ -192,7 +229,7 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
     schedules: [
       section('Schedule 1 - Additional Terms for Employment Permit Holders (Overseas Employees)', [
         'This Schedule applies in addition to, and does not replace, the main body of this contract, where your right to work in Ireland depends on an employment permit.',
-        '1. Your employment, and its continuation, is conditional on you holding a valid employment permit for this Role at all times. The Company [will apply for / has applied for] a General Employment Permit on your behalf, valid from [date] to [date].',
+        '1. Your employment, and its continuation, is conditional on you holding a valid employment permit for this Role at all times. The Company will apply for a General Employment Permit on your behalf, valid from your start date.',
         '2. You must not start work until your employment permit has been granted and you have given the Company a copy of it.',
         '3. The salary in Clause 5 will not be reduced below the minimum salary the Department of Enterprise, Tourism and Employment requires to keep your permit valid (currently EUR 32,691 per annum for this Role).',
         '4. The Company will not deduct the cost of your employment permit application or any recruitment fees from your pay, and will not retain your personal documents, including your passport, in accordance with Irish employment permit law.',
@@ -217,7 +254,7 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
         'Assisting with, but not directly handling, a client\'s bills and finances, in line with the Company\'s safeguarding policy',
       ]),
       section('Schedule 2A - Role-Specific Notes', [
-        '[Insert: minimum experience required, mandatory training/qualifications, any duties the employee must NOT perform, and any driving requirement.]',
+        'Minimum experience, mandatory training/qualifications, and any driving requirement for this role are set out in the recruitment role profile and confirmed to the employee before their start date.',
       ]),
       section('Schedule 3 - Quick-Reference Compliance Checklist', [
         "For Bimed's internal use before issuing any contract:",
@@ -234,6 +271,7 @@ function buildTemplate(roleLabel: string, roleSlug: string, roleGroup: string): 
     ],
     closingNote:
       'Employee acknowledgement: I confirm that I have received, read, and understood this contract of employment (including Schedule 1, where it applies) and the Employee Handbook referred to in it.',
+    employerSignatory,
   };
 }
 
@@ -246,7 +284,19 @@ export const contractTemplates: ContractTemplate[] = [
   buildTemplate(
     'Healthcare Assistant',
     'healthcare-assistant',
-    'Clinical support role'
+    'Clinical support role',
+    {
+      workLocation:
+        'a Bimed-assigned residential care facility in the Dublin area (Bimed Healthcare provides healthcare services to a number of residential care facilities in the Dublin area, and successful applicants may be assigned to an appropriate facility according to operational requirements)',
+      workLocationShort: 'Dublin, Ireland (assigned residential care facility)',
+      contractedHours: '39 hours per week',
+      workingSchedule:
+        'rostered shifts according to the requirements of the assigned care facility, which may include mornings, afternoons, evenings, nights, weekends and public holidays',
+      overtime:
+        'any overtime is subject to the applicable employment contract, roster requirements and Irish employment legislation; where overtime or premium rates apply, these will be clearly stated in the employment contract',
+      pay: 'EUR 32,691 gross per annum minimum, equivalent to EUR 16.12 gross per hour based on a 39-hour working week',
+      payFrequency: '[weekly / fortnightly / monthly]',
+    }
   ),
   buildTemplate(
     'Senior Support Worker',

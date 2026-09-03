@@ -252,6 +252,9 @@ export default function AdminDashboard() {
             {adminEmail && <p className="muted">Signed in as {adminEmail}</p>}
           </div>
           <div className="toolbar">
+            <a className="primary link-button" href="/contract-letterhead">
+              Contract templates
+            </a>
             <button className="secondary" onClick={() => void loadApplications()}>
               Refresh
             </button>
@@ -348,6 +351,30 @@ export default function AdminDashboard() {
               </a>
               <a className="secondary link-button" href="/contract-letterhead/senior-support-worker">
                 Senior support worker
+              </a>
+            </div>
+          </section>
+
+          <section className="subcard">
+            <h2>Job descriptions &amp; handbook</h2>
+            <p className="muted">
+              Issue these alongside the employment contract from the administration area.
+            </p>
+            <div className="stack-links">
+              <a className="secondary link-button" href="/documents">
+                Open documents hub
+              </a>
+              <a className="secondary link-button" href="/documents/job-description/support-worker">
+                Support worker job description
+              </a>
+              <a className="secondary link-button" href="/documents/job-description/healthcare-assistant">
+                Healthcare assistant job description
+              </a>
+              <a className="secondary link-button" href="/documents/job-description/senior-support-worker">
+                Senior support worker job description
+              </a>
+              <a className="secondary link-button" href="/documents/employee-handbook">
+                Employee handbook
               </a>
             </div>
           </section>
