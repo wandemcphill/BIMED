@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import EmploymentContractDocument from '@/components/EmploymentContractDocument';
-import { getContractTemplate } from '@/lib/contract-templates';
+import ContractAccessGate from '@/components/ContractAccessGate';
+import { resolveContractTemplate } from '@/lib/contract-prefill';
 
 export const metadata: Metadata = {
   title: 'Bimed Healthcare | Support Worker Contract Template',
@@ -9,11 +10,17 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-export default function SupportWorkerContractPage() {
-  const template = getContractTemplate('support-worker');
-  if (!template) {
-    return null;
+type PageProps = {
+  searchParams: Promise<{ applicationId?: string }>;
+};
+
+export default async function SupportWorkerContractPage({ searchParams }: PageProps) {
+  const { applicationId } = await searchParams;
+  const result = await resolveContractTemplate('support-worker', applicationId);
+
+  if (result.status === 'unauthorized' || result.status === 'not_found') {
+    return <ContractAccessGate reason={result.status} />;
   }
 
-  return <EmploymentContractDocument template={template} />;
+  return <EmploymentContractDocument template={result.template} prefilledFor={result.prefilledFor} />;
 }

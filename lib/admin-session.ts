@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import type { NextRequest, NextResponse } from 'next/server';
 import { db } from './db';
 
-const COOKIE_NAME = 'bimed_admin_session';
+export const ADMIN_SESSION_COOKIE_NAME = 'bimed_admin_session';
+const COOKIE_NAME = ADMIN_SESSION_COOKIE_NAME;
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
 
 export type AdminSession = {
@@ -82,8 +83,8 @@ export function verifyAdminSessionToken(token: string | undefined | null) {
   }
 }
 
-export async function getAdminSession(request: NextRequest) {
-  const tokenSession = verifyAdminSessionToken(request.cookies.get(COOKIE_NAME)?.value);
+export async function getAdminSessionFromToken(token: string | undefined | null) {
+  const tokenSession = verifyAdminSessionToken(token);
   if (!tokenSession) return null;
 
   try {
@@ -102,6 +103,10 @@ export async function getAdminSession(request: NextRequest) {
   } catch {
     return null;
   }
+}
+
+export async function getAdminSession(request: NextRequest) {
+  return getAdminSessionFromToken(request.cookies.get(COOKIE_NAME)?.value);
 }
 
 export async function isAdminRequestAuthenticated(request: NextRequest) {

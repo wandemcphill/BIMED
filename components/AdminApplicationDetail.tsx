@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { candidateSupportDocuments, recruitmentStatuses, isInternationalCandidate } from '@/lib/recruitment-config';
+import { contractTemplates, guessContractRoleSlug } from '@/lib/contract-templates';
 import AdminInterviewPanel from '@/components/AdminInterviewPanel';
 
 type ApplicationRecord = {
@@ -104,6 +105,7 @@ export default function AdminApplicationDetail({
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [contractRoleSlug, setContractRoleSlug] = useState('');
 
   const loadApplication = async () => {
     const response = await fetch(`/api/admin/applications/${applicationId}`);
@@ -124,6 +126,7 @@ export default function AdminApplicationDetail({
     setPayload(nextPayload);
     setStatus(nextPayload.application.status);
     setNotes(nextPayload.application.admin_notes || '');
+    setContractRoleSlug(guessContractRoleSlug(nextPayload.application.role_applied));
     setAuthenticated(true);
     setBootstrapping(false);
   };
@@ -332,6 +335,33 @@ export default function AdminApplicationDetail({
           Save changes
         </button>
         {message && <div className="success" style={{ marginTop: 12 }}>{message}</div>}
+      </section>
+
+      <section className="subcard">
+        <h2>Generate contract</h2>
+        <p className="muted">
+          Opens the contract pre-filled with this candidate&apos;s name, address and start date. Line manager and pay still need
+          to be confirmed before issue.
+        </p>
+        <div className="grid">
+          <Field label="Contract role">
+            <select value={contractRoleSlug} onChange={(event) => setContractRoleSlug(event.target.value)}>
+              {contractTemplates.map((template) => (
+                <option key={template.roleSlug} value={template.roleSlug}>
+                  {template.roleLabel}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <a
+          className="primary link-button"
+          href={`/contract-letterhead/${contractRoleSlug}?applicationId=${applicationId}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open pre-filled contract
+        </a>
       </section>
 
       <AdminInterviewPanel applicationId={applicationId} onStatusChanged={() => void loadApplication()} />

@@ -308,3 +308,60 @@ export const contractTemplates: ContractTemplate[] = [
 export function getContractTemplate(roleSlug: string) {
   return contractTemplates.find((template) => template.roleSlug === roleSlug) ?? null;
 }
+
+// Maps a candidate's freeform role_applied text (from recruitment_applications) onto one of the
+// three contract templates, so a "Generate contract" action can pick a sensible default.
+export function guessContractRoleSlug(roleApplied: string | null | undefined): string {
+  const normalized = (roleApplied || '').toLowerCase();
+  if (normalized.includes('senior')) return 'senior-support-worker';
+  if (normalized.includes('healthcare')) return 'healthcare-assistant';
+  return 'support-worker';
+}
+
+export type ContractOverrides = {
+  employeeName?: string | null;
+  employeeAddress?: string | null;
+  startDate?: string | null;
+};
+
+// Fills the employee-specific blanks in a contract template with real application data. Every
+// bracket variant that appears across editableFields, section text and schedule text for a given
+// field is listed here, since the same value is phrased slightly differently in each place.
+export function applyContractOverrides(template: ContractTemplate, overrides: ContractOverrides): ContractTemplate {
+  const replacements: [string, string][] = [];
+
+  if (overrides.employeeName) {
+    replacements.push(['[Insert employee name]', overrides.employeeName]);
+    replacements.push(['[Employee full name]', overrides.employeeName]);
+  }
+  if (overrides.employeeAddress) {
+    replacements.push(['[Insert employee address]', overrides.employeeAddress]);
+    replacements.push(['[Employee address]', overrides.employeeAddress]);
+  }
+  if (overrides.startDate) {
+    const formatted = new Date(overrides.startDate).toLocaleDateString('en-IE', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    replacements.push(['[Insert start date]', formatted]);
+    replacements.push(['[start date]', formatted]);
+  }
+
+  if (replacements.length === 0) return template;
+
+  const applyToText = (text: string) => replacements.reduce((acc, [find, value]) => acc.split(find).join(value), text);
+  const applyToSection = (section: ContractSection): ContractSection => ({
+    heading: section.heading,
+    paragraphs: section.paragraphs.map(applyToText),
+    bullets: section.bullets?.map(applyToText),
+  });
+
+  return {
+    ...template,
+    editableFields: template.editableFields.map((field) => ({ ...field, value: applyToText(field.value) })),
+    sections: template.sections.map(applyToSection),
+    schedules: template.schedules.map(applyToSection),
+    closingNote: applyToText(template.closingNote),
+  };
+}

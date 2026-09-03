@@ -3,7 +3,13 @@ import EmploymentContractLetterhead from '@/components/EmploymentContractLetterh
 import type { ContractTemplate } from '@/lib/contract-templates';
 import PrintContractButton from '@/components/PrintContractButton';
 
-export default function EmploymentContractDocument({ template }: { template: ContractTemplate }) {
+export default function EmploymentContractDocument({
+  template,
+  prefilledFor,
+}: {
+  template: ContractTemplate;
+  prefilledFor?: { name: string; email: string };
+}) {
   return (
     <EmploymentContractLetterhead>
       <section className="contract-section">
@@ -11,6 +17,16 @@ export default function EmploymentContractDocument({ template }: { template: Con
           <span className="pill">CONTRACT OF EMPLOYMENT</span>
           <PrintContractButton />
         </div>
+
+        {prefilledFor && (
+          <div className="contract-callout">
+            <strong>Pre-filled from application</strong>
+            <p>
+              Employee details below were pulled automatically from {prefilledFor.name}&apos;s application ({prefilledFor.email}
+              ). Review before issue.
+            </p>
+          </div>
+        )}
 
         <div className="contract-meta">
           <div>
