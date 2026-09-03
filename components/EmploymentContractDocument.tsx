@@ -6,10 +6,14 @@ import PrintContractButton from '@/components/PrintContractButton';
 export default function EmploymentContractDocument({
   template,
   prefilledFor,
+  employeeSignatureSlot,
 }: {
   template: ContractTemplate;
   prefilledFor?: { name: string; email: string };
+  /** Replaces the default blank employee signature line - used by the live e-signing page. */
+  employeeSignatureSlot?: ReactNode;
 }) {
+  const employeeName = template.editableFields.find((field) => field.label === 'Employee name')?.value || '[Insert employee name]';
   return (
     <EmploymentContractLetterhead>
       <section className="contract-section">
@@ -139,9 +143,13 @@ export default function EmploymentContractDocument({
           </div>
           <div>
             <span>Employee</span>
-            <div className="signature-line" />
-            <strong>{withPlaceholders('[Insert employee name]')}</strong>
-            <small>Dated: [Insert date signed]</small>
+            {employeeSignatureSlot ?? (
+              <>
+                <div className="signature-line" />
+                <strong>{withPlaceholders(employeeName)}</strong>
+                <small>Dated: [Insert date signed]</small>
+              </>
+            )}
           </div>
         </section>
       </section>

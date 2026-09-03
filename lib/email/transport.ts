@@ -33,7 +33,9 @@ export type EmailType =
   | 'admin_new_application'
   | 'admin_interview_update'
   | 'admin_status_change'
-  | 'admin_password_reset';
+  | 'admin_password_reset'
+  | 'contract_ready_to_sign'
+  | 'admin_contract_signed';
 
 export type SendResult =
   | { status: 'sent'; messageId: string | null }

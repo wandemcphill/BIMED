@@ -441,9 +441,63 @@ export function interviewCancelledEmail(input: {
   });
 }
 
+export function contractReadyToSignEmail(input: {
+  candidateName: string;
+  role?: string | null;
+  applicationId: string;
+  signUrl: string;
+}): EmailContent {
+  const link = safeUrl(input.signUrl);
+
+  return build('Your Bimed Healthcare employment contract is ready to sign', {
+    preheader: 'Your employment contract is ready for you to review and sign online.',
+    heading: 'Your employment contract is ready to sign',
+    paragraphs: [
+      `Dear ${input.candidateName},`,
+      'Your Bimed Healthcare employment contract has been prepared and is ready for you to review and sign online.',
+    ],
+    rows: [
+      { label: 'Position', value: input.role || 'To be confirmed' },
+      { label: 'Reference', value: applicationReference(input.applicationId) },
+    ],
+    callout: 'Please read the full contract carefully before signing. This link is for your use only and should not be shared.',
+    cta: link ? { label: 'Review and sign your contract', url: link } : undefined,
+    bullets: [
+      'The link above opens your contract with your details already filled in.',
+      'Signing online confirms you accept the terms set out in the contract.',
+      'Contact our recruitment team first if you have any questions before signing.',
+    ],
+    closing: 'Kind regards,\nBimed Healthcare Recruitment Team',
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Admin templates
 // ---------------------------------------------------------------------------
+
+export function adminContractSignedEmail(input: {
+  candidateName: string;
+  role?: string | null;
+  applicationId: string;
+  signedName: string;
+  signedAtLabel: string;
+  adminRecordUrl: string;
+}): EmailContent {
+  return build(`Contract signed: ${input.candidateName}`, {
+    preheader: `${input.candidateName} signed their employment contract.`,
+    heading: 'Employment contract signed',
+    paragraphs: ['A candidate has signed their employment contract online.'],
+    rows: [
+      { label: 'Candidate', value: input.candidateName },
+      { label: 'Position', value: input.role },
+      { label: 'Reference', value: applicationReference(input.applicationId) },
+      { label: 'Signed as', value: input.signedName },
+      { label: 'Signed at', value: input.signedAtLabel },
+    ],
+    cta: { label: 'Open candidate record', url: input.adminRecordUrl },
+    closing: 'Bimed recruitment portal',
+  });
+}
 
 export function adminNewApplicationEmail(input: {
   candidateName: string;

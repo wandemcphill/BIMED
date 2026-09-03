@@ -1242,6 +1242,10 @@ button:disabled {
   color: var(--navy);
 }
 
+.sign-contract-panel {
+  max-width: 420px;
+}
+
 .contract-signatures small {
   display: block;
   color: #5b7480;

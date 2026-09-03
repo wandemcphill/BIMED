@@ -13,12 +13,14 @@ import {
   supportingDocumentsEmail,
 } from '../recruitment-config';
 import {
+  adminContractSignedEmail,
   adminInterviewNotificationEmail,
   adminNewApplicationEmail,
   adminPasswordResetEmail,
   adminStatusChangeNotificationEmail,
   applicationReceivedEmail,
   applicationStatusUpdateEmail,
+  contractReadyToSignEmail,
   interviewCancelledEmail,
   interviewInvitationEmail,
   interviewRescheduledEmail,
@@ -360,6 +362,57 @@ async function sendInterviewAdminNotifications(
         emailType: 'admin_interview_update',
         dedupeKey: `admin_interview_${action}:${interview.id}:${input.revision ?? 0}:${recipient}`,
         applicationId: application.id,
+        client,
+      })
+    )
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Contract e-signature
+// ---------------------------------------------------------------------------
+
+export async function sendContractReadyToSignEmail(
+  input: { application: ApplicationEmailRecord; signUrl: string; signatureId: string },
+  client?: SupabaseClient | null
+): Promise<SendResult> {
+  return sendTransactionalEmail({
+    to: input.application.email,
+    content: contractReadyToSignEmail({
+      candidateName: input.application.full_name,
+      role: input.application.role_applied,
+      applicationId: input.application.id,
+      signUrl: input.signUrl,
+    }),
+    emailType: 'contract_ready_to_sign',
+    dedupeKey: `contract_ready_to_sign:${input.signatureId}`,
+    applicationId: input.application.id,
+    client,
+    replyTo: recruitmentContacts.ireland,
+  });
+}
+
+export async function sendContractSignedNotificationEmails(
+  input: { application: ApplicationEmailRecord; signedName: string; signedAtLabel: string; signatureId: string },
+  client?: SupabaseClient | null
+): Promise<SendResult[]> {
+  const content = adminContractSignedEmail({
+    candidateName: input.application.full_name,
+    role: input.application.role_applied,
+    applicationId: input.application.id,
+    signedName: input.signedName,
+    signedAtLabel: input.signedAtLabel,
+    adminRecordUrl: adminRecordUrl(input.application.id),
+  });
+
+  return Promise.all(
+    internalRecipients(input.application).map((recipient) =>
+      sendTransactionalEmail({
+        to: recipient,
+        content,
+        emailType: 'admin_contract_signed',
+        dedupeKey: `admin_contract_signed:${input.signatureId}:${recipient}`,
+        applicationId: input.application.id,
         client,
       })
     )

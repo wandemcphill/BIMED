@@ -44,6 +44,16 @@ type ApplicationRecord = {
   invite_id: string | null;
 };
 
+type ContractSignature = {
+  id: string;
+  role_slug: string;
+  status: 'issued' | 'signed';
+  signed_name: string | null;
+  signed_at: string | null;
+  issued_at: string;
+  expires_at: string | null;
+};
+
 type AuditLogEntry = {
   id: string;
   event_type: string;
@@ -106,6 +116,10 @@ export default function AdminApplicationDetail({
   const [notes, setNotes] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [contractRoleSlug, setContractRoleSlug] = useState('');
+  const [signatures, setSignatures] = useState<ContractSignature[]>([]);
+  const [sendingForSignature, setSendingForSignature] = useState(false);
+  const [signatureMessage, setSignatureMessage] = useState('');
+  const [issuingPack, setIssuingPack] = useState(false);
 
   const loadApplication = async () => {
     const response = await fetch(`/api/admin/applications/${applicationId}`);
@@ -129,6 +143,64 @@ export default function AdminApplicationDetail({
     setContractRoleSlug(guessContractRoleSlug(nextPayload.application.role_applied));
     setAuthenticated(true);
     setBootstrapping(false);
+    await loadSignatures();
+  };
+
+  const loadSignatures = async () => {
+    const response = await fetch(`/api/admin/applications/${applicationId}/contract-signature`);
+    if (!response.ok) return;
+    const nextPayload = (await response.json()) as { signatures: ContractSignature[] };
+    setSignatures(nextPayload.signatures || []);
+  };
+
+  const sendForSignature = async () => {
+    setSendingForSignature(true);
+    setSignatureMessage('');
+
+    const response = await fetch(`/api/admin/applications/${applicationId}/contract-signature`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role_slug: contractRoleSlug }),
+    });
+
+    const nextPayload = await response.json();
+    setSendingForSignature(false);
+
+    if (!response.ok) {
+      setSignatureMessage(nextPayload.error || 'Unable to send the contract for signature.');
+      return;
+    }
+
+    const emailStatus = nextPayload.email?.status;
+    setSignatureMessage(
+      emailStatus === 'sent'
+        ? 'Signing link emailed to the candidate.'
+        : 'Signing link created, but the email could not be confirmed as sent. Check the candidate email delivery.'
+    );
+    await loadSignatures();
+  };
+
+  const issueOnboardingPack = async () => {
+    setIssuingPack(true);
+
+    const response = await fetch(`/api/admin/applications/${applicationId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Offer Issued' }),
+    });
+
+    if (response.ok) {
+      const nextPayload = await response.json();
+      setPayload((current) => (current ? { ...current, application: nextPayload.application } : current));
+      setStatus(nextPayload.application.status);
+    }
+
+    setIssuingPack(false);
+
+    const base = window.location.origin;
+    window.open(`${base}/contract-letterhead/${contractRoleSlug}?applicationId=${applicationId}`, '_blank', 'noopener');
+    window.open(`${base}/documents/job-description/${contractRoleSlug}`, '_blank', 'noopener');
+    window.open(`${base}/documents/employee-handbook`, '_blank', 'noopener');
   };
 
   const checkSession = async () => {
@@ -354,14 +426,48 @@ export default function AdminApplicationDetail({
             </select>
           </Field>
         </div>
-        <a
-          className="primary link-button"
-          href={`/contract-letterhead/${contractRoleSlug}?applicationId=${applicationId}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open pre-filled contract
-        </a>
+        <div className="toolbar">
+          <a
+            className="primary link-button"
+            href={`/contract-letterhead/${contractRoleSlug}?applicationId=${applicationId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open pre-filled contract
+          </a>
+          <button className="secondary" onClick={() => void sendForSignature()} disabled={sendingForSignature}>
+            {sendingForSignature ? 'Sending...' : 'Send for e-signature'}
+          </button>
+        </div>
+        {signatureMessage && <div className="success" style={{ marginTop: 12 }}>{signatureMessage}</div>}
+
+        {signatures.length > 0 && (
+          <div className="activity-list" style={{ marginTop: 16 }}>
+            {signatures.map((signature) => (
+              <article className="activity-item" key={signature.id}>
+                <div className="activity-heading">
+                  <strong>{signature.status === 'signed' ? 'Signed' : 'Awaiting signature'}</strong>
+                  <span>{signature.status === 'signed' ? formatDate(signature.signed_at) : formatDate(signature.issued_at)}</span>
+                </div>
+                <p className="muted">
+                  Role: {signature.role_slug}
+                  {signature.status === 'signed' ? ` - Signed as ${signature.signed_name}` : ' - Link sent to candidate'}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="subcard">
+        <h2>Issue onboarding pack</h2>
+        <p className="muted">
+          Marks the application as &quot;Offer Issued&quot; and opens the pre-filled contract, job description and employee
+          handbook together for review before sending them on.
+        </p>
+        <button className="primary" onClick={() => void issueOnboardingPack()} disabled={issuingPack}>
+          {issuingPack ? 'Issuing...' : 'Issue onboarding pack'}
+        </button>
       </section>
 
       <AdminInterviewPanel applicationId={applicationId} onStatusChanged={() => void loadApplication()} />

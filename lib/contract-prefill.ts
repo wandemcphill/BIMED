@@ -26,13 +26,16 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
     return { status: 'unauthorized' };
   }
 
-  const { data: application, error } = await db()
-    .from('recruitment_applications')
-    .select('full_name,email,address,start_date')
-    .eq('id', applicationId)
-    .maybeSingle();
-
-  if (error || !application) {
+  let application;
+  try {
+    const result = await db()
+      .from('recruitment_applications')
+      .select('full_name,email,address,start_date')
+      .eq('id', applicationId)
+      .maybeSingle();
+    if (result.error || !result.data) return { status: 'not_found' };
+    application = result.data;
+  } catch {
     return { status: 'not_found' };
   }
 
