@@ -12,6 +12,9 @@ import {
   supportingDocumentsEmail,
   isInternationalCandidate,
 } from '@/lib/recruitment-config';
+import { getFirstInterviewQuestions, pickRandomAudioQuestionIds, findAudioInterviewQuestion } from '@/lib/interview-questions';
+import InterviewAnswerInput, { type InterviewAnswerValue } from '@/components/InterviewAnswerInput';
+import SpeakQuestionButton from '@/components/SpeakQuestionButton';
 
 type Invite = {
   candidate_name?: string | null;
@@ -49,6 +52,8 @@ type FormValues = {
   relocation_readiness: string;
   supporting_documents: string[];
   consent: boolean;
+  interview_responses: Record<string, InterviewAnswerValue>;
+  audio_question_ids: string[];
 };
 
 type DraftState = 'saving' | 'saved' | 'restored' | 'error';
@@ -59,6 +64,7 @@ const stepGuidance = [
   'Share your care background, qualifications and training.',
   'List your employment history and references clearly.',
   'Confirm whether you are already living in Ireland or will need the international route.',
+  'Answer these written interview questions in your own words - type, or use the microphone.',
   'Tick the documents you have and prepare to email them separately.',
   'Review everything before you submit.',
   'Read the declaration carefully and give consent to proceed.',
@@ -96,6 +102,8 @@ const initialForm = (invite?: Invite): FormValues => ({
   relocation_readiness: '',
   supporting_documents: [],
   consent: false,
+  interview_responses: {},
+  audio_question_ids: [],
 });
 
 export default function CandidateForm({
@@ -176,6 +184,12 @@ export default function CandidateForm({
     }
   }, [furthestStep, step]);
 
+  // Picks this candidate's 3 random audio-segment questions once, then keeps them stable
+  // (persisted with the rest of the draft) so a reload doesn't hand them a new set.
+  useEffect(() => {
+    setForm((current) => (current.audio_question_ids.length ? current : { ...current, audio_question_ids: pickRandomAudioQuestionIds() }));
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -189,12 +203,17 @@ export default function CandidateForm({
     const timer = window.setTimeout(() => {
       try {
         const savedAt = new Date().toISOString();
+        // Voice notes are excluded from the saved draft - base64 audio would quickly blow past
+        // localStorage's quota. A reload loses recorded answers; typed answers are unaffected.
+        const draftInterviewResponses = Object.fromEntries(
+          Object.entries(form.interview_responses).filter(([, answer]) => !answer.audio_base64)
+        );
         window.localStorage.setItem(
           draftKey,
           JSON.stringify({
             token,
             step,
-            form,
+            form: { ...form, interview_responses: draftInterviewResponses },
             lastSavedAt: savedAt,
           })
         );
@@ -208,6 +227,17 @@ export default function CandidateForm({
     return () => window.clearTimeout(timer);
   }, [draftKey, done, form, step, token]);
 
+  const setInterviewAnswer = (id: string, value: InterviewAnswerValue) => {
+    setForm((current) => ({
+      ...current,
+      interview_responses: { ...current.interview_responses, [id]: value },
+    }));
+  };
+
+  const interviewQuestions = useMemo(
+    () => getFirstInterviewQuestions(form.living_in_ireland, form.role_applied),
+    [form.living_in_ireland, form.role_applied]
+  );
   const international = useMemo(() => isInternationalCandidate(form), [form]);
   const destinationEmail = supportingDocumentsEmail(form);
   const progress = ((step + 1) / candidateStepTitles.length) * 100;
@@ -297,6 +327,19 @@ export default function CandidateForm({
       }
     }
 
+    const isAnswered = (id: string) => {
+      const answer = form.interview_responses[id];
+      return Boolean(answer && (answer.audio_base64 || answer.text?.trim()));
+    };
+
+    if (interviewQuestions.some((question) => !isAnswered(question.id))) {
+      return 'Please answer every written interview question before submitting.';
+    }
+
+    if (form.audio_question_ids.some((id) => !isAnswered(id))) {
+      return 'Please record an answer for every audio interview question before submitting.';
+    }
+
     return '';
   };
 
@@ -307,6 +350,10 @@ export default function CandidateForm({
       return;
     }
 
+    // audio_question_ids is client-side bookkeeping only - which questions were audio ones is
+    // already recoverable from the interview_responses keys, so it isn't part of the API payload.
+    const { audio_question_ids: _audioQuestionIds, ...submittable } = form;
+
     const response = await fetch('/api/applications', {
       method: 'POST',
       headers: {
@@ -314,7 +361,7 @@ export default function CandidateForm({
       },
       body: JSON.stringify({
         token,
-        ...form,
+        ...submittable,
       }),
     });
 
@@ -678,6 +725,63 @@ export default function CandidateForm({
       {step === 5 && (
         <section className="subcard candidate-section">
           <div className="section-intro">
+            <h2>Written interview</h2>
+            <p className="muted">
+              Answer in your own words. Type your answer, or use the microphone to record a voice note - whichever is easier for
+              you.
+            </p>
+          </div>
+          <div className="interview-question-list">
+            {interviewQuestions.map((question, index) => (
+              <div className="subcard" key={question.id} style={{ marginBottom: 14 }}>
+                <span className="pill">{question.category.toUpperCase()}</span>
+                <h3 style={{ marginTop: 8 }}>
+                  {index + 1}. {question.text}
+                </h3>
+                {question.guidance && <p className="muted">{question.guidance}</p>}
+                <InterviewAnswerInput
+                  value={form.interview_responses[question.id]}
+                  onChange={(next) => setInterviewAnswer(question.id, next)}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="section-intro" style={{ marginTop: 24 }}>
+            <h2>Audio interview segment</h2>
+            <p className="muted">
+              These 3 questions are picked at random for you. Press play to hear each question, then record your answer as a
+              voice note - this segment must be answered by voice where your device supports it.
+            </p>
+          </div>
+          <div className="interview-question-list">
+            {form.audio_question_ids.map((id, index) => {
+              const question = findAudioInterviewQuestion(id);
+              if (!question) return null;
+              return (
+                <div className="subcard" key={id} style={{ marginBottom: 14 }}>
+                  <span className="pill">{question.category.toUpperCase()}</span>
+                  <h3 style={{ marginTop: 8 }}>
+                    Audio question {index + 1}. {question.text}
+                  </h3>
+                  <div style={{ marginBottom: 10 }}>
+                    <SpeakQuestionButton text={question.text} />
+                  </div>
+                  <InterviewAnswerInput
+                    value={form.interview_responses[id]}
+                    onChange={(next) => setInterviewAnswer(id, next)}
+                    audioRequired
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {step === 6 && (
+        <section className="subcard candidate-section">
+          <div className="section-intro">
             <h2>Supporting documents</h2>
             <p className="muted">
               Tick what you have. Do not upload documents here. Send them separately after submission, using the email address shown below.
@@ -701,7 +805,7 @@ export default function CandidateForm({
         </section>
       )}
 
-      {step === 6 && (
+      {step === 7 && (
         <section className="subcard candidate-section">
           <div className="section-intro">
             <h2>Review your application</h2>
@@ -747,8 +851,30 @@ export default function CandidateForm({
             ], 4)}
             <section className="review-card">
               <div className="review-header">
-                <h3>Supporting documents</h3>
+                <h3>Written interview</h3>
                 <button className="secondary review-edit" type="button" onClick={() => setStep(5)}>
+                  Edit
+                </button>
+              </div>
+              <dl className="review-list">
+                {[...interviewQuestions, ...form.audio_question_ids.map((id) => findAudioInterviewQuestion(id)).filter(Boolean)].map(
+                  (question) => {
+                    if (!question) return null;
+                    const answer = form.interview_responses[question.id];
+                    return (
+                      <div key={question.id}>
+                        <dt>{question.text}</dt>
+                        <dd>{answer?.audio_base64 ? 'Voice note recorded' : answer?.text || 'Not answered'}</dd>
+                      </div>
+                    );
+                  }
+                )}
+              </dl>
+            </section>
+            <section className="review-card">
+              <div className="review-header">
+                <h3>Supporting documents</h3>
+                <button className="secondary review-edit" type="button" onClick={() => setStep(6)}>
                   Edit
                 </button>
               </div>
@@ -770,7 +896,7 @@ export default function CandidateForm({
         </section>
       )}
 
-      {step === 7 && (
+      {step === 8 && (
         <section className="subcard candidate-section">
           <div className="section-intro">
             <h2>Declaration and consent</h2>
@@ -806,7 +932,7 @@ export default function CandidateForm({
         </button>
         {step < candidateStepTitles.length - 1 ? (
           <button className="primary" onClick={() => setStep((current) => current + 1)}>
-            {step === 6 ? 'Continue to declaration' : 'Continue'}
+            {step === 7 ? 'Continue to declaration' : 'Continue'}
           </button>
         ) : (
           <button className="primary" onClick={submit}>

@@ -1233,6 +1233,30 @@ button:disabled {
   margin: 6px 0 8px;
 }
 
+.status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.status-tabs button {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.voice-textarea {
+  display: flex;
+  flex-direction: column;
+}
+
+.voice-mic-active,
+button.danger {
+  background: #d64545 !important;
+  color: #fff !important;
+}
+
 .signature-line-signed {
   display: flex;
   align-items: flex-end;

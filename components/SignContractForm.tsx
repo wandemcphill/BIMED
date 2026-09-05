@@ -3,14 +3,31 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function SignContractForm({ token, employeeName }: { token: string; employeeName: string }) {
+export default function SignContractForm({
+  token,
+  employeeName,
+  employeeAddress,
+  startDate,
+}: {
+  token: string;
+  employeeName: string;
+  employeeAddress: string;
+  startDate: string;
+}) {
   const router = useRouter();
+  const [name, setName] = useState(employeeName);
+  const [address, setAddress] = useState(employeeAddress);
+  const [date, setDate] = useState(startDate);
   const [typedName, setTypedName] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const submit = async () => {
+    if (!name.trim()) {
+      setError('Your full legal name cannot be blank.');
+      return;
+    }
     if (!typedName.trim()) {
       setError('Type your full legal name to sign.');
       return;
@@ -26,7 +43,12 @@ export default function SignContractForm({ token, employeeName }: { token: strin
     const response = await fetch(`/api/sign-contract/${token}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ signed_name: typedName.trim() }),
+      body: JSON.stringify({
+        signed_name: typedName.trim(),
+        employee_name: name.trim(),
+        employee_address: address.trim(),
+        start_date: date,
+      }),
     });
 
     if (!response.ok) {
@@ -42,11 +64,28 @@ export default function SignContractForm({ token, employeeName }: { token: strin
   return (
     <div className="sign-contract-panel">
       <p className="muted">
-        Type your full legal name below to sign as {employeeName}. This records your electronic signature and today&apos;s date
-        against this contract.
+        Check your details below and correct anything that is wrong before you sign - Bimed will not need to reissue the
+        contract for a typo.
       </p>
       <div className="field">
-        <label>Type your full legal name</label>
+        <label>Your full legal name</label>
+        <input value={name} onChange={(event) => setName(event.target.value)} />
+      </div>
+      <div className="field" style={{ marginTop: 10 }}>
+        <label>Your address</label>
+        <input value={address} onChange={(event) => setAddress(event.target.value)} />
+      </div>
+      <div className="field" style={{ marginTop: 10 }}>
+        <label>Start date</label>
+        <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+      </div>
+
+      <p className="muted" style={{ marginTop: 16 }}>
+        Type your full legal name below to sign. This records your electronic signature and today&apos;s date against this
+        contract.
+      </p>
+      <div className="field">
+        <label>Type your full legal name to sign</label>
         <input value={typedName} onChange={(event) => setTypedName(event.target.value)} placeholder="Full legal name" />
       </div>
       <label className="check" style={{ marginTop: 10 }}>

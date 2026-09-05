@@ -51,6 +51,14 @@ type RoleTerms = {
   overtime: string;
   pay: string;
   payFrequency: string;
+  /** Extra clause 16.3 for roles that require statutory professional registration (e.g. CORU). */
+  professionalRegistrationClause?: string;
+  /** Role-specific Schedule 2 duties. Falls back to the generic frontline-care duty list. */
+  dutiesOverride?: string[];
+  /** Role-specific Schedule 2A note. Falls back to the generic "set out in the role profile" text. */
+  scheduleNote?: string;
+  /** Overrides the parenthetical in clause 5.2 - falls back to the HCA/Home Support Worker floor. */
+  permitFloorNote?: string;
 };
 
 function buildTemplate(
@@ -133,7 +141,7 @@ function buildTemplate(
       ]),
       section('5. Remuneration', [
         `5.1 Your pay is ${pay}, payable ${payFrequency} by bank transfer, on or before the last working day of each pay period.`,
-        '5.2 Where you hold an employment permit for this Role, your pay will not be reduced below the minimum salary required to keep that permit valid (currently EUR 32,691 per annum for Healthcare Assistant / Home Support Worker roles) - see also Schedule 1.',
+        `5.2 Where you hold an employment permit for this Role, your pay will not be reduced below the minimum salary required to keep that permit valid${roleTerms?.permitFloorNote ?? ' (currently EUR 32,691 per annum for Healthcare Assistant / Home Support Worker roles)'} - see also Schedule 1.`,
         '5.3 The Company will deduct PAYE, PRSI and USC as required by law. No other deduction will be made from your pay without your prior written consent, except as permitted by the Payment of Wages Act 1991.',
         '5.4 Pay is reviewed at the Company\'s discretion. The Company does not guarantee any increase.',
       ]),
@@ -188,6 +196,7 @@ function buildTemplate(
       section('16. Right to Work', [
         '16.1 Your employment is conditional on you having, and continuing to hold, the right to work in Ireland for the duration of your employment. You must give the Company satisfactory evidence of your right to work before your start date, and must tell the Company immediately of any change in your immigration status.',
         '16.2 If you need an employment permit to work in this Role, Schedule 1 to this contract applies in addition to these terms.',
+        ...(roleTerms?.professionalRegistrationClause ? [roleTerms.professionalRegistrationClause] : []),
       ]),
       section('17. Garda Vetting', [
         '17.1 This Role involves regular contact with vulnerable persons and is subject to mandatory vetting under the National Vetting Bureau (Children and Vulnerable Persons) Acts 2012-2016. Your employment, and its continuation, is conditional on a satisfactory vetting disclosure and, for candidates who have lived outside Ireland, a satisfactory police clearance certificate from each relevant country. You must not begin unsupervised client-facing duties until vetting is complete.',
@@ -231,7 +240,7 @@ function buildTemplate(
         'This Schedule applies in addition to, and does not replace, the main body of this contract, where your right to work in Ireland depends on an employment permit.',
         '1. Your employment, and its continuation, is conditional on you holding a valid employment permit for this Role at all times. The Company will apply for a General Employment Permit on your behalf, valid from your start date.',
         '2. You must not start work until your employment permit has been granted and you have given the Company a copy of it.',
-        '3. The salary in Clause 5 will not be reduced below the minimum salary the Department of Enterprise, Tourism and Employment requires to keep your permit valid (currently EUR 32,691 per annum for this Role).',
+        '3. The salary in Clause 5 will not be reduced below the minimum salary the Department of Enterprise, Tourism and Employment requires to keep your permit valid for this Role, as published from time to time.',
         '4. The Company will not deduct the cost of your employment permit application or any recruitment fees from your pay, and will not retain your personal documents, including your passport, in accordance with Irish employment permit law.',
         '5. You must tell the Company immediately of any change to your immigration status, and must apply for a permit renewal in good time before it expires, with the Company\'s assistance.',
         '6. If your employment permit is refused, revoked, or not renewed, or if you otherwise cease to hold the right to work in Ireland, your employment will end automatically, and the Company will pay you any notice or entitlements due to you up to that date, in accordance with law.',
@@ -241,7 +250,7 @@ function buildTemplate(
       section('Schedule 2 - Job Description', [
         'Job title: [insert]     Reports to: [insert]',
         'Main duties may include:',
-      ], [
+      ], roleTerms?.dutiesOverride ?? [
         'Personal care support',
         'Meal preparation, cooking and menu planning',
         'Medication management support',
@@ -254,7 +263,8 @@ function buildTemplate(
         'Assisting with, but not directly handling, a client\'s bills and finances, in line with the Company\'s safeguarding policy',
       ]),
       section('Schedule 2A - Role-Specific Notes', [
-        'Minimum experience, mandatory training/qualifications, and any driving requirement for this role are set out in the recruitment role profile and confirmed to the employee before their start date.',
+        roleTerms?.scheduleNote ??
+          'Minimum experience, mandatory training/qualifications, and any driving requirement for this role are set out in the recruitment role profile and confirmed to the employee before their start date.',
       ]),
       section('Schedule 3 - Quick-Reference Compliance Checklist', [
         "For Bimed's internal use before issuing any contract:",
@@ -303,6 +313,37 @@ export const contractTemplates: ContractTemplate[] = [
     'senior-support-worker',
     'Senior frontline care role'
   ),
+  buildTemplate(
+    'Physiotherapist',
+    'physiotherapist',
+    'Allied health professional role',
+    {
+      workLocation:
+        'a Bimed-assigned residential care facility in the Dublin area, with travel between facilities as clinically required',
+      workLocationShort: 'Dublin, Ireland (assigned care facility, multi-site)',
+      contractedHours: '35 hours per week',
+      workingSchedule:
+        'standard weekday clinical hours according to the requirements of the assigned care facility, with occasional weekend or evening cover where clinically required',
+      overtime:
+        'any overtime is subject to the applicable employment contract, rostering requirements and Irish employment legislation; where overtime or premium rates apply, these will be clearly stated in the employment contract',
+      pay: 'EUR 45,514 to EUR 63,831 gross per annum, in line with the HSE-aligned Physiotherapist (staff grade) pay scale, based on experience',
+      payFrequency: 'monthly',
+      professionalRegistrationClause:
+        '16.3 This Role requires registration with CORU (the Health and Social Care Professionals Council) under the Physiotherapists Registration Board. Your employment, and its continuation, is conditional on you holding and maintaining live CORU registration. If your qualification was obtained outside Ireland, you must have had it assessed and recognised by CORU under its Qualification Recognition process before your start date, and you must provide the Company with evidence of your CORU registration number before you begin unsupervised clinical duties.',
+      dutiesOverride: [
+        "Assessing service users' physical function, mobility and rehabilitation needs",
+        'Developing and delivering individualised physiotherapy treatment and exercise programmes',
+        "Working with the multidisciplinary care team to support each service user's overall care plan",
+        'Maintaining accurate clinical records in line with CORU standards of practice',
+        'Advising care staff and families on safe moving, handling and mobility support',
+        'Monitoring and reviewing service user progress, adjusting treatment plans as required',
+        'Ensuring all clinical practice remains within the CORU Standards of Proficiency for Physiotherapists',
+      ],
+      scheduleNote:
+        'This Role requires a BSc or MSc in Physiotherapy from a CORU-approved programme (or, for internationally qualified candidates, a completed CORU Qualification Recognition Assessment confirming equivalence) and live CORU registration under the Physiotherapists Registration Board, confirmed before the start date.',
+      permitFloorNote: ', in line with the applicable Critical Skills or General Employment Permit salary threshold for physiotherapists',
+    }
+  ),
 ];
 
 export function getContractTemplate(roleSlug: string) {
@@ -313,6 +354,7 @@ export function getContractTemplate(roleSlug: string) {
 // three contract templates, so a "Generate contract" action can pick a sensible default.
 export function guessContractRoleSlug(roleApplied: string | null | undefined): string {
   const normalized = (roleApplied || '').toLowerCase();
+  if (normalized.includes('physio')) return 'physiotherapist';
   if (normalized.includes('senior')) return 'senior-support-worker';
   if (normalized.includes('healthcare')) return 'healthcare-assistant';
   return 'support-worker';

@@ -1,7 +1,49 @@
 import { recruitmentRoles, recruitmentStatuses } from './recruitment-config';
+import { FIRST_INTERVIEW_ALL_QUESTIONS } from './interview-questions';
+
+const FIRST_INTERVIEW_QUESTION_IDS = new Set(FIRST_INTERVIEW_ALL_QUESTIONS.map((q) => q.id));
+
+// A voice note capped at ~90 seconds of opus audio (client-side) is comfortably under 1.5MB
+// base64. This bounds per-answer size against abuse while leaving real recordings plenty of room.
+const MAX_AUDIO_BASE64_LENGTH = 4_000_000;
+
+export type InterviewAnswer = { text: string } | { audio_base64: string; mime_type: string };
+
+function validateInterviewResponses(value: unknown): Record<string, InterviewAnswer> {
+  if (value === undefined) return {};
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('interview_responses must be an object.');
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > FIRST_INTERVIEW_ALL_QUESTIONS.length) {
+    throw new Error('interview_responses has too many entries.');
+  }
+
+  const result: Record<string, InterviewAnswer> = {};
+  for (const [key, raw] of entries) {
+    if (!FIRST_INTERVIEW_QUESTION_IDS.has(key)) throw new Error(`Unknown interview question: ${key}`);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`interview_responses.${key} is invalid.`);
+
+    const answer = raw as Record<string, unknown>;
+    if (typeof answer.audio_base64 === 'string') {
+      if (answer.audio_base64.length > MAX_AUDIO_BASE64_LENGTH) throw new Error(`interview_responses.${key} audio is too long.`);
+      if (typeof answer.mime_type !== 'string' || !answer.mime_type.startsWith('audio/')) {
+        throw new Error(`interview_responses.${key} has an invalid audio type.`);
+      }
+      result[key] = { audio_base64: answer.audio_base64, mime_type: answer.mime_type };
+    } else if (typeof answer.text === 'string') {
+      if (answer.text.length > 4000) throw new Error(`interview_responses.${key} is too long.`);
+      result[key] = { text: answer.text.trim() };
+    } else {
+      throw new Error(`interview_responses.${key} is invalid.`);
+    }
+  }
+  return result;
+}
 
 export const MAX_JSON_BYTES = {
-  candidateApplication: 128 * 1024,
+  candidateApplication: 20 * 1024 * 1024, // raised to fit voice-note interview answers (base64 audio)
   admin: 32 * 1024,
   interview: 16 * 1024,
 } as const;
@@ -80,6 +122,7 @@ const APPLICATION_KEYS = [
   'professional_experience', 'employment_history', 'employment_gaps', 'references',
   'living_in_ireland', 'current_country', 'work_permission', 'requires_employment_permit',
   'international_experience', 'relocation_readiness', 'supporting_documents', 'consent',
+  'interview_responses',
 ] as const;
 
 export function validateCandidateApplication(input: unknown): JsonResult<Record<string, unknown>> {
@@ -136,6 +179,7 @@ export function validateCandidateApplication(input: unknown): JsonResult<Record<
       relocation_readiness: stringField(input, 'relocation_readiness', 100),
       supporting_documents: supportingDocuments,
       consent: true,
+      interview_responses: validateInterviewResponses(input.interview_responses),
     };
 
     if (living === 'No') {

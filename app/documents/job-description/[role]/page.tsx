@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PolicyDocument from '@/components/PolicyDocument';
-import { getJobDescriptionTemplate, jobDescriptionTemplates } from '@/lib/document-templates';
+import { jobDescriptionTemplates, getJobDescriptionTemplate } from '@/lib/document-templates';
+import { resolveJobDescriptionTemplate } from '@/lib/job-description-prefill';
 
 export const dynamic = 'force-dynamic';
 
 type PageProps = {
   params: Promise<{ role: string }>;
+  searchParams: Promise<{ applicationId?: string }>;
 };
 
 export function generateStaticParams() {
@@ -22,12 +24,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function JobDescriptionPage({ params }: PageProps) {
+export default async function JobDescriptionPage({ params, searchParams }: PageProps) {
   const { role } = await params;
-  const template = getJobDescriptionTemplate(role);
-  if (!template) {
+  const { applicationId } = await searchParams;
+  const result = await resolveJobDescriptionTemplate(role, applicationId);
+  if (result.status === 'not_found') {
     notFound();
   }
 
-  return <PolicyDocument template={template} />;
+  return <PolicyDocument template={result.template} />;
 }

@@ -19,9 +19,30 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const bodyResult = await readJsonBody(request, MAX_JSON_BYTES.admin);
   if (!bodyResult.ok) return NextResponse.json({ error: bodyResult.error }, { status: 400 });
-  const signedName = (bodyResult.data as Record<string, unknown>).signed_name;
+  const body = bodyResult.data as Record<string, unknown>;
+  const signedName = body.signed_name;
   if (typeof signedName !== 'string' || !signedName.trim() || signedName.trim().length > 200) {
     return NextResponse.json({ error: 'A valid signed_name is required.' }, { status: 400 });
+  }
+
+  const corrections: { employeeName?: string; employeeAddress?: string; startDate?: string } = {};
+  if (body.employee_name !== undefined) {
+    if (typeof body.employee_name !== 'string' || !body.employee_name.trim() || body.employee_name.length > 200) {
+      return NextResponse.json({ error: 'employee_name must be a non-empty string.' }, { status: 400 });
+    }
+    corrections.employeeName = body.employee_name.trim();
+  }
+  if (body.employee_address !== undefined) {
+    if (typeof body.employee_address !== 'string' || body.employee_address.length > 500) {
+      return NextResponse.json({ error: 'employee_address must be a string.' }, { status: 400 });
+    }
+    corrections.employeeAddress = body.employee_address.trim();
+  }
+  if (body.start_date !== undefined) {
+    if (typeof body.start_date !== 'string' || (body.start_date && Number.isNaN(new Date(body.start_date).getTime()))) {
+      return NextResponse.json({ error: 'start_date must be a valid date.' }, { status: 400 });
+    }
+    corrections.startDate = body.start_date;
   }
 
   const { token } = await context.params;
@@ -35,7 +56,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const client = db();
-    const updated = await markContractSignatureSigned(signature.id, signedName.trim());
+    const updated = await markContractSignatureSigned(signature.id, signedName.trim(), corrections);
     if (!updated) return NextResponse.json({ error: 'This contract has already been signed.' }, { status: 409 });
 
     const { data: application } = await client
@@ -48,7 +69,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       applicationId: updated.application_id,
       eventType: 'contract_signed',
       actor: signedName.trim(),
-      metadata: { signature_id: updated.id, role_slug: updated.role_slug },
+      metadata: {
+        signature_id: updated.id,
+        role_slug: updated.role_slug,
+        corrected_fields: Object.keys(corrections),
+      },
     });
 
     if (application) {

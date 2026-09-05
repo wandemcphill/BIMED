@@ -39,6 +39,8 @@ type LayoutInput = {
   callout?: string;
   bullets?: string[];
   cta?: { label: string; url: string };
+  /** Multiple named links (e.g. contract, job description, handbook), rendered as a list of buttons. */
+  ctas?: { label: string; url: string }[];
   closing?: string;
 };
 
@@ -163,6 +165,24 @@ function layout(input: LayoutInput): { html: string; text: string } {
           )}</p>`
       : '';
 
+  const validCtas = (input.ctas || []).map((entry) => ({ ...entry, url: safeUrl(entry.url) })).filter((entry) => entry.url);
+  const ctasHtml = validCtas.length
+    ? validCtas
+        .map(
+          (entry) => `
+          <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px;">
+            <tr>
+              <td style="border-radius:6px;background:${BRAND.blue};">
+                <a href="${escapeHtml(entry.url!)}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">${escapeHtml(
+                  entry.label
+                )}</a>
+              </td>
+            </tr>
+          </table>`
+        )
+        .join('\n          ')
+    : '';
+
   const paragraphsHtml = input.paragraphs
     .map((paragraph) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:${BRAND.text};">${escapeHtml(paragraph)}</p>`)
     .join('\n          ');
@@ -200,7 +220,7 @@ function layout(input: LayoutInput): { html: string; text: string } {
               <h1 style="margin:0 0 16px;font-size:20px;line-height:1.35;color:${BRAND.navy};font-weight:700;">${escapeHtml(
                 input.heading
               )}</h1>
-          ${paragraphsHtml}${calloutHtml}${rowsHtml}${bulletsHtml}${ctaHtml}
+          ${paragraphsHtml}${calloutHtml}${rowsHtml}${bulletsHtml}${ctasHtml}${ctaHtml}
           ${closingHtml}
             </td>
           </tr>
@@ -244,6 +264,9 @@ function layout(input: LayoutInput): { html: string; text: string } {
   }
   if (ctaUrl) {
     textParts.push('', `${input.cta!.label}: ${ctaUrl}`);
+  }
+  if (validCtas.length) {
+    textParts.push('', ...validCtas.map((entry) => `${entry.label}: ${entry.url}`));
   }
   if (input.closing) {
     textParts.push('', input.closing);
@@ -437,6 +460,121 @@ export function interviewCancelledEmail(input: {
       { label: 'Reason', value: input.reason },
     ],
     callout: `Our recruitment team will contact you about next steps. If you have questions, email ${recruitmentContacts.ireland}.`,
+    closing: 'Kind regards,\nBimed Healthcare Recruitment Team',
+  });
+}
+
+export function recruitmentInviteEmail(input: {
+  candidateName?: string | null;
+  role?: string | null;
+  applyUrl: string;
+  expiresLabel?: string | null;
+}): EmailContent {
+  const link = safeUrl(input.applyUrl);
+  const greetingName = input.candidateName?.trim() || 'there';
+
+  return build('Your private Bimed Healthcare application link', {
+    preheader: 'Use this private link to complete your Bimed Healthcare application.',
+    heading: 'Complete your Bimed Healthcare application',
+    paragraphs: [
+      `Dear ${greetingName},`,
+      'Bimed Healthcare has invited you to complete an application using the private link below. This link is for your use only and should not be shared.',
+    ],
+    rows: [
+      { label: 'Position', value: input.role || 'To be confirmed' },
+      { label: 'Link expires', value: input.expiresLabel || 'No expiry set' },
+    ],
+    cta: link ? { label: 'Start your application', url: link } : undefined,
+    bullets: [
+      'Have your identification and any qualification or training certificates available.',
+      'You can save your progress and return to the same link to continue.',
+      'This link can only be used to submit one application.',
+    ],
+    closing: 'Kind regards,\nBimed Healthcare Recruitment Team',
+  });
+}
+
+export function secondInterviewInviteEmail(input: {
+  candidateName: string;
+  role?: string | null;
+  applicationId: string;
+  interviewUrl: string;
+  expiresLabel?: string | null;
+}): EmailContent {
+  const link = safeUrl(input.interviewUrl);
+
+  return build('You have been invited to a second interview - Bimed Healthcare', {
+    preheader: 'Bimed Healthcare would like to move your application to a second interview.',
+    heading: "You're invited to a second interview",
+    paragraphs: [
+      `Dear ${input.candidateName},`,
+      'Thank you for completing your written interview. Bimed Healthcare would like to move your application forward to a second, practical interview.',
+      'This stage covers real care scenarios you may face on the job. There are no trick questions - answer honestly and in your own words, saying what you would actually do.',
+    ],
+    rows: [
+      { label: 'Position', value: input.role || 'To be confirmed' },
+      { label: 'Reference', value: applicationReference(input.applicationId) },
+      { label: 'Link expires', value: input.expiresLabel || 'No expiry set' },
+    ],
+    cta: link ? { label: 'Start your second interview', url: link } : undefined,
+    bullets: [
+      'You can type your answers, or use the microphone to record a voice note for each question.',
+      'Take your time - this link is for your use only and is not timed.',
+      'Contact our recruitment team first if anything is unclear.',
+    ],
+    closing: 'Kind regards,\nBimed Healthcare Recruitment Team',
+  });
+}
+
+export function adminSecondInterviewCompletedEmail(input: {
+  candidateName: string;
+  role?: string | null;
+  applicationId: string;
+  adminRecordUrl: string;
+}): EmailContent {
+  return build(`Second interview completed: ${input.candidateName}`, {
+    preheader: `${input.candidateName} completed their second interview.`,
+    heading: 'Second interview completed',
+    paragraphs: ['A candidate has completed their second (practical) interview and it is ready to review.'],
+    rows: [
+      { label: 'Candidate', value: input.candidateName },
+      { label: 'Position', value: input.role },
+      { label: 'Reference', value: applicationReference(input.applicationId) },
+    ],
+    cta: { label: 'Open candidate record', url: input.adminRecordUrl },
+    closing: 'Bimed recruitment portal',
+  });
+}
+
+export function onboardingPackEmail(input: {
+  candidateName: string;
+  role?: string | null;
+  applicationId: string;
+  contractSignUrl: string;
+  jobDescriptionUrl: string;
+  handbookUrl: string;
+}): EmailContent {
+  return build('Your Bimed Healthcare onboarding documents', {
+    preheader: 'Your employment contract, job description and employee handbook are ready.',
+    heading: 'Your onboarding documents are ready',
+    paragraphs: [
+      `Dear ${input.candidateName},`,
+      'Congratulations - please find your onboarding documents below. Review each one carefully, and sign your contract online using the link provided.',
+    ],
+    rows: [
+      { label: 'Position', value: input.role || 'To be confirmed' },
+      { label: 'Reference', value: applicationReference(input.applicationId) },
+    ],
+    ctas: [
+      { label: 'Review and sign your contract', url: input.contractSignUrl },
+      { label: 'View your job description', url: input.jobDescriptionUrl },
+      { label: 'View the employee handbook', url: input.handbookUrl },
+    ],
+    bullets: [
+      'Sign your contract online using the first link above.',
+      'Keep a copy of your job description and the employee handbook for reference.',
+      'Contact our recruitment team first if you have any questions before signing.',
+    ],
     closing: 'Kind regards,\nBimed Healthcare Recruitment Team',
   });
 }

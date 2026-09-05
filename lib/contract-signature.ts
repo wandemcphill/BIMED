@@ -79,13 +79,32 @@ export async function listContractSignaturesForApplication(applicationId: string
   return data as ContractSignatureRecord[];
 }
 
+export type SignatureCorrections = {
+  employeeName?: string;
+  employeeAddress?: string;
+  startDate?: string;
+};
+
+// Lets the candidate fix a wrong pre-filled detail (name, address, start date) at the point of
+// signing, rather than being stuck with whatever the admin entered when issuing the link.
 export async function markContractSignatureSigned(
   id: string,
-  signedName: string
+  signedName: string,
+  corrections?: SignatureCorrections
 ): Promise<ContractSignatureRecord | null> {
+  const update: Record<string, unknown> = {
+    status: 'signed',
+    signed_name: signedName,
+    signed_at: new Date().toISOString(),
+  };
+
+  if (corrections?.employeeName) update.employee_name = corrections.employeeName;
+  if (corrections?.employeeAddress !== undefined) update.employee_address = corrections.employeeAddress || null;
+  if (corrections?.startDate !== undefined) update.start_date = corrections.startDate || null;
+
   const { data, error } = await db()
     .from('recruitment_contract_signatures')
-    .update({ status: 'signed', signed_name: signedName, signed_at: new Date().toISOString() })
+    .update(update)
     .eq('id', id)
     .eq('status', 'issued')
     .select('*')

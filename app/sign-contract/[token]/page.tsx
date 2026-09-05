@@ -3,6 +3,7 @@ import EmploymentContractDocument from '@/components/EmploymentContractDocument'
 import SignContractForm from '@/components/SignContractForm';
 import { getContractSignatureByToken } from '@/lib/contract-signature';
 import { applyContractOverrides, getContractTemplate } from '@/lib/contract-templates';
+import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
 
 export const metadata: Metadata = {
   title: 'Bimed Healthcare | Sign Your Employment Contract',
@@ -62,9 +63,17 @@ export default async function SignContractPage({ params }: PageProps) {
     return <GateMessage title="Link expired" body="This contract signing link has expired. Please contact the Bimed recruitment team to have it reissued." />;
   }
 
-  const baseTemplate = getContractTemplate(signature.role_slug);
-  if (!baseTemplate) {
+  const rawTemplate = getContractTemplate(signature.role_slug);
+  if (!rawTemplate) {
     return <GateMessage title="Contract unavailable" body="The contract for this role could not be found. Please contact the Bimed recruitment team." />;
+  }
+
+  let baseTemplate = rawTemplate;
+  try {
+    const contentOverride = await getDocumentOverride('contract', signature.role_slug);
+    baseTemplate = mergeContractTemplate(rawTemplate, contentOverride);
+  } catch {
+    // Fall back to the code-defined template if the override lookup fails.
   }
 
   const template = applyContractOverrides(baseTemplate, {
@@ -81,7 +90,12 @@ export default async function SignContractPage({ params }: PageProps) {
         <small>Dated: {signature.signed_at ? new Date(signature.signed_at).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}</small>
       </>
     ) : (
-      <SignContractForm token={token} employeeName={signature.employee_name} />
+      <SignContractForm
+        token={token}
+        employeeName={signature.employee_name}
+        employeeAddress={signature.employee_address || ''}
+        startDate={signature.start_date || ''}
+      />
     );
 
   return <EmploymentContractDocument template={template} employeeSignatureSlot={employeeSignatureSlot} />;

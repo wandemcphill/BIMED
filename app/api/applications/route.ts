@@ -4,6 +4,7 @@ import { hashToken } from '@/lib/token';
 import { sendApplicationReceivedEmails } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
+import { uploadInterviewVoiceNotes } from '@/lib/interview-audio';
 import { MAX_JSON_BYTES, readJsonBody, validateCandidateApplication } from '@/lib/request-validation';
 
 // Supabase RPC errors are PostgrestError objects ({ code, message, details, hint }),
@@ -44,9 +45,32 @@ export async function POST(req: NextRequest) {
 
     const client = db();
     const payload = validation.data;
+    const tokenHash = hashToken(String(payload.token));
+
+    let interviewResponses = payload.interview_responses;
+    if (interviewResponses && typeof interviewResponses === 'object') {
+      try {
+        interviewResponses = await uploadInterviewVoiceNotes(
+          client,
+          tokenHash,
+          interviewResponses as Record<string, { text?: string; audio_base64?: string; mime_type?: string }>
+        );
+      } catch (uploadError) {
+        console.error(JSON.stringify({
+          level: 'error',
+          event: 'interview_audio.upload_failed',
+          reason: uploadError instanceof Error ? uploadError.message : 'unknown',
+        }));
+        return NextResponse.json(
+          { error: 'Unable to save a voice note answer. Please try re-recording it, or type that answer instead.' },
+          { status: 500 }
+        );
+      }
+    }
+
     const { data: application, error: applicationError } = await client.rpc('create_recruitment_application', {
-      p_token_hash: hashToken(String(payload.token)),
-      p_payload: payload,
+      p_token_hash: tokenHash,
+      p_payload: { ...payload, interview_responses: interviewResponses },
     });
 
     if (applicationError || !application) {

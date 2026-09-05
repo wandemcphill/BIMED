@@ -2,8 +2,10 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { candidateSupportDocuments, recruitmentStatuses, isInternationalCandidate } from '@/lib/recruitment-config';
 import { contractTemplates, guessContractRoleSlug } from '@/lib/contract-templates';
+import { FIRST_INTERVIEW_ALL_QUESTIONS, getSecondInterviewQuestions } from '@/lib/interview-questions';
 import AdminInterviewPanel from '@/components/AdminInterviewPanel';
 
 type ApplicationRecord = {
@@ -42,6 +44,16 @@ type ApplicationRecord = {
   submitted_at: string;
   updated_at: string | null;
   invite_id: string | null;
+  interview_responses: Record<string, { text?: string; audio_path?: string }> | null;
+};
+
+type SecondInterview = {
+  id: string;
+  status: 'sent' | 'completed';
+  answers: Record<string, string | { audio_path: string; mime_type: string }> | null;
+  sent_at: string;
+  completed_at: string | null;
+  expires_at: string | null;
 };
 
 type ContractSignature = {
@@ -72,6 +84,7 @@ type ApplicationPayload = {
     used_at?: string | null;
   };
   auditLog?: AuditLogEntry[];
+  interviewAudioUrls?: Record<string, string>;
 };
 
 function formatDate(value: string | null) {
@@ -105,6 +118,7 @@ export default function AdminApplicationDetail({
 }: {
   applicationId: string;
 }) {
+  const router = useRouter();
   const [bootstrapping, setBootstrapping] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
@@ -120,6 +134,12 @@ export default function AdminApplicationDetail({
   const [sendingForSignature, setSendingForSignature] = useState(false);
   const [signatureMessage, setSignatureMessage] = useState('');
   const [issuingPack, setIssuingPack] = useState(false);
+  const [packMessage, setPackMessage] = useState('');
+  const [secondInterviews, setSecondInterviews] = useState<SecondInterview[]>([]);
+  const [secondInterviewAudioUrls, setSecondInterviewAudioUrls] = useState<Record<string, Record<string, string>>>({});
+  const [sendingSecondInterview, setSendingSecondInterview] = useState(false);
+  const [secondInterviewMessage, setSecondInterviewMessage] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const loadApplication = async () => {
     const response = await fetch(`/api/admin/applications/${applicationId}`);
@@ -144,6 +164,7 @@ export default function AdminApplicationDetail({
     setAuthenticated(true);
     setBootstrapping(false);
     await loadSignatures();
+    await loadSecondInterviews();
   };
 
   const loadSignatures = async () => {
@@ -151,6 +172,58 @@ export default function AdminApplicationDetail({
     if (!response.ok) return;
     const nextPayload = (await response.json()) as { signatures: ContractSignature[] };
     setSignatures(nextPayload.signatures || []);
+  };
+
+  const loadSecondInterviews = async () => {
+    const response = await fetch(`/api/admin/applications/${applicationId}/second-interview`);
+    if (!response.ok) return;
+    const nextPayload = (await response.json()) as {
+      interviews: SecondInterview[];
+      audioUrlsByInterview: Record<string, Record<string, string>>;
+    };
+    setSecondInterviews(nextPayload.interviews || []);
+    setSecondInterviewAudioUrls(nextPayload.audioUrlsByInterview || {});
+  };
+
+  const sendSecondInterview = async () => {
+    setSendingSecondInterview(true);
+    setSecondInterviewMessage('');
+
+    const response = await fetch(`/api/admin/applications/${applicationId}/second-interview`, { method: 'POST' });
+    const nextPayload = await response.json();
+    setSendingSecondInterview(false);
+
+    if (!response.ok) {
+      setSecondInterviewMessage(nextPayload.error || 'Unable to send the second interview.');
+      return;
+    }
+
+    setSecondInterviewMessage(
+      nextPayload.email?.status === 'sent'
+        ? 'Second interview emailed to the candidate.'
+        : 'Second interview created, but the email could not be confirmed as sent. Check the candidate email delivery.'
+    );
+    await loadSecondInterviews();
+  };
+
+  const deleteApplication = async () => {
+    if (!payload) return;
+    const confirmed = window.confirm(
+      `Permanently delete ${payload.application.full_name}'s application? This removes their answers, interviews, contract signatures and any voice notes. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    const response = await fetch(`/api/admin/applications/${applicationId}`, { method: 'DELETE' });
+
+    if (!response.ok) {
+      const nextPayload = await response.json().catch(() => ({}));
+      setDeleting(false);
+      setMessage(nextPayload.error || 'Unable to delete this application.');
+      return;
+    }
+
+    router.push('/admin');
   };
 
   const sendForSignature = async () => {
@@ -182,25 +255,29 @@ export default function AdminApplicationDetail({
 
   const issueOnboardingPack = async () => {
     setIssuingPack(true);
+    setPackMessage('');
 
-    const response = await fetch(`/api/admin/applications/${applicationId}`, {
-      method: 'PATCH',
+    const response = await fetch(`/api/admin/applications/${applicationId}/onboarding-pack`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Offer Issued' }),
+      body: JSON.stringify({ role_slug: contractRoleSlug }),
     });
 
-    if (response.ok) {
-      const nextPayload = await response.json();
-      setPayload((current) => (current ? { ...current, application: nextPayload.application } : current));
-      setStatus(nextPayload.application.status);
-    }
-
+    const nextPayload = await response.json();
     setIssuingPack(false);
 
-    const base = window.location.origin;
-    window.open(`${base}/contract-letterhead/${contractRoleSlug}?applicationId=${applicationId}`, '_blank', 'noopener');
-    window.open(`${base}/documents/job-description/${contractRoleSlug}`, '_blank', 'noopener');
-    window.open(`${base}/documents/employee-handbook`, '_blank', 'noopener');
+    if (!response.ok) {
+      setPackMessage(nextPayload.error || 'Unable to send the onboarding pack.');
+      return;
+    }
+
+    setPackMessage(
+      nextPayload.email?.status === 'sent'
+        ? 'Onboarding pack emailed to the candidate (contract signing link, job description and handbook).'
+        : 'Onboarding pack created, but the email could not be confirmed as sent. Check the candidate email delivery.'
+    );
+    setStatus('Offer Issued');
+    await loadSignatures();
   };
 
   const checkSession = async () => {
@@ -374,6 +451,9 @@ export default function AdminApplicationDetail({
           <a className="secondary link-button" href="/admin">
             Back to dashboard
           </a>
+          <button className="secondary danger" onClick={() => void deleteApplication()} disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete application'}
+          </button>
           <button className="secondary" onClick={() => void logout()}>
             Sign out
           </button>
@@ -462,12 +542,13 @@ export default function AdminApplicationDetail({
       <section className="subcard">
         <h2>Issue onboarding pack</h2>
         <p className="muted">
-          Marks the application as &quot;Offer Issued&quot; and opens the pre-filled contract, job description and employee
-          handbook together for review before sending them on.
+          Emails the candidate a contract signing link, their job description and the employee handbook in one message, and
+          marks the application &quot;Offer Issued&quot;.
         </p>
         <button className="primary" onClick={() => void issueOnboardingPack()} disabled={issuingPack}>
-          {issuingPack ? 'Issuing...' : 'Issue onboarding pack'}
+          {issuingPack ? 'Sending...' : 'Send onboarding pack to candidate'}
         </button>
+        {packMessage && <div className="success" style={{ marginTop: 12 }}>{packMessage}</div>}
       </section>
 
       <AdminInterviewPanel applicationId={applicationId} onStatusChanged={() => void loadApplication()} />
@@ -527,6 +608,76 @@ export default function AdminApplicationDetail({
           <div className="notice" style={{ marginTop: 12 }}>
             <b>International route:</b> employment permit and immigration requirements must be satisfied before lawful commencement
             of employment.
+          </div>
+        )}
+      </section>
+
+      <section className="subcard">
+        <h2>Written interview</h2>
+        {application.interview_responses && Object.keys(application.interview_responses).length > 0 ? (
+          <div className="activity-list">
+            {FIRST_INTERVIEW_ALL_QUESTIONS.filter((question) => application.interview_responses?.[question.id]).map((question) => {
+              const answer = application.interview_responses![question.id];
+              const audioUrl = payload.interviewAudioUrls?.[question.id];
+              return (
+                <article className="activity-item" key={question.id}>
+                  <div className="activity-heading">
+                    <strong>{question.category}</strong>
+                  </div>
+                  <p className="muted">{question.text}</p>
+                  {audioUrl ? (
+                    <audio controls src={audioUrl} style={{ width: '100%' }} />
+                  ) : (
+                    <p>{answer.text || 'Not answered'}</p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="muted">No written interview answers recorded.</p>
+        )}
+      </section>
+
+      <section className="subcard">
+        <h2>Second interview (practical)</h2>
+        <p className="muted">
+          Send this to candidates being seriously considered. Covers tougher, safeguarding-led care scenarios.
+        </p>
+        <button className="primary" onClick={() => void sendSecondInterview()} disabled={sendingSecondInterview}>
+          {sendingSecondInterview ? 'Sending...' : 'Send second interview'}
+        </button>
+        {secondInterviewMessage && <div className="success" style={{ marginTop: 12 }}>{secondInterviewMessage}</div>}
+
+        {secondInterviews.length > 0 && (
+          <div className="activity-list" style={{ marginTop: 16 }}>
+            {secondInterviews.map((interview) => (
+              <article className="activity-item" key={interview.id}>
+                <div className="activity-heading">
+                  <strong>{interview.status === 'completed' ? 'Completed' : 'Awaiting response'}</strong>
+                  <span>{formatDate(interview.status === 'completed' ? interview.completed_at : interview.sent_at)}</span>
+                </div>
+                {interview.status === 'completed' && interview.answers && (
+                  <div style={{ marginTop: 8 }}>
+                    {getSecondInterviewQuestions(application.role_applied).filter((question) => interview.answers?.[question.id]).map((question) => {
+                      const answer = interview.answers![question.id];
+                      const audioUrl = secondInterviewAudioUrls[interview.id]?.[question.id];
+                      return (
+                        <div key={question.id} style={{ marginTop: 10 }}>
+                          <strong style={{ display: 'block', fontSize: 13 }}>{question.category}</strong>
+                          <p className="muted" style={{ margin: '2px 0 6px' }}>{question.text}</p>
+                          {audioUrl ? (
+                            <audio controls src={audioUrl} style={{ width: '100%' }} />
+                          ) : (
+                            <p style={{ margin: 0 }}>{typeof answer === 'string' ? answer : ''}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </article>
+            ))}
           </div>
         )}
       </section>

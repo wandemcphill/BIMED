@@ -21,9 +21,13 @@ import {
   applicationReceivedEmail,
   applicationStatusUpdateEmail,
   contractReadyToSignEmail,
+  adminSecondInterviewCompletedEmail,
   interviewCancelledEmail,
   interviewInvitationEmail,
   interviewRescheduledEmail,
+  onboardingPackEmail,
+  recruitmentInviteEmail,
+  secondInterviewInviteEmail,
 } from './templates';
 import { sendTransactionalEmail, type SendResult } from './transport';
 
@@ -82,6 +86,41 @@ function internalRecipients(application: ApplicationEmailRecord): string[] {
   const configured = getInternalRecruitmentRecipients(application);
 
   return [...new Set(extra ? [...configured, extra] : configured)];
+}
+
+// ---------------------------------------------------------------------------
+// Recruitment invites
+// ---------------------------------------------------------------------------
+
+/**
+ * Sends the private application link directly to the candidate. This is what makes invite
+ * creation a one-step action instead of the admin having to copy the link and email it
+ * themselves - the only way this scales past a handful of candidates.
+ */
+export async function sendRecruitmentInviteEmail(
+  input: {
+    inviteId: string;
+    candidateEmail: string;
+    candidateName?: string | null;
+    role?: string | null;
+    applyUrl: string;
+    expiresLabel?: string | null;
+  },
+  client?: SupabaseClient | null
+): Promise<SendResult> {
+  return sendTransactionalEmail({
+    to: input.candidateEmail,
+    content: recruitmentInviteEmail({
+      candidateName: input.candidateName,
+      role: input.role,
+      applyUrl: input.applyUrl,
+      expiresLabel: input.expiresLabel,
+    }),
+    emailType: 'recruitment_invite',
+    dedupeKey: `recruitment_invite:${input.inviteId}`,
+    client,
+    replyTo: recruitmentContacts.ireland,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -366,6 +405,92 @@ async function sendInterviewAdminNotifications(
       })
     )
   );
+}
+
+// ---------------------------------------------------------------------------
+// Second (practical) interview
+// ---------------------------------------------------------------------------
+
+export async function sendSecondInterviewInviteEmail(
+  input: { application: ApplicationEmailRecord; interviewUrl: string; expiresLabel?: string | null; interviewId: string },
+  client?: SupabaseClient | null
+): Promise<SendResult> {
+  return sendTransactionalEmail({
+    to: input.application.email,
+    content: secondInterviewInviteEmail({
+      candidateName: input.application.full_name,
+      role: input.application.role_applied,
+      applicationId: input.application.id,
+      interviewUrl: input.interviewUrl,
+      expiresLabel: input.expiresLabel,
+    }),
+    emailType: 'second_interview_invite',
+    dedupeKey: `second_interview_invite:${input.interviewId}`,
+    applicationId: input.application.id,
+    client,
+    replyTo: recruitmentContacts.ireland,
+  });
+}
+
+export async function sendSecondInterviewCompletedEmails(
+  input: { application: ApplicationEmailRecord; interviewId: string },
+  client?: SupabaseClient | null
+): Promise<SendResult[]> {
+  const content = adminSecondInterviewCompletedEmail({
+    candidateName: input.application.full_name,
+    role: input.application.role_applied,
+    applicationId: input.application.id,
+    adminRecordUrl: adminRecordUrl(input.application.id),
+  });
+
+  return Promise.all(
+    internalRecipients(input.application).map((recipient) =>
+      sendTransactionalEmail({
+        to: recipient,
+        content,
+        emailType: 'admin_second_interview_completed',
+        dedupeKey: `admin_second_interview_completed:${input.interviewId}:${recipient}`,
+        applicationId: input.application.id,
+        client,
+      })
+    )
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding pack
+// ---------------------------------------------------------------------------
+
+/**
+ * The email that actually delivers the onboarding documents to a candidate: contract
+ * signing link, job description, and handbook, all in one message.
+ */
+export async function sendOnboardingPackEmail(
+  input: {
+    application: ApplicationEmailRecord;
+    contractSignUrl: string;
+    jobDescriptionUrl: string;
+    handbookUrl: string;
+    packId: string;
+  },
+  client?: SupabaseClient | null
+): Promise<SendResult> {
+  return sendTransactionalEmail({
+    to: input.application.email,
+    content: onboardingPackEmail({
+      candidateName: input.application.full_name,
+      role: input.application.role_applied,
+      applicationId: input.application.id,
+      contractSignUrl: input.contractSignUrl,
+      jobDescriptionUrl: input.jobDescriptionUrl,
+      handbookUrl: input.handbookUrl,
+    }),
+    emailType: 'onboarding_pack',
+    dedupeKey: `onboarding_pack:${input.packId}`,
+    applicationId: input.application.id,
+    client,
+    replyTo: recruitmentContacts.ireland,
+  });
 }
 
 // ---------------------------------------------------------------------------

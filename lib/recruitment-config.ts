@@ -13,6 +13,7 @@ export const recruitmentRoles = [
   'Support Worker',
   'Healthcare Worker',
   'Healthcare Assistant',
+  'Physiotherapist',
   'Other',
 ] as const;
 
@@ -48,6 +49,7 @@ export const candidateStepTitles = [
   'Experience and qualifications',
   'Employment and references',
   'Ireland / international pathway',
+  'Written interview',
   'Supporting documents',
   'Review',
   'Declaration',
