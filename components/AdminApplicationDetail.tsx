@@ -140,6 +140,12 @@ export default function AdminApplicationDetail({
   const [sendingSecondInterview, setSendingSecondInterview] = useState(false);
   const [secondInterviewMessage, setSecondInterviewMessage] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [handbookSignatures, setHandbookSignatures] = useState<ContractSignature[]>([]);
+  const [sendingHandbook, setSendingHandbook] = useState(false);
+  const [handbookMessage, setHandbookMessage] = useState('');
+  const [jobDescSignatures, setJobDescSignatures] = useState<ContractSignature[]>([]);
+  const [sendingJobDesc, setSendingJobDesc] = useState(false);
+  const [jobDescMessage, setJobDescMessage] = useState('');
 
   const loadApplication = async () => {
     const response = await fetch(`/api/admin/applications/${applicationId}`);
@@ -165,6 +171,8 @@ export default function AdminApplicationDetail({
     setBootstrapping(false);
     await loadSignatures();
     await loadSecondInterviews();
+    await loadHandbookSignatures();
+    await loadJobDescSignatures();
   };
 
   const loadSignatures = async () => {
@@ -172,6 +180,72 @@ export default function AdminApplicationDetail({
     if (!response.ok) return;
     const nextPayload = (await response.json()) as { signatures: ContractSignature[] };
     setSignatures(nextPayload.signatures || []);
+  };
+
+  const loadHandbookSignatures = async () => {
+    const response = await fetch(`/api/admin/applications/${applicationId}/document-signature?doc_type=handbook`);
+    if (!response.ok) return;
+    const nextPayload = (await response.json()) as { signatures: ContractSignature[] };
+    setHandbookSignatures(nextPayload.signatures || []);
+  };
+
+  const loadJobDescSignatures = async () => {
+    const response = await fetch(`/api/admin/applications/${applicationId}/document-signature?doc_type=job_description`);
+    if (!response.ok) return;
+    const nextPayload = (await response.json()) as { signatures: ContractSignature[] };
+    setJobDescSignatures(nextPayload.signatures || []);
+  };
+
+  const sendHandbookForSignature = async () => {
+    setSendingHandbook(true);
+    setHandbookMessage('');
+
+    const response = await fetch(`/api/admin/applications/${applicationId}/document-signature`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doc_type: 'handbook' }),
+    });
+
+    const nextPayload = await response.json();
+    setSendingHandbook(false);
+
+    if (!response.ok) {
+      setHandbookMessage(nextPayload.error || 'Unable to send the handbook for signature.');
+      return;
+    }
+
+    setHandbookMessage(
+      nextPayload.email?.status === 'sent'
+        ? 'Signing link emailed to the candidate.'
+        : 'Signing link created, but the email could not be confirmed as sent. Check the candidate email delivery.'
+    );
+    await loadHandbookSignatures();
+  };
+
+  const sendJobDescriptionForSignature = async () => {
+    setSendingJobDesc(true);
+    setJobDescMessage('');
+
+    const response = await fetch(`/api/admin/applications/${applicationId}/document-signature`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doc_type: 'job_description', role_slug: contractRoleSlug }),
+    });
+
+    const nextPayload = await response.json();
+    setSendingJobDesc(false);
+
+    if (!response.ok) {
+      setJobDescMessage(nextPayload.error || 'Unable to send the job description for signature.');
+      return;
+    }
+
+    setJobDescMessage(
+      nextPayload.email?.status === 'sent'
+        ? 'Signing link emailed to the candidate.'
+        : 'Signing link created, but the email could not be confirmed as sent. Check the candidate email delivery.'
+    );
+    await loadJobDescSignatures();
   };
 
   const loadSecondInterviews = async () => {
@@ -540,10 +614,57 @@ export default function AdminApplicationDetail({
       </section>
 
       <section className="subcard">
+        <h2>Handbook e-signature</h2>
+        <p className="muted">Sends the employee handbook for the candidate to review and sign online.</p>
+        <button className="secondary" onClick={() => void sendHandbookForSignature()} disabled={sendingHandbook}>
+          {sendingHandbook ? 'Sending...' : 'Send handbook for e-signature'}
+        </button>
+        {handbookMessage && <div className="success" style={{ marginTop: 12 }}>{handbookMessage}</div>}
+        {handbookSignatures.length > 0 && (
+          <div className="activity-list" style={{ marginTop: 16 }}>
+            {handbookSignatures.map((signature) => (
+              <article className="activity-item" key={signature.id}>
+                <div className="activity-heading">
+                  <strong>{signature.status === 'signed' ? 'Signed' : 'Awaiting signature'}</strong>
+                  <span>{signature.status === 'signed' ? formatDate(signature.signed_at) : formatDate(signature.issued_at)}</span>
+                </div>
+                <p className="muted">{signature.status === 'signed' ? `Signed as ${signature.signed_name}` : 'Link sent to candidate'}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="subcard">
+        <h2>Job description e-signature</h2>
+        <p className="muted">Sends the {contractRoleSlug ? contractTemplates.find((t) => t.roleSlug === contractRoleSlug)?.roleLabel : 'role'} job description for the candidate to review and sign online. Uses the role selected above under &quot;Generate contract&quot;.</p>
+        <button className="secondary" onClick={() => void sendJobDescriptionForSignature()} disabled={sendingJobDesc}>
+          {sendingJobDesc ? 'Sending...' : 'Send job description for e-signature'}
+        </button>
+        {jobDescMessage && <div className="success" style={{ marginTop: 12 }}>{jobDescMessage}</div>}
+        {jobDescSignatures.length > 0 && (
+          <div className="activity-list" style={{ marginTop: 16 }}>
+            {jobDescSignatures.map((signature) => (
+              <article className="activity-item" key={signature.id}>
+                <div className="activity-heading">
+                  <strong>{signature.status === 'signed' ? 'Signed' : 'Awaiting signature'}</strong>
+                  <span>{signature.status === 'signed' ? formatDate(signature.signed_at) : formatDate(signature.issued_at)}</span>
+                </div>
+                <p className="muted">
+                  Role: {signature.role_slug}
+                  {signature.status === 'signed' ? ` - Signed as ${signature.signed_name}` : ' - Link sent to candidate'}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="subcard">
         <h2>Issue onboarding pack</h2>
         <p className="muted">
-          Emails the candidate a contract signing link, their job description and the employee handbook in one message, and
-          marks the application &quot;Offer Issued&quot;.
+          Emails the candidate sign-online links for their contract, job description and the employee handbook in one message,
+          and marks the application &quot;Offer Issued&quot;.
         </p>
         <button className="primary" onClick={() => void issueOnboardingPack()} disabled={issuingPack}>
           {issuingPack ? 'Sending...' : 'Send onboarding pack to candidate'}

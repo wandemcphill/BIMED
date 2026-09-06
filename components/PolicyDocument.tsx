@@ -3,7 +3,14 @@ import EmploymentContractLetterhead from '@/components/EmploymentContractLetterh
 import type { DocumentTemplate } from '@/lib/document-templates';
 import PrintContractButton from '@/components/PrintContractButton';
 
-export default function PolicyDocument({ template }: { template: DocumentTemplate }) {
+export default function PolicyDocument({
+  template,
+  employeeSignatureSlot,
+}: {
+  template: DocumentTemplate;
+  /** Replaces the default blank employee signature line - used by the live e-signing page. */
+  employeeSignatureSlot?: ReactNode;
+}) {
   return (
     <EmploymentContractLetterhead>
       <section className="contract-section">
@@ -73,9 +80,13 @@ export default function PolicyDocument({ template }: { template: DocumentTemplat
           </div>
           <div>
             <span>Employee</span>
-            <div className="signature-line" />
-            <strong>{withPlaceholders('[Insert employee name]')}</strong>
-            <small>Dated: [Insert date signed]</small>
+            {employeeSignatureSlot ?? (
+              <>
+                <div className="signature-line" />
+                <strong>{withPlaceholders('[Insert employee name]')}</strong>
+                <small>Dated: [Insert date signed]</small>
+              </>
+            )}
           </div>
         </section>
       </section>

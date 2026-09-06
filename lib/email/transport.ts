@@ -36,6 +36,8 @@ export type EmailType =
   | 'admin_password_reset'
   | 'contract_ready_to_sign'
   | 'admin_contract_signed'
+  | 'document_ready_to_sign'
+  | 'admin_document_signed'
   | 'onboarding_pack'
   | 'recruitment_invite'
   | 'second_interview_invite'

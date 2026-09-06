@@ -7,13 +7,13 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  getInternalRecruitmentRecipients,
   isInternationalCandidate,
   recruitmentContacts,
   supportingDocumentsEmail,
 } from '../recruitment-config';
 import {
   adminContractSignedEmail,
+  adminDocumentSignedEmail,
   adminInterviewNotificationEmail,
   adminNewApplicationEmail,
   adminPasswordResetEmail,
@@ -21,6 +21,7 @@ import {
   applicationReceivedEmail,
   applicationStatusUpdateEmail,
   contractReadyToSignEmail,
+  documentReadyToSignEmail,
   adminSecondInterviewCompletedEmail,
   interviewCancelledEmail,
   interviewInvitationEmail,
@@ -74,18 +75,6 @@ function submittedLabel(value?: string | null): string {
   const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
 
   return safeDate.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-/**
- * Recruitment/admin staff addresses come from the existing BIMED_* configuration.
- * RECRUITMENT_ADMIN_EMAIL is an optional extra recipient for deployments that want a
- * dedicated inbox without changing the routing rules.
- */
-function internalRecipients(application: ApplicationEmailRecord): string[] {
-  const extra = process.env.RECRUITMENT_ADMIN_EMAIL?.trim();
-  const configured = getInternalRecruitmentRecipients(application);
-
-  return [...new Set(extra ? [...configured, extra] : configured)];
 }
 
 // ---------------------------------------------------------------------------
@@ -165,8 +154,10 @@ export async function sendApplicationReceivedEmails(
     applicationId: application.id,
   });
 
+  // New-application alerts go to info@bimedhealthcare.com only, not the full internal
+  // distribution (recruitment/overseas + manager) that other notification types use.
   const internal = await Promise.all(
-    internalRecipients(application).map((recipient) =>
+    [recruitmentContacts.admin].map((recipient) =>
       sendTransactionalEmail({
         to: recipient,
         content: adminContent,
@@ -255,8 +246,10 @@ export async function sendApplicationStatusUpdateEmails(
     adminRecordUrl: adminRecordUrl(application.id),
   });
 
+  // Status-update alerts go to the candidate (above) and info@bimedhealthcare.com only, not the
+  // full internal distribution (recruitment/overseas + manager) that other notification types use.
   const internal = await Promise.all(
-    internalRecipients(application).map((recipient) =>
+    [recruitmentContacts.admin].map((recipient) =>
       sendTransactionalEmail({
         to: recipient,
         content: adminContent,
@@ -393,8 +386,9 @@ async function sendInterviewAdminNotifications(
     adminRecordUrl: adminRecordUrl(application.id),
   });
 
+  // Admin-only alert: goes to info@bimedhealthcare.com only, not the full internal distribution.
   return Promise.all(
-    internalRecipients(application).map((recipient) =>
+    [recruitmentContacts.admin].map((recipient) =>
       sendTransactionalEmail({
         to: recipient,
         content,
@@ -443,8 +437,9 @@ export async function sendSecondInterviewCompletedEmails(
     adminRecordUrl: adminRecordUrl(input.application.id),
   });
 
+  // Admin-only alert: goes to info@bimedhealthcare.com only, not the full internal distribution.
   return Promise.all(
-    internalRecipients(input.application).map((recipient) =>
+    [recruitmentContacts.admin].map((recipient) =>
       sendTransactionalEmail({
         to: recipient,
         content,
@@ -530,13 +525,68 @@ export async function sendContractSignedNotificationEmails(
     adminRecordUrl: adminRecordUrl(input.application.id),
   });
 
+  // Admin-only alert: goes to info@bimedhealthcare.com only, not the full internal distribution.
   return Promise.all(
-    internalRecipients(input.application).map((recipient) =>
+    [recruitmentContacts.admin].map((recipient) =>
       sendTransactionalEmail({
         to: recipient,
         content,
         emailType: 'admin_contract_signed',
         dedupeKey: `admin_contract_signed:${input.signatureId}:${recipient}`,
+        applicationId: input.application.id,
+        client,
+      })
+    )
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Handbook / job description e-signature (generic document signing, contract keeps its own above)
+// ---------------------------------------------------------------------------
+
+export async function sendDocumentReadyToSignEmail(
+  input: { application: ApplicationEmailRecord; documentLabel: string; signUrl: string; signatureId: string },
+  client?: SupabaseClient | null
+): Promise<SendResult> {
+  return sendTransactionalEmail({
+    to: input.application.email,
+    content: documentReadyToSignEmail({
+      candidateName: input.application.full_name,
+      documentLabel: input.documentLabel,
+      role: input.application.role_applied,
+      applicationId: input.application.id,
+      signUrl: input.signUrl,
+    }),
+    emailType: 'document_ready_to_sign',
+    dedupeKey: `document_ready_to_sign:${input.signatureId}`,
+    applicationId: input.application.id,
+    client,
+    replyTo: recruitmentContacts.ireland,
+  });
+}
+
+export async function sendDocumentSignedNotificationEmails(
+  input: { application: ApplicationEmailRecord; documentLabel: string; signedName: string; signedAtLabel: string; signatureId: string },
+  client?: SupabaseClient | null
+): Promise<SendResult[]> {
+  const content = adminDocumentSignedEmail({
+    candidateName: input.application.full_name,
+    documentLabel: input.documentLabel,
+    role: input.application.role_applied,
+    applicationId: input.application.id,
+    signedName: input.signedName,
+    signedAtLabel: input.signedAtLabel,
+    adminRecordUrl: adminRecordUrl(input.application.id),
+  });
+
+  // Admin-only alert: goes to info@bimedhealthcare.com only, not the full internal distribution.
+  return Promise.all(
+    [recruitmentContacts.admin].map((recipient) =>
+      sendTransactionalEmail({
+        to: recipient,
+        content,
+        emailType: 'admin_document_signed',
+        dedupeKey: `admin_document_signed:${input.signatureId}:${recipient}`,
         applicationId: input.application.id,
         client,
       })

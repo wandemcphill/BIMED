@@ -555,11 +555,11 @@ export function onboardingPackEmail(input: {
   handbookUrl: string;
 }): EmailContent {
   return build('Your Bimed Healthcare onboarding documents', {
-    preheader: 'Your employment contract, job description and employee handbook are ready.',
+    preheader: 'Your employment contract, job description and employee handbook are ready to review and sign.',
     heading: 'Your onboarding documents are ready',
     paragraphs: [
       `Dear ${input.candidateName},`,
-      'Congratulations - please find your onboarding documents below. Review each one carefully, and sign your contract online using the link provided.',
+      'Congratulations - please find your onboarding documents below. Review each one carefully and sign online using the links provided.',
     ],
     rows: [
       { label: 'Position', value: input.role || 'To be confirmed' },
@@ -567,12 +567,12 @@ export function onboardingPackEmail(input: {
     ],
     ctas: [
       { label: 'Review and sign your contract', url: input.contractSignUrl },
-      { label: 'View your job description', url: input.jobDescriptionUrl },
-      { label: 'View the employee handbook', url: input.handbookUrl },
+      { label: 'Review and sign your job description', url: input.jobDescriptionUrl },
+      { label: 'Review and sign the employee handbook', url: input.handbookUrl },
     ],
     bullets: [
-      'Sign your contract online using the first link above.',
-      'Keep a copy of your job description and the employee handbook for reference.',
+      'Sign all three documents online using the links above.',
+      'Each link is for your use only and does not expire quickly, but should not be shared.',
       'Contact our recruitment team first if you have any questions before signing.',
     ],
     closing: 'Kind regards,\nBimed Healthcare Recruitment Team',
@@ -609,9 +609,66 @@ export function contractReadyToSignEmail(input: {
   });
 }
 
+// Generic version of contractReadyToSignEmail for the handbook and job description - anything
+// that isn't the contract itself, which keeps its own dedicated wording above.
+export function documentReadyToSignEmail(input: {
+  candidateName: string;
+  documentLabel: string;
+  role?: string | null;
+  applicationId: string;
+  signUrl: string;
+}): EmailContent {
+  const link = safeUrl(input.signUrl);
+
+  return build(`Your Bimed Healthcare ${input.documentLabel} is ready to sign`, {
+    preheader: `Your ${input.documentLabel} is ready for you to review and sign online.`,
+    heading: `Your ${input.documentLabel} is ready to sign`,
+    paragraphs: [
+      `Dear ${input.candidateName},`,
+      `Your Bimed Healthcare ${input.documentLabel} has been prepared and is ready for you to review and sign online.`,
+    ],
+    rows: [
+      { label: 'Position', value: input.role || 'To be confirmed' },
+      { label: 'Reference', value: applicationReference(input.applicationId) },
+    ],
+    callout: `Please read the full ${input.documentLabel} carefully before signing. This link is for your use only and should not be shared.`,
+    cta: link ? { label: `Review and sign your ${input.documentLabel}`, url: link } : undefined,
+    bullets: [
+      'Signing online confirms you have received and read this document.',
+      'Contact our recruitment team first if you have any questions before signing.',
+    ],
+    closing: 'Kind regards,\nBimed Healthcare Recruitment Team',
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Admin templates
 // ---------------------------------------------------------------------------
+
+export function adminDocumentSignedEmail(input: {
+  candidateName: string;
+  documentLabel: string;
+  role?: string | null;
+  applicationId: string;
+  signedName: string;
+  signedAtLabel: string;
+  adminRecordUrl: string;
+}): EmailContent {
+  return build(`${input.documentLabel} signed: ${input.candidateName}`, {
+    preheader: `${input.candidateName} signed their ${input.documentLabel}.`,
+    heading: `${input.documentLabel} signed`,
+    paragraphs: [`A candidate has signed their ${input.documentLabel} online.`],
+    rows: [
+      { label: 'Candidate', value: input.candidateName },
+      { label: 'Position', value: input.role },
+      { label: 'Reference', value: applicationReference(input.applicationId) },
+      { label: 'Signed as', value: input.signedName },
+      { label: 'Signed at', value: input.signedAtLabel },
+    ],
+    cta: { label: 'Open candidate record', url: input.adminRecordUrl },
+    closing: 'Bimed recruitment portal',
+  });
+}
 
 export function adminContractSignedEmail(input: {
   candidateName: string;

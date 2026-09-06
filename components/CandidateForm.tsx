@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   candidateStepTitles,
   candidateSupportDocuments,
+  countries,
   recruitmentContacts,
   recruitmentCopy,
   recruitmentRoles,
@@ -529,13 +530,9 @@ export default function CandidateForm({
             <Field label="Country of residence *">
               <select value={form.country_of_residence} onChange={(event) => setField('country_of_residence', event.target.value)}>
                 <option value="">Select</option>
-                <option>Ireland</option>
-                <option>Nigeria</option>
-                <option>Ghana</option>
-                <option>Kenya</option>
-                <option>South Africa</option>
-                <option>United Kingdom</option>
-                <option>Other</option>
+                {countries.map((country) => (
+                  <option key={country}>{country}</option>
+                ))}
               </select>
             </Field>
             <Field label="Current address" full>

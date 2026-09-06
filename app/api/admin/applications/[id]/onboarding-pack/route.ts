@@ -3,9 +3,9 @@ import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
-import { getAppUrl, sendOnboardingPackEmail } from '@/lib/email';
+import { sendOnboardingPackEmail } from '@/lib/email';
 import { getContractTemplate } from '@/lib/contract-templates';
-import { createContractSignatureRequest } from '@/lib/contract-signature';
+import { createDocumentSignatureRequest } from '@/lib/contract-signature';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -45,25 +45,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
-    const { record: signature, signUrl } = await createContractSignatureRequest({
+    const contractInfo = {
       applicationId: application.id,
-      roleSlug,
       employeeName: application.full_name,
       employeeAddress: application.address,
       startDate: application.start_date,
       issuedBy: session.email,
-    });
+    };
 
-    const jobDescriptionUrl = `${getAppUrl()}/documents/job-description/${roleSlug}?applicationId=${application.id}`;
-    const handbookUrl = `${getAppUrl()}/documents/employee-handbook`;
+    const [contractResult, jobDescResult, handbookResult] = await Promise.all([
+      createDocumentSignatureRequest({ ...contractInfo, docType: 'contract', roleSlug }),
+      createDocumentSignatureRequest({ ...contractInfo, docType: 'job_description', roleSlug }),
+      createDocumentSignatureRequest({ ...contractInfo, docType: 'handbook', roleSlug: '' }),
+    ]);
 
     const email = await sendOnboardingPackEmail(
       {
         application,
-        contractSignUrl: signUrl,
-        jobDescriptionUrl,
-        handbookUrl,
-        packId: signature.id,
+        contractSignUrl: contractResult.signUrl,
+        jobDescriptionUrl: jobDescResult.signUrl,
+        handbookUrl: handbookResult.signUrl,
+        packId: contractResult.record.id,
       },
       client
     );
@@ -77,10 +79,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
       applicationId: application.id,
       eventType: 'onboarding_pack_sent',
       actor: session.email,
-      metadata: { signature_id: signature.id, role_slug: roleSlug, previous_status: previousStatus, email_status: email.status },
+      metadata: {
+        contract_signature_id: contractResult.record.id,
+        job_description_signature_id: jobDescResult.record.id,
+        handbook_signature_id: handbookResult.record.id,
+        role_slug: roleSlug,
+        previous_status: previousStatus,
+        email_status: email.status,
+      },
     });
 
-    return NextResponse.json({ signature, signUrl, jobDescriptionUrl, handbookUrl, email });
+    return NextResponse.json({
+      signature: contractResult.record,
+      signUrl: contractResult.signUrl,
+      jobDescriptionUrl: jobDescResult.signUrl,
+      handbookUrl: handbookResult.signUrl,
+      email,
+    });
   } catch (error) {
     console.error(JSON.stringify({
       level: 'error',
