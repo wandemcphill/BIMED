@@ -7,8 +7,9 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  isInternationalCandidate,
+  isInternationalRoutingCandidate,
   recruitmentContacts,
+  recruitmentInternalRecipients,
   supportingDocumentsEmail,
 } from '../recruitment-config';
 import {
@@ -124,7 +125,7 @@ export async function sendApplicationReceivedEmails(
   application: ApplicationEmailRecord,
   client?: SupabaseClient | null
 ): Promise<{ candidate: SendResult; internal: SendResult[] }> {
-  const international = isInternationalCandidate(application);
+  const international = isInternationalRoutingCandidate(application);
 
   const candidate = await sendTransactionalEmail({
     to: application.email,
@@ -154,10 +155,8 @@ export async function sendApplicationReceivedEmails(
     applicationId: application.id,
   });
 
-  // New-application alerts go to info@bimedhealthcare.com only, not the full internal
-  // distribution (recruitment/overseas + manager) that other notification types use.
   const internal = await Promise.all(
-    [recruitmentContacts.admin].map((recipient) =>
+    recruitmentInternalRecipients(international).map((recipient) =>
       sendTransactionalEmail({
         to: recipient,
         content: adminContent,
@@ -216,6 +215,7 @@ export async function sendApplicationStatusUpdateEmails(
 ): Promise<{ candidate: SendResult | null; internal: SendResult[] }> {
   const { application, status, previousStatus } = input;
   const notifyCandidate = input.notifyCandidate !== false && isCandidateNotifiableStatus(status);
+  const international = isInternationalRoutingCandidate(application);
 
   const candidate = notifyCandidate
     ? await sendTransactionalEmail({
@@ -246,10 +246,8 @@ export async function sendApplicationStatusUpdateEmails(
     adminRecordUrl: adminRecordUrl(application.id),
   });
 
-  // Status-update alerts go to the candidate (above) and info@bimedhealthcare.com only, not the
-  // full internal distribution (recruitment/overseas + manager) that other notification types use.
   const internal = await Promise.all(
-    [recruitmentContacts.admin].map((recipient) =>
+    recruitmentInternalRecipients(international).map((recipient) =>
       sendTransactionalEmail({
         to: recipient,
         content: adminContent,
@@ -386,9 +384,8 @@ async function sendInterviewAdminNotifications(
     adminRecordUrl: adminRecordUrl(application.id),
   });
 
-  // Admin-only alert: goes to info@bimedhealthcare.com only, not the full internal distribution.
   return Promise.all(
-    [recruitmentContacts.admin].map((recipient) =>
+    recruitmentInternalRecipients(isInternationalRoutingCandidate(application)).map((recipient) =>
       sendTransactionalEmail({
         to: recipient,
         content,
@@ -437,7 +434,6 @@ export async function sendSecondInterviewCompletedEmails(
     adminRecordUrl: adminRecordUrl(input.application.id),
   });
 
-  // Admin-only alert: goes to info@bimedhealthcare.com only, not the full internal distribution.
   return Promise.all(
     [recruitmentContacts.admin].map((recipient) =>
       sendTransactionalEmail({
@@ -525,7 +521,6 @@ export async function sendContractSignedNotificationEmails(
     adminRecordUrl: adminRecordUrl(input.application.id),
   });
 
-  // Admin-only alert: goes to info@bimedhealthcare.com only, not the full internal distribution.
   return Promise.all(
     [recruitmentContacts.admin].map((recipient) =>
       sendTransactionalEmail({
@@ -579,7 +574,6 @@ export async function sendDocumentSignedNotificationEmails(
     adminRecordUrl: adminRecordUrl(input.application.id),
   });
 
-  // Admin-only alert: goes to info@bimedhealthcare.com only, not the full internal distribution.
   return Promise.all(
     [recruitmentContacts.admin].map((recipient) =>
       sendTransactionalEmail({
