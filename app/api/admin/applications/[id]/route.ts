@@ -5,6 +5,7 @@ import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendApplicationStatusUpdateEmails } from '@/lib/email';
 import { MAX_JSON_BYTES, readJsonBody, validateAdminApplicationPatch } from '@/lib/request-validation';
 import { createSignedAudioUrl, INTERVIEW_AUDIO_BUCKET } from '@/lib/interview-audio';
+import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -67,6 +68,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     metadata: { status: body.status || data.status, previous_status: previousStatus, notes_updated: body.notes !== undefined },
   });
 
+  let staffIdentity: { bimed_id: string; activationUrl: string | null } | null = null;
+  if (body.status && ['Selected', 'Offer Issued', 'Onboarding'].includes(body.status)) {
+    try {
+      const result = await createStaffFromApplication(client, applicationId);
+      const origin = new URL(request.url).origin;
+      staffIdentity = {
+        bimed_id: result.staff.bimed_id,
+        activationUrl: result.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}` : null,
+      };
+      await createStaffAudit(client, { staffId: result.staff.id, actor: session.email, eventType: 'recruitment_status_linked_to_staff', metadata: { application_id: applicationId, recruitment_status: body.status } });
+    } catch (staffError) {
+      console.error(JSON.stringify({ level: 'error', event: 'staff.identity_creation_failed', application_id: applicationId, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
+    }
+  }
+
   let statusEmail = null;
   if (body.status && previousStatus && body.status !== previousStatus) {
     try {
@@ -83,7 +99,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
-  return NextResponse.json({ application: data, statusEmail });
+  return NextResponse.json({ application: data, statusEmail, staffIdentity });
 }
 
 // Permanently deletes a candidate's application and everything tied to it (interviews, contract
