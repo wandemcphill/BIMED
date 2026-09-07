@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const from = url.searchParams.get('from');
   const to = url.searchParams.get('to');
+  const swapFor = url.searchParams.get('swap_for');
   const client = db();
 
   let assignedQuery = client.from('recruitment_workforce_shifts').select('*').eq('staff_id', session.staff_id).order('shift_date', { ascending: true }).order('start_at', { ascending: true }).limit(200);
@@ -24,7 +25,27 @@ export async function GET(request: NextRequest) {
     leaveQuery,
   ]);
   if (shiftError || availableError || requestError || leaveError) return NextResponse.json({ error: 'Unable to load your rota.' }, { status: 500 });
-  return NextResponse.json({ shifts: shifts || [], availableShifts: availableShifts || [], requests: requests || [], leaveRequests: leaveRequests || [] });
+
+  let swapCandidates: any[] = [];
+  if (swapFor) {
+    const { data: ownShift } = await client.from('recruitment_workforce_shifts').select('id,staff_id,status,start_at').eq('id', swapFor).single();
+    if (!ownShift || ownShift.staff_id !== session.staff_id || !['assigned', 'confirmed'].includes(ownShift.status) || new Date(ownShift.start_at).getTime() <= Date.now()) {
+      return NextResponse.json({ error: 'That shift is not eligible for swapping.' }, { status: 409 });
+    }
+    const { data, error } = await client
+      .from('recruitment_workforce_shifts')
+      .select('id,shift_date,start_at,end_at,shift_type,role,location,status,staff:recruitment_staff(id,bimed_id,full_name,preferred_name,role,profile_photo_path)')
+      .neq('staff_id', session.staff_id)
+      .in('status', ['assigned', 'confirmed'])
+      .gt('start_at', new Date().toISOString())
+      .order('shift_date', { ascending: true })
+      .order('start_at', { ascending: true })
+      .limit(100);
+    if (error) return NextResponse.json({ error: 'Unable to load swap options.' }, { status: 500 });
+    swapCandidates = data || [];
+  }
+
+  return NextResponse.json({ shifts: shifts || [], availableShifts: availableShifts || [], requests: requests || [], leaveRequests: leaveRequests || [], swapCandidates });
 }
 
 export async function POST(request: NextRequest) {
