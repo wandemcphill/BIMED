@@ -25,18 +25,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getAdminSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
-  let body: { action?: string; shiftId?: string; staffId?: string | null; shiftDate?: string; startAt?: string; endAt?: string; shiftType?: string; role?: string; location?: string; breakMinutes?: number; notes?: string; requestId?: string; reason?: string };
+  let body: { action?: string; shiftId?: string; staffId?: string | null; shiftDate?: string; startAt?: string; endAt?: string; shiftType?: string; role?: string; location?: string; breakMinutes?: number; notes?: string; requestId?: string; reason?: string; decision?: 'approve'|'decline' };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 }); }
   const client = db();
 
   if (body.action === 'create') {
     if (!body.shiftDate || !body.startAt || !body.endAt || !body.shiftType) return NextResponse.json({ error: 'shiftDate, startAt, endAt and shiftType are required.' }, { status: 400 });
-    const { data, error } = await client.from('recruitment_workforce_shifts').insert({
-      shift_date: body.shiftDate, start_at: body.startAt, end_at: body.endAt, shift_type: body.shiftType,
-      staff_id: body.staffId || null, role: body.role || null, location: body.location || null,
-      break_minutes: Math.max(0, Number(body.breakMinutes || 0)), status: body.staffId ? 'assigned' : 'available',
-      created_by: session.email, assigned_at: body.staffId ? new Date().toISOString() : null, notes: body.notes || null,
-    }).select('*,staff:recruitment_staff(id,bimed_id,full_name)').single();
+    const { data, error } = await client.from('recruitment_workforce_shifts').insert({ shift_date: body.shiftDate, start_at: body.startAt, end_at: body.endAt, shift_type: body.shiftType, staff_id: body.staffId || null, role: body.role || null, location: body.location || null, break_minutes: Math.max(0, Number(body.breakMinutes || 0)), status: body.staffId ? 'assigned' : 'available', created_by: session.email, assigned_at: body.staffId ? new Date().toISOString() : null, notes: body.notes || null }).select('*,staff:recruitment_staff(id,bimed_id,full_name)').single();
     if (error || !data) return NextResponse.json({ error: 'Unable to create shift.' }, { status: 500 });
     if (body.staffId) await createStaffNotification(client, { staffId: body.staffId, category: 'rota', title: 'New shift assigned', body: `You have been assigned a ${body.shiftType} shift on ${body.shiftDate}.`, actionUrl: '/staff/rota' });
     await createStaffAudit(client, { staffId: body.staffId || null, actor: session.email, eventType: 'shift_created', metadata: { shift_id: data.id, assigned: Boolean(body.staffId) } });
@@ -63,16 +58,20 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.action === 'request_response') {
-    if (!body.requestId || !['approve','decline'].includes(body.reason || '')) return NextResponse.json({ error: 'requestId and reason=approve|decline are required.' }, { status: 400 });
-    const approved = body.reason === 'approve';
+    if (!body.requestId || !body.decision) return NextResponse.json({ error: 'requestId and decision=approve|decline are required.' }, { status: 400 });
+    const approved = body.decision === 'approve';
     const { data: requestRow } = await client.from('recruitment_shift_requests').select('*,shift:recruitment_workforce_shifts(*)').eq('id', body.requestId).single();
     if (!requestRow || requestRow.status !== 'pending') return NextResponse.json({ error: 'This request is no longer pending.' }, { status: 409 });
     const { data: updated, error } = await client.from('recruitment_shift_requests').update({ status: approved ? 'approved' : 'declined', responded_by: session.email, responded_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', body.requestId).select('*').single();
     if (error || !updated) return NextResponse.json({ error: 'Unable to respond to request.' }, { status: 500 });
     if (approved && requestRow.request_type === 'shift') {
-      await client.from('recruitment_workforce_shifts').update({ staff_id: requestRow.staff_id, status: 'assigned', assigned_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', requestRow.shift_id).eq('status', 'available');
+      const { data: assigned } = await client.from('recruitment_workforce_shifts').update({ staff_id: requestRow.staff_id, status: 'assigned', assigned_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', requestRow.shift_id).eq('status', 'available').select('*').maybeSingle();
+      if (!assigned) return NextResponse.json({ error: 'The shift is no longer available.' }, { status: 409 });
     }
-    await createStaffNotification(client, { staffId: requestRow.staff_id, category: 'rota', title: approved ? 'Shift request approved' : 'Shift request declined', body: approved ? 'Your shift request has been approved and added to your rota.' : 'Your shift request has been declined.', actionUrl: '/staff/rota' });
+    if (approved && requestRow.request_type === 'cancellation') {
+      await client.from('recruitment_workforce_shifts').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancellation_reason: requestRow.reason || 'Cancellation approved by BIMED.', updated_at: new Date().toISOString() }).eq('id', requestRow.shift_id).eq('staff_id', requestRow.staff_id);
+    }
+    await createStaffNotification(client, { staffId: requestRow.staff_id, category: 'rota', title: approved ? 'Shift request approved' : 'Shift request declined', body: approved ? (requestRow.request_type === 'cancellation' ? 'Your shift cancellation request has been approved.' : 'Your shift request has been approved and added to your rota.') : 'Your shift request has been declined.', actionUrl: '/staff/rota' });
     await createStaffAudit(client, { staffId: requestRow.staff_id, actor: session.email, eventType: `shift_request_${approved ? 'approved' : 'declined'}`, metadata: { request_id: body.requestId, request_type: requestRow.request_type } });
     return NextResponse.json({ request: updated });
   }
