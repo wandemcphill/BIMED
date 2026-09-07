@@ -38,8 +38,8 @@ export const recruitmentRoles = [
 ] as const;
 
 export const recruitmentStatuses = [
-  'Submitted', 'Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting',
-  'Permit Processing', 'Visa/Immigration Processing', 'Onboarding', 'Rejected', 'Withdrawn',
+  'Submitted', 'Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing',
+  'Visa/Immigration Processing', 'Onboarding', 'Rejected', 'Withdrawn',
 ] as const;
 
 export const candidateSupportDocuments = [
@@ -92,19 +92,33 @@ export function getResendFromEmail() {
   return `Bimed Healthcare <${configuredValue}>`;
 }
 
+/**
+ * Returns true only when the international pathway is fully completed.
+ * CandidateForm uses this value during final validation. Keeping incomplete
+ * pathway data out of this boolean lets the API return the exact missing field
+ * instead of trapping the candidate behind a generic message.
+ */
 export function isInternationalCandidate(input: {
   living_in_ireland?: string | null;
   country_of_residence?: string | null;
+  current_country?: string | null;
+  work_permission?: string | null;
+  requires_employment_permit?: string | null;
+  relocation_readiness?: string | null;
 }) {
-  // The application explicitly asks whether the candidate currently lives in Ireland.
-  // Keep this as the single source of truth for the international pathway so the UI,
-  // validation and recruitment routing cannot disagree with one another.
-  return input.living_in_ireland === 'No';
+  if (input.living_in_ireland !== 'No') return false;
+  return Boolean(
+    input.current_country?.trim() &&
+    input.work_permission?.trim() &&
+    input.requires_employment_permit?.trim() &&
+    input.relocation_readiness?.trim()
+  );
 }
 
-export function supportingDocumentsEmail(input: {
-  living_in_ireland?: string | null;
-  country_of_residence?: string | null;
-}) {
-  return isInternationalCandidate(input) ? recruitmentContacts.overseas : recruitmentContacts.ireland;
+/**
+ * Routing is based on the candidate's explicit living-in-Ireland answer,
+ * not on whether the pathway fields have already been completed.
+ */
+export function supportingDocumentsEmail(input: { living_in_ireland?: string | null }) {
+  return input.living_in_ireland === 'No' ? recruitmentContacts.overseas : recruitmentContacts.ireland;
 }
