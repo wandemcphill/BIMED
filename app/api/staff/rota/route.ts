@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getStaffSession } from '@/lib/staff-auth';
-import { createStaffAudit, createStaffNotification } from '@/lib/staff';
+import { createStaffAudit } from '@/lib/staff';
 
 export async function GET(request: NextRequest) {
   const session = await getStaffSession(request);
@@ -11,15 +11,18 @@ export async function GET(request: NextRequest) {
   const to = url.searchParams.get('to');
   const client = db();
 
-  let shiftQuery = client.from('recruitment_workforce_shifts').select('*').eq('staff_id', session.staff_id).order('shift_date', { ascending: true }).order('start_at', { ascending: true }).limit(200);
-  if (from) shiftQuery = shiftQuery.gte('shift_date', from);
-  if (to) shiftQuery = shiftQuery.lte('shift_date', to);
-  const [{ data: shifts, error: shiftError }, { data: requests, error: requestError }] = await Promise.all([
-    shiftQuery,
+  let assignedQuery = client.from('recruitment_workforce_shifts').select('*').eq('staff_id', session.staff_id).order('shift_date', { ascending: true }).order('start_at', { ascending: true }).limit(200);
+  let availableQuery = client.from('recruitment_workforce_shifts').select('*').eq('status', 'available').order('shift_date', { ascending: true }).order('start_at', { ascending: true }).limit(200);
+  if (from) { assignedQuery = assignedQuery.gte('shift_date', from); availableQuery = availableQuery.gte('shift_date', from); }
+  if (to) { assignedQuery = assignedQuery.lte('shift_date', to); availableQuery = availableQuery.lte('shift_date', to); }
+
+  const [{ data: shifts, error: shiftError }, { data: availableShifts, error: availableError }, { data: requests, error: requestError }] = await Promise.all([
+    assignedQuery,
+    availableQuery,
     client.from('recruitment_shift_requests').select('*,shift:recruitment_workforce_shifts(*)').eq('staff_id', session.staff_id).order('created_at', { ascending: false }).limit(200),
   ]);
-  if (shiftError || requestError) return NextResponse.json({ error: 'Unable to load your rota.' }, { status: 500 });
-  return NextResponse.json({ shifts: shifts || [], requests: requests || [] });
+  if (shiftError || availableError || requestError) return NextResponse.json({ error: 'Unable to load your rota.' }, { status: 500 });
+  return NextResponse.json({ shifts: shifts || [], availableShifts: availableShifts || [], requests: requests || [] });
 }
 
 export async function POST(request: NextRequest) {
