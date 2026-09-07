@@ -8,83 +8,49 @@ export const recruitmentContacts = {
   admin: getEnvValue('BIMED_ADMIN_EMAIL', 'info@bimedhealthcare.com'),
 } as const;
 
-// Full country list for the "Country of residence" field - the previous version had 7 options
-// (Ireland plus a handful of countries), which forced most non-Irish applicants into "Other".
 export const countries = [
-  'Ireland',
-  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Argentina', 'Armenia', 'Australia',
-  'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium',
-  'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei',
-  'Bulgaria', 'Burkina Faso', 'Burundi', 'Cambodia', 'Cameroon', 'Canada', 'Cape Verde',
-  'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo',
-  'Congo (DRC)', 'Costa Rica', "Cote d'Ivoire", 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic',
-  'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador',
-  'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland', 'France',
-  'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea',
-  'Guinea-Bissau', 'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia',
-  'Iran', 'Iraq', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya',
-  'Kiribati', 'Kosovo', 'Kuwait', 'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia',
-  'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar', 'Malawi', 'Malaysia',
-  'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico',
-  'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique',
-  'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger',
-  'Nigeria', 'North Korea', 'North Macedonia', 'Norway', 'Oman', 'Pakistan', 'Palau',
-  'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland',
-  'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Lucia', 'Samoa', 'San Marino',
-  'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone',
-  'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa',
-  'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden',
-  'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo',
-  'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda',
-  'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan',
-  'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
-  'Other',
+  'Ireland', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Argentina', 'Armenia', 'Australia',
+  'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize',
+  'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria',
+  'Burkina Faso', 'Burundi', 'Cambodia', 'Cameroon', 'Canada', 'Cape Verde', 'Central African Republic',
+  'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo', 'Congo (DRC)', 'Costa Rica', "Cote d'Ivoire",
+  'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic',
+  'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji',
+  'Finland', 'France', 'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala',
+  'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran',
+  'Iraq', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kosovo', 'Kuwait', 'Laos',
+  'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
+  'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico',
+  'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia',
+  'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea',
+  'North Macedonia', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea',
+  'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Lucia',
+  'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles',
+  'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Somalia', 'South Africa', 'South Korea', 'South Sudan',
+  'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania',
+  'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan',
+  'Tuvalu', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay',
+  'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe', 'Other',
 ] as const;
 
 export const recruitmentRoles = [
-  'Support Worker',
-  'Healthcare Worker',
-  'Healthcare Assistant',
-  'Physiotherapist',
-  'Other',
+  'Support Worker', 'Healthcare Worker', 'Healthcare Assistant', 'Physiotherapist', 'Other',
 ] as const;
 
 export const recruitmentStatuses = [
-  'Submitted',
-  'Under Review',
-  'Interview',
-  'Selected',
-  'Offer Issued',
-  'Documents Awaiting',
-  'Permit Processing',
-  'Visa/Immigration Processing',
-  'Onboarding',
-  'Rejected',
-  'Withdrawn',
+  'Submitted', 'Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting',
+  'Permit Processing', 'Visa/Immigration Processing', 'Onboarding', 'Rejected', 'Withdrawn',
 ] as const;
 
 export const candidateSupportDocuments = [
-  'Passport / identity document',
-  'CV',
-  'Qualification certificates',
-  'Training certificates',
-  'Employment references',
-  'Evidence of previous employment',
-  'Garda vetting or police / background documentation where requested',
-  'Driving licence',
-  'Other relevant documents',
+  'Passport / identity document', 'CV', 'Qualification certificates', 'Training certificates',
+  'Employment references', 'Evidence of previous employment',
+  'Garda vetting or police / background documentation where requested', 'Driving licence', 'Other relevant documents',
 ] as const;
 
 export const candidateStepTitles = [
-  'Personal information',
-  'Position and availability',
-  'Experience and qualifications',
-  'Employment and references',
-  'Ireland / international pathway',
-  'Written interview',
-  'Supporting documents',
-  'Review',
-  'Declaration',
+  'Personal information', 'Position and availability', 'Experience and qualifications', 'Employment and references',
+  'Ireland / international pathway', 'Written interview', 'Supporting documents', 'Review', 'Declaration',
 ] as const;
 
 export const recruitmentStatusGroups = {
@@ -115,24 +81,14 @@ export const recruitmentCopy = {
     consent:
       'I agree that Bimed may process my application information for recruitment, assessment, onboarding, legal compliance and record-keeping purposes, in line with the privacy notice above.',
   },
-  candidateConfirmation: {
-    subject: 'Bimed Healthcare recruitment application received',
-  },
-  adminNotification: {
-    subjectPrefix: 'New Bimed Healthcare application:',
-  },
+  candidateConfirmation: { subject: 'Bimed Healthcare recruitment application received' },
+  adminNotification: { subjectPrefix: 'New Bimed Healthcare application:' },
 } as const;
 
 export function getResendFromEmail() {
   const configuredValue = process.env.RESEND_FROM_EMAIL?.trim();
-  if (!configuredValue) {
-    return 'Bimed Healthcare <noreply@bimedhealthcare.com>';
-  }
-
-  if (configuredValue.includes('<')) {
-    return configuredValue;
-  }
-
+  if (!configuredValue) return 'Bimed Healthcare <noreply@bimedhealthcare.com>';
+  if (configuredValue.includes('<')) return configuredValue;
   return `Bimed Healthcare <${configuredValue}>`;
 }
 
@@ -140,7 +96,10 @@ export function isInternationalCandidate(input: {
   living_in_ireland?: string | null;
   country_of_residence?: string | null;
 }) {
-  return input.living_in_ireland === 'No' || (input.country_of_residence ? input.country_of_residence !== 'Ireland' : false);
+  // The application explicitly asks whether the candidate currently lives in Ireland.
+  // Keep this as the single source of truth for the international pathway so the UI,
+  // validation and recruitment routing cannot disagree with one another.
+  return input.living_in_ireland === 'No';
 }
 
 export function supportingDocumentsEmail(input: {
@@ -149,4 +108,3 @@ export function supportingDocumentsEmail(input: {
 }) {
   return isInternationalCandidate(input) ? recruitmentContacts.overseas : recruitmentContacts.ireland;
 }
-
