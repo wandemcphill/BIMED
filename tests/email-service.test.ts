@@ -67,40 +67,46 @@ afterEach(() => {
 });
 
 describe('application submission', () => {
-  it('emails the candidate and the Ireland-based internal recipients', async () => {
+  it('emails the candidate and sends the only automated internal notification to info@bimedhealthcare.com', async () => {
     const db = createFakeSupabase();
     const result = await sendApplicationReceivedEmails(irishApplication, db as never);
 
     expect(result.candidate.status).toBe('sent');
+    expect(result.internal).toHaveLength(1);
     expect(result.internal.every((entry) => entry.status === 'sent')).toBe(true);
 
     const recipients = sent.map((email) => email.to);
     expect(recipients).toContain('ada@example.com');
-    expect(recipients).toContain('recruitment@bimedhealthcare.com');
-    expect(recipients).toContain('manager@bimedhealthcare.com');
     expect(recipients).toContain('info@bimedhealthcare.com');
+    expect(recipients).not.toContain('recruitment@bimedhealthcare.com');
+    expect(recipients).not.toContain('manager@bimedhealthcare.com');
     expect(recipients).not.toContain('overseas@bimedhealthcare.com');
   });
 
-  it('routes international candidates to the overseas inbox', async () => {
+  it('routes international correspondence to the overseas address but keeps automated internal notification on info@bimedhealthcare.com', async () => {
     const db = createFakeSupabase();
     await sendApplicationReceivedEmails(internationalApplication, db as never);
 
     const recipients = sent.map((email) => email.to);
-    expect(recipients).toContain('overseas@bimedhealthcare.com');
+    expect(recipients).toContain('chidi@example.com');
+    expect(recipients).toContain('info@bimedhealthcare.com');
     expect(recipients).not.toContain('recruitment@bimedhealthcare.com');
+    expect(recipients).not.toContain('manager@bimedhealthcare.com');
+    expect(recipients).not.toContain('overseas@bimedhealthcare.com');
 
     const candidateEmail = sent.find((email) => email.to === 'chidi@example.com');
     expect(candidateEmail?.html).toContain('overseas@bimedhealthcare.com');
   });
 
-  it('adds RECRUITMENT_ADMIN_EMAIL when configured', async () => {
+  it('does not use RECRUITMENT_ADMIN_EMAIL as an automated notification recipient', async () => {
     process.env.RECRUITMENT_ADMIN_EMAIL = 'recruitment-inbox@bimedhealthcare.com';
     const db = createFakeSupabase();
 
     await sendApplicationReceivedEmails(irishApplication, db as never);
 
-    expect(sent.map((email) => email.to)).toContain('recruitment-inbox@bimedhealthcare.com');
+    const recipients = sent.map((email) => email.to);
+    expect(recipients).toContain('info@bimedhealthcare.com');
+    expect(recipients).not.toContain('recruitment-inbox@bimedhealthcare.com');
   });
 
   it('does not resend when the same submission is replayed', async () => {
@@ -134,7 +140,7 @@ describe('status updates', () => {
     expect(isCandidateNotifiableStatus('Submitted')).toBe(false);
   });
 
-  it('emails the candidate and internal staff on a real transition', async () => {
+  it('emails the candidate and sends the internal notification only to info@bimedhealthcare.com on a real transition', async () => {
     const db = createFakeSupabase();
 
     const result = await sendApplicationStatusUpdateEmails(
@@ -152,11 +158,13 @@ describe('status updates', () => {
     expect(candidateEmail?.html).toContain('Under Review');
     expect(candidateEmail?.html).not.toContain('admin@bimedhealthcare.com');
 
-    const internalEmail = sent.find((email) => email.to === 'manager@bimedhealthcare.com');
+    const internalEmail = sent.find((email) => email.to === 'info@bimedhealthcare.com');
     expect(internalEmail?.html).toContain('admin@bimedhealthcare.com');
+    expect(sent.some((email) => email.to === 'manager@bimedhealthcare.com')).toBe(false);
+    expect(sent.some((email) => email.to === 'recruitment@bimedhealthcare.com')).toBe(false);
   });
 
-  it('skips the candidate email for a non-notifiable status but still tells staff', async () => {
+  it('skips the candidate email for a non-notifiable status but still tells info@bimedhealthcare.com', async () => {
     const db = createFakeSupabase();
 
     const result = await sendApplicationStatusUpdateEmails(
@@ -171,7 +179,8 @@ describe('status updates', () => {
 
     expect(result.candidate).toBeNull();
     expect(sent.some((email) => email.to === 'ada@example.com')).toBe(false);
-    expect(result.internal.length).toBeGreaterThan(0);
+    expect(result.internal.length).toBe(1);
+    expect(sent.some((email) => email.to === 'info@bimedhealthcare.com')).toBe(true);
   });
 
   it('honours notifyCandidate: false', async () => {
@@ -190,6 +199,7 @@ describe('status updates', () => {
 
     expect(result.candidate).toBeNull();
     expect(sent.some((email) => email.to === 'ada@example.com')).toBe(false);
+    expect(sent.some((email) => email.to === 'info@bimedhealthcare.com')).toBe(true);
   });
 
   it('suppresses a duplicate status email inside the window', async () => {
@@ -212,7 +222,7 @@ describe('status updates', () => {
 });
 
 describe('interviews', () => {
-  it('sends an invitation to the candidate and a notice to staff', async () => {
+  it('sends an invitation to the candidate and the automated staff notice to info@bimedhealthcare.com', async () => {
     const db = createFakeSupabase();
 
     const result = await sendInterviewInvitationEmails({ application: irishApplication, interview }, db as never);
@@ -223,7 +233,9 @@ describe('interviews', () => {
     expect(candidateEmail?.html).toContain('Bimed office, Dublin');
     expect(candidateEmail?.html).toContain('Bring photo ID.');
 
-    expect(sent.some((email) => email.to === 'manager@bimedhealthcare.com')).toBe(true);
+    expect(result.internal).toHaveLength(1);
+    expect(sent.some((email) => email.to === 'info@bimedhealthcare.com')).toBe(true);
+    expect(sent.some((email) => email.to === 'manager@bimedhealthcare.com')).toBe(false);
   });
 
   it('does not resend the same invitation twice', async () => {
@@ -254,6 +266,7 @@ describe('interviews', () => {
     const candidateEmail = sent.find((email) => email.to === 'ada@example.com');
     expect(candidateEmail?.subject).toContain('rescheduled');
     expect(candidateEmail?.html).toContain('Previous time');
+    expect(sent.some((email) => email.to === 'info@bimedhealthcare.com')).toBe(true);
   });
 
   it('treats each reschedule revision as a distinct email', async () => {
@@ -281,6 +294,7 @@ describe('interviews', () => {
     const candidateEmail = sent.find((email) => email.to === 'ada@example.com');
     expect(candidateEmail?.subject).toContain('cancelled');
     expect(candidateEmail?.html).toContain('Interviewer unavailable');
+    expect(sent.some((email) => email.to === 'info@bimedhealthcare.com')).toBe(true);
   });
 });
 
