@@ -24,9 +24,6 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-// Records a real voice note (browser MediaRecorder API - no third-party service, no
-// transcription) as an alternative to typing. The recording is stored and played back as-is;
-// admins listen to it directly rather than reading a transcript.
 export default function InterviewAnswerInput({
   value,
   onChange,
@@ -34,13 +31,14 @@ export default function InterviewAnswerInput({
 }: {
   value: InterviewAnswerValue | undefined;
   onChange: (next: InterviewAnswerValue) => void;
-  /** Audio interview segment: no typing option unless the browser can't record at all. */
+  /** Audio interview segment. Typing remains an explicit fallback if recording is unavailable. */
   audioRequired?: boolean;
 }) {
   const [supported, setSupported] = useState(false);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState('');
+  const [microphoneFailed, setMicrophoneFailed] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -49,7 +47,11 @@ export default function InterviewAnswerInput({
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    setSupported(typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia) && Boolean(pickSupportedMimeType()));
+    setSupported(
+      typeof navigator !== 'undefined' &&
+        Boolean(navigator.mediaDevices?.getUserMedia) &&
+        Boolean(pickSupportedMimeType())
+    );
   }, []);
 
   useEffect(() => {
@@ -73,8 +75,13 @@ export default function InterviewAnswerInput({
 
   const startRecording = async () => {
     setError('');
+    setMicrophoneFailed(false);
     const mimeType = pickSupportedMimeType();
-    if (!mimeType) return;
+    if (!mimeType) {
+      setMicrophoneFailed(true);
+      setError('Audio recording is not supported in this browser. You can type your answer instead.');
+      return;
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -100,7 +107,7 @@ export default function InterviewAnswerInput({
       recorder.start();
       setRecording(true);
       setSeconds(0);
-
+    
       timerRef.current = setInterval(() => {
         setSeconds((current) => {
           if (current + 1 >= MAX_RECORDING_SECONDS) {
@@ -110,7 +117,9 @@ export default function InterviewAnswerInput({
         });
       }, 1000);
     } catch {
-      setError('Could not access your microphone. Check your browser permissions, or type your answer instead.');
+      setRecording(false);
+      setMicrophoneFailed(true);
+      setError('We could not access your microphone. You can allow microphone access and try again, or type your answer below.');
     }
   };
 
@@ -120,6 +129,7 @@ export default function InterviewAnswerInput({
 
   const removeRecording = () => {
     onChange({ text: '' });
+    setError('');
   };
 
   if (value?.audio_base64 && previewUrl) {
@@ -127,15 +137,15 @@ export default function InterviewAnswerInput({
       <div className="voice-answer">
         <audio controls src={previewUrl} style={{ width: '100%' }} />
         <button type="button" className="secondary" style={{ marginTop: 8 }} onClick={removeRecording}>
-          {audioRequired ? 'Re-record' : 'Remove voice note and type instead'}
+          {audioRequired ? 'Re-record or type instead' : 'Remove voice note and type instead'}
         </button>
       </div>
     );
   }
 
-  // Audio-required with no recording support at all: fall back to typing rather than blocking
-  // the candidate outright.
-  if (audioRequired && supported) {
+  const showTextFallback = audioRequired && (!supported || microphoneFailed);
+
+  if (audioRequired && supported && !microphoneFailed) {
     return (
       <div className="voice-answer">
         {recording ? (
@@ -154,6 +164,22 @@ export default function InterviewAnswerInput({
 
   return (
     <div className="voice-answer">
+      {showTextFallback && (
+        <div className="notice" style={{ marginBottom: 10 }}>
+          <strong>{microphoneFailed ? 'Microphone unavailable.' : 'Audio recording is unavailable on this device.'}</strong>
+          <p style={{ margin: '4px 0 8px' }}>
+            {microphoneFailed
+              ? 'You can allow microphone access and try again, or type your answer below.'
+              : 'Please type your answer below.'}
+          </p>
+          {microphoneFailed && (
+            <button type="button" className="secondary" onClick={() => void startRecording()}>
+              Try recording again
+            </button>
+          )}
+        </div>
+      )}
+
       <textarea
         value={value?.text || ''}
         onChange={(event) => onChange({ text: event.target.value })}
@@ -161,12 +187,13 @@ export default function InterviewAnswerInput({
         disabled={recording}
         placeholder={
           audioRequired
-            ? "Your browser can't record audio here - please type your answer instead."
+            ? 'Type your answer here if you cannot record audio.'
             : supported
               ? 'Type your answer, or record a voice note below.'
               : 'Type your answer.'
         }
       />
+
       {supported && !audioRequired && (
         <div style={{ marginTop: 8 }}>
           {recording ? (
@@ -180,7 +207,7 @@ export default function InterviewAnswerInput({
           )}
         </div>
       )}
-      {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
+      {error && !microphoneFailed && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
     </div>
   );
 }
