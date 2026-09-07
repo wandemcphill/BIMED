@@ -5,6 +5,7 @@ function getEnvValue(primary: string, fallback: string) {
 export const recruitmentContacts = {
   ireland: getEnvValue('BIMED_LOCAL_RECRUITMENT_EMAIL', 'recruitment@bimedhealthcare.com'),
   overseas: getEnvValue('BIMED_OVERSEAS_RECRUITMENT_EMAIL', 'overseas@bimedhealthcare.com'),
+  manager: getEnvValue('BIMED_MANAGER_EMAIL', 'manager@bimedhealthcare.com'),
   admin: getEnvValue('BIMED_ADMIN_EMAIL', 'info@bimedhealthcare.com'),
 } as const;
 
@@ -92,12 +93,7 @@ export function getResendFromEmail() {
   return `Bimed Healthcare <${configuredValue}>`;
 }
 
-/**
- * Returns true only when the international pathway is fully completed.
- * CandidateForm uses this value during final validation. Keeping incomplete
- * pathway data out of this boolean lets the API return the exact missing field
- * instead of trapping the candidate behind a generic message.
- */
+/** Returns true only when all international pathway fields are complete. */
 export function isInternationalCandidate(input: {
   living_in_ireland?: string | null;
   country_of_residence?: string | null;
@@ -115,10 +111,18 @@ export function isInternationalCandidate(input: {
   );
 }
 
-/**
- * Routing is based on the candidate's explicit living-in-Ireland answer,
- * not on whether the pathway fields have already been completed.
- */
+/** Routing is based only on the candidate's explicit living-in-Ireland answer. */
+export function isInternationalRoutingCandidate(input: { living_in_ireland?: string | null }) {
+  return input.living_in_ireland === 'No';
+}
+
 export function supportingDocumentsEmail(input: { living_in_ireland?: string | null }) {
-  return input.living_in_ireland === 'No' ? recruitmentContacts.overseas : recruitmentContacts.ireland;
+  return isInternationalRoutingCandidate(input) ? recruitmentContacts.overseas : recruitmentContacts.ireland;
+}
+
+/** Core routing plus optional extra inbox, deduplicated. */
+export function recruitmentInternalRecipients(international: boolean) {
+  const primary = international ? recruitmentContacts.overseas : recruitmentContacts.ireland;
+  const optional = process.env.RECRUITMENT_ADMIN_EMAIL?.trim();
+  return [...new Set([primary, recruitmentContacts.manager, recruitmentContacts.admin, optional].filter(Boolean) as string[])];
 }
