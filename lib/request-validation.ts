@@ -125,6 +125,13 @@ const APPLICATION_KEYS = [
   'interview_responses',
 ] as const;
 
+const INTERNATIONAL_FIELDS: Record<string, string> = {
+  current_country: 'Current country',
+  work_permission: 'Permission to work in Ireland',
+  requires_employment_permit: 'Employment permit requirement',
+  relocation_readiness: 'Relocation readiness',
+};
+
 export function validateCandidateApplication(input: unknown): JsonResult<Record<string, unknown>> {
   if (!isPlainRecord(input)) return { ok: false, error: 'Request body must be a JSON object.' };
 
@@ -183,8 +190,8 @@ export function validateCandidateApplication(input: unknown): JsonResult<Record<
     };
 
     if (living === 'No') {
-      for (const field of ['current_country', 'work_permission', 'requires_employment_permit', 'relocation_readiness']) {
-        if (!result[field]) throw new Error(`${field} is required for the international pathway.`);
+      for (const [field, label] of Object.entries(INTERNATIONAL_FIELDS)) {
+        if (!result[field]) throw new Error(`${label} is required for the international pathway.`);
       }
     }
 
