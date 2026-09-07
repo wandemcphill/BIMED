@@ -30,10 +30,11 @@ The `production-hardening` branch adds:
 Before deployment, apply `supabase/schema.sql` and then `supabase/migrations/20260820_production_hardening.sql` to the production Supabase project. See `docs/PRODUCTION_HARDENING.md` for the launch gate and retention periods.
 
 ## Email routing
-Local candidate notifications: recruitment@bimedhealthcare.com
-International candidate notifications: overseas@bimedhealthcare.com
-Manager notifications: manager@bimedhealthcare.com
-Admin notifications: info@bimedhealthcare.com
+Candidate-facing correspondence still uses the appropriate recruitment mailbox:
+- Ireland-based candidates: recruitment@bimedhealthcare.com
+- International candidates: overseas@bimedhealthcare.com
+
+**Automated internal portal notifications go only to `info@bimedhealthcare.com`.** This includes new-application alerts, application status changes, interview scheduling/rescheduling/cancellation notices, and other internal recruitment alerts. The recruitment, overseas and manager inboxes are intentionally left available for normal human correspondence and supporting-document handling.
 
 ## Transactional email
 Resend is the only outbound email provider and runs server-side only. `RESEND_API_KEY` is
@@ -83,7 +84,6 @@ Required environment variables on the web service:
 - `BIMED_OVERSEAS_RECRUITMENT_EMAIL`
 - `BIMED_MANAGER_EMAIL`
 - `BIMED_ADMIN_EMAIL`
-- `RECRUITMENT_ADMIN_EMAIL` (optional extra internal recipient)
 - `ADMIN_BOOTSTRAP_EMAIL`
 - `ADMIN_BOOTSTRAP_PASSWORD`
 - `ADMIN_BOOTSTRAP_NAME`
