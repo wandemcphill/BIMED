@@ -8,8 +8,8 @@ import {
 } from '@/lib/request-validation';
 
 describe('request validation', () => {
-  it('rejects oversized candidate submissions by configured limit', () => {
-    expect(MAX_JSON_BYTES.candidateApplication).toBe(128 * 1024);
+  it('allows the configured candidate submission limit required for voice-note answers', () => {
+    expect(MAX_JSON_BYTES.candidateApplication).toBe(20 * 1024 * 1024);
   });
 
   it('accepts a valid Ireland candidate payload', () => {
