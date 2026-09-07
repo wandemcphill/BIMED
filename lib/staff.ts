@@ -19,7 +19,12 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
     .select('*')
     .eq('application_id', applicationId)
     .maybeSingle();
-  if (existing) return { staff: existing, activationToken: null as string | null };
+  if (existing) {
+    if (application.bimed_id !== existing.bimed_id) {
+      await client.from('recruitment_applications').update({ bimed_id: existing.bimed_id, updated_at: new Date().toISOString() }).eq('id', applicationId);
+    }
+    return { staff: existing, activationToken: null as string | null };
+  }
 
   const activationToken = createActivationToken();
   const { data: staff, error } = await client
@@ -44,6 +49,7 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
     .single();
   if (error || !staff) throw error || new Error('Unable to create staff profile.');
 
+  await client.from('recruitment_applications').update({ bimed_id: staff.bimed_id, updated_at: new Date().toISOString() }).eq('id', applicationId);
   return { staff, activationToken };
 }
 
@@ -62,7 +68,10 @@ export async function createStaffNotification(
     })
     .select('*')
     .single();
-  if (error) throw error;
+  if (error) {
+    console.error(JSON.stringify({ level: 'error', event: 'staff_notification_failed', staff_id: input.staffId, category: input.category, reason: error.message }));
+    return null;
+  }
   return data;
 }
 
