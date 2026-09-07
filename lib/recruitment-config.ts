@@ -120,9 +120,12 @@ export function supportingDocumentsEmail(input: { living_in_ireland?: string | n
   return isInternationalRoutingCandidate(input) ? recruitmentContacts.overseas : recruitmentContacts.ireland;
 }
 
-/** Core routing plus optional extra inbox, deduplicated. */
-export function recruitmentInternalRecipients(international: boolean) {
-  const primary = international ? recruitmentContacts.overseas : recruitmentContacts.ireland;
-  const optional = process.env.RECRUITMENT_ADMIN_EMAIL?.trim();
-  return [...new Set([primary, recruitmentContacts.manager, recruitmentContacts.admin, optional].filter(Boolean) as string[])];
+/**
+ * Internal transactional notifications are intentionally centralized to the client's
+ * monitoring inbox. Recruitment, overseas and manager inboxes remain available for normal
+ * correspondence and document handling, but the portal does not send automated notifications
+ * to them.
+ */
+export function recruitmentInternalRecipients(_international: boolean) {
+  return [recruitmentContacts.admin];
 }
