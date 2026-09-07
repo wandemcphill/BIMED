@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Staff = Record<string, any>;
@@ -8,37 +8,281 @@ type Shift = Record<string, any>;
 type Payslip = Record<string, any>;
 type Notice = Record<string, any>;
 
-const card: React.CSSProperties={background:'#fff',border:'1px solid #e5eaf0',borderRadius:18,padding:20,boxShadow:'0 8px 28px rgba(15,23,42,.04)'};
+type Tab = 'overview' | 'rota' | 'pay' | 'profile' | 'notifications';
 
-export default function StaffDashboard(){
- const router=useRouter(); const [staff,setStaff]=useState<Staff|null>(null); const [shifts,setShifts]=useState<Shift[]>([]); const [requests,setRequests]=useState<any[]>([]); const [payslips,setPayslips]=useState<Payslip[]>([]); const [notifications,setNotifications]=useState<Notice[]>([]); const [error,setError]=useState(''); const [busy,setBusy]=useState(false); const [tab,setTab]=useState<'overview'|'rota'|'pay'|'profile'>('overview');
- const [pps,setPps]=useState(''); const [address,setAddress]=useState(''); const [phone,setPhone]=useState(''); const [photoBusy,setPhotoBusy]=useState(false);
- async function load(){setError('');const [meR,rotaR,payR,noticeR]=await Promise.all([fetch('/api/staff/me'),fetch('/api/staff/rota'),fetch('/api/staff/payslips'),fetch('/api/staff/notifications')]);if(meR.status===401){router.replace('/staff/login');return;}const [me,rota,pay,notice]=await Promise.all([meR.json(),rotaR.json(),payR.json(),noticeR.json()]);if(!meR.ok){setError(me.error||'Unable to load staff profile.');return}setStaff(me.staff);setPps(me.staff.pps_number||'');setAddress(me.staff.address_line_1||'');setPhone(me.staff.phone||'');setShifts(rota.shifts||[]);setRequests(rota.requests||[]);setPayslips(pay.payslips||[]);setNotifications(notice.notifications||[])}
- useEffect(()=>{load()},[]);
- const unread=useMemo(()=>notifications.filter(n=>!n.read_at).length,[notifications]);
- async function saveProfile(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await fetch('/api/staff/me',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({pps_number:pps,address_line_1:address,phone})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to save.');setStaff(d.staff);alert('Profile updated.')}catch(e){setError(e instanceof Error?e.message:'Unable to save.')}finally{setBusy(false)}}
- async function uploadPhoto(e:React.ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0];if(!file)return;setPhotoBusy(true);try{const form=new FormData();form.append('photo',file);const r=await fetch('/api/staff/me',{method:'POST',body:form});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to upload photo.');setStaff(d.staff)}catch(e){setError(e instanceof Error?e.message:'Unable to upload photo.')}finally{setPhotoBusy(false);e.target.value=''}}
- async function logout(){await fetch('/api/staff/auth/logout',{method:'POST'});router.replace('/staff/login')}
- if(!staff)return <main style={{padding:40,fontFamily:'system-ui'}}>{error?<div>{error}</div>:'Loading BIMED Staff Portal…'}</main>;
- return <main style={{minHeight:'100vh',background:'#f4f7fb',fontFamily:'system-ui',color:'#102a43'}}>
-   <header style={{background:'#fff',borderBottom:'1px solid #e5eaf0',padding:'16px 5vw',display:'flex',justifyContent:'space-between',alignItems:'center',gap:20}}><div><div style={{fontSize:12,fontWeight:800,letterSpacing:1.4,color:'#0f766e',textTransform:'uppercase'}}>BIMED Healthcare</div><div style={{fontSize:22,fontWeight:800}}>Staff Portal</div></div><div style={{display:'flex',alignItems:'center',gap:12}}><div style={{textAlign:'right'}}><div style={{fontWeight:800}}>{staff.preferred_name||staff.full_name}</div><div style={{fontSize:12,color:'#627d98'}}>{staff.bimed_id}</div></div><button onClick={logout} style={{padding:'9px 12px',border:'1px solid #d9e2ec',background:'#fff',borderRadius:9}}>Sign out</button></div></header>
-   <div style={{maxWidth:1200,margin:'0 auto',padding:'28px 20px'}}>
-    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:20}}>{[['overview','Overview'],['rota','My Rota'],['pay','Payslips'],['profile','My Profile']].map(([id,label])=><button key={id} onClick={()=>setTab(id as any)} style={{padding:'10px 15px',borderRadius:10,border:'1px solid #d9e2ec',background:tab===id?'#0f766e':'#fff',color:tab===id?'#fff':'#334e68',fontWeight:800}}>{label}</button>)}</div>
-    {error&&<div style={{...card,borderColor:'#fed7d7',color:'#9b2c2c',marginBottom:18}}>{error}</div>}
-    {tab==='overview'&&<>
-      <section style={{display:'grid',gridTemplateColumns:'minmax(0,1.6fr) minmax(280px,.8fr)',gap:18}}>
-        <div style={card}><div style={{display:'flex',justifyContent:'space-between',gap:20,alignItems:'flex-start'}}><div><div style={{color:'#627d98',fontSize:13}}>Welcome back</div><h1 style={{fontSize:32,margin:'4px 0 10px'}}>{staff.preferred_name||staff.full_name}</h1><p style={{margin:0,color:'#627d98'}}>Your permanent BIMED ID is <strong>{staff.bimed_id}</strong>. Keep using this account throughout your employment.</p></div><div style={{width:92,height:92,borderRadius:'50%',overflow:'hidden',background:'#e6fffb',display:'grid',placeItems:'center',flexShrink:0}}>{staff.profile_photo_url?<img src={staff.profile_photo_url} alt='BIMED staff photograph' style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontWeight:900,color:'#0f766e',fontSize:28}}>{String(staff.full_name||'?').split(' ').map((x:string)=>x[0]).slice(0,2).join('')}</span>}</div></div></div>
-        <div style={card}><div style={{color:'#627d98',fontSize:13}}>Profile readiness</div><div style={{fontSize:28,fontWeight:900,margin:'4px 0 12px'}}>{staff.pps_number?'Ready':'PPS number pending'}</div><div style={{height:8;background:'#edf2f7',borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:staff.pps_number?'100%':'70%',background:'#0f766e'}}/></div><div style={{fontSize:12,color:'#627d98',marginTop:8}}>{staff.pps_number?'Irish payroll details have started.':'Add your PPS number when you receive it in Ireland.'}</div></div>
-      </section>
-      <section style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:18,marginTop:18}}>
-       <div style={card}><div style={{fontSize:13,color:'#627d98'}}>Upcoming shifts</div><div style={{fontSize:30,fontWeight:900}}>{shifts.filter(s=>s.status!=='cancelled').length}</div><button onClick={()=>setTab('rota')} style={{border:0,background:'none',color:'#0f766e',fontWeight:800,padding:0}}>Open rota →</button></div>
-       <div style={card}><div style={{fontSize:13,color:'#627d98'}}>Payslips available</div><div style={{fontSize:30,fontWeight:900}}>{payslips.length}</div><button onClick={()=>setTab('pay')} style={{border:0,background:'none',color:'#0f766e',fontWeight:800,padding:0}}>View payslips →</button></div>
-       <div style={card}><div style={{fontSize:13,color:'#627d98'}}>Unread notifications</div><div style={{fontSize:30,fontWeight:900}}>{unread}</div><span style={{fontSize:12,color:'#627d98'}}>Rota, payroll, training and BIMED updates</span></div>
-      </section>
-    </>}
-    {tab==='rota'&&<section style={{display:'grid',gridTemplateColumns:'1.5fr 1fr',gap:18}}><div style={card}><h2 style={{marginTop:0}}>My Rota</h2>{shifts.length===0?<p style={{color:'#627d98'}}>No assigned shifts yet.</p>:<div style={{display:'grid',gap:10}}>{shifts.map(s=><div key={s.id} style={{padding:14,border:'1px solid #e5eaf0',borderRadius:12,display:'flex',justifyContent:'space-between',gap:16}}><div><strong>{s.shift_type}</strong><div>{s.shift_date} · {new Date(s.start_at).toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'})}–{new Date(s.end_at).toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'})}</div><div style={{fontSize:12,color:'#627d98'}}>{s.location||'BIMED'}{s.role?` · ${s.role}`:''}</div></div><span style={{fontSize:12,fontWeight:800,color:s.status==='cancelled'?'#c53030':'#0f766e'}}>{s.status}</span></div>)}</div>}</div><div style={card}><h2 style={{marginTop:0}}>My Shift Requests</h2>{requests.length===0?<p style={{color:'#627d98'}}>No shift requests yet.</p>:requests.map(r=><div key={r.id} style={{padding:'12px 0',borderBottom:'1px solid #edf2f7'}}><strong>{r.request_type}</strong><div style={{fontSize:12,color:'#627d98'}}>{r.status}</div>{r.reason&&<div style={{fontSize:13,marginTop:4}}>{r.reason}</div>}</div>)}</div></section>}
-    {tab==='pay'&&<section style={card}><h2 style={{marginTop:0}}>My Payslips</h2>{payslips.length===0?<p style={{color:'#627d98'}}>Your BIMED payslips will appear here when issued.</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th style={{textAlign:'left',padding:10}}>Pay period</th><th style={{textAlign:'right',padding:10}}>Gross</th><th style={{textAlign:'right',padding:10}}>Deductions</th><th style={{textAlign:'right',padding:10}}>Net pay</th></tr></thead><tbody>{payslips.map(p=><tr key={p.id} style={{borderTop:'1px solid #edf2f7'}}><td style={{padding:10}}>{p.pay_period_start} – {p.pay_period_end}</td><td style={{textAlign:'right',padding:10}}>€{Number(p.gross_pay||0).toFixed(2)}</td><td style={{textAlign:'right',padding:10}}>€{(Number(p.paye||0)+Number(p.prsi||0)+Number(p.usc||0)+Number(p.other_deductions||0)).toFixed(2)}</td><td style={{textAlign:'right',padding:10,fontWeight:900}}>€{Number(p.net_pay||0).toFixed(2)}</td></tr>)}</tbody></table></div>}</section>}
-    {tab==='profile'&&<section style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 320px',gap:18}}><form onSubmit={saveProfile} style={card}><h2 style={{marginTop:0}}>My BIMED Profile</h2><div style={{display:'grid',gap:14}}><div><label style={{display:'block',fontWeight:800,fontSize:13}}>BIMED ID</label><div style={{padding:12,borderRadius:10,background:'#f4f7fb',fontWeight:900}}>{staff.bimed_id}</div></div><div><label style={{display:'block',fontWeight:800,fontSize:13}}>PPS Number</label><input value={pps} onChange={e=>setPps(e.target.value)} placeholder='Not yet available? Leave blank and add it later.' style={{width:'100%',padding:12,border:'1px solid #d9e2ec',borderRadius:10}}/><div style={{fontSize:12,color:'#627d98',marginTop:5}}>You do not need an Irish PPS Number before arrival. Add it when you receive it.</div></div><div><label style={{display:'block',fontWeight:800,fontSize:13}}>Phone</label><input value={phone} onChange={e=>setPhone(e.target.value)} style={{width:'100%',padding:12,border:'1px solid #d9e2ec',borderRadius:10}}/></div><div><label style={{display:'block',fontWeight:800,fontSize:13}}>Irish/Current Address</label><input value={address} onChange={e=>setAddress(e.target.value)} placeholder='Add your Ireland address when available' style={{width:'100%',padding:12,border:'1px solid #d9e2ec',borderRadius:10}}/></div><button disabled={busy} style={{padding:'12px 16px',border:0,borderRadius:10,background:'#0f766e',color:'#fff',fontWeight:900}}>{busy?'Saving…':'Save profile'}</button></div></form><div style={card}><h2 style={{marginTop:0}}>BIMED Staff Photograph</h2><div style={{width:180,height:220,borderRadius:14,overflow:'hidden',background:'#eef2f7',display:'grid',placeItems:'center',marginBottom:14}}>{staff.profile_photo_url?<img src={staff.profile_photo_url} alt='BIMED Staff Photograph' style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{color:'#829ab1'}}>No photo</span>}</div><input id='photo' type='file' accept='image/jpeg,image/png,image/webp' onChange={uploadPhoto} disabled={photoBusy}/><p style={{fontSize:12,color:'#627d98'}}>Use a recent clear photograph. Maximum 5 MB.</p></div></section>}
-   </div>
- </main>
+const card: React.CSSProperties = {
+  background: '#fff',
+  border: '1px solid #e5eaf0',
+  borderRadius: 18,
+  padding: 20,
+  boxShadow: '0 8px 28px rgba(15,23,42,.04)',
+};
+
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function initials(name: string) {
+  return name
+    .split(' ')
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
+
+export default function StaffDashboard() {
+  const router = useRouter();
+  const [staff, setStaff] = useState<Staff | null>(null);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [notifications, setNotifications] = useState<Notice[]>([]);
+  const [tab, setTab] = useState<Tab>('overview');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [pps, setPps] = useState('');
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+
+  async function load() {
+    setError('');
+    const [meResponse, rotaResponse, payResponse, noticeResponse] = await Promise.all([
+      fetch('/api/staff/me'),
+      fetch('/api/staff/rota'),
+      fetch('/api/staff/payslips'),
+      fetch('/api/staff/notifications'),
+    ]);
+
+    if (meResponse.status === 401) {
+      router.replace('/staff/login');
+      return;
+    }
+
+    const [me, rota, pay, notice] = await Promise.all([
+      meResponse.json(),
+      rotaResponse.json(),
+      payResponse.json(),
+      noticeResponse.json(),
+    ]);
+
+    if (!meResponse.ok) {
+      setError(me.error || 'Unable to load your BIMED profile.');
+      return;
+    }
+
+    setStaff(me.staff);
+    setPps(me.staff.pps_number || '');
+    setAddress(me.staff.address_line_1 || '');
+    setPhone(me.staff.phone || '');
+    setShifts(rota.shifts || []);
+    setRequests(rota.requests || []);
+    setPayslips(pay.payslips || []);
+    setNotifications(notice.notifications || []);
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const unreadCount = useMemo(
+    () => notifications.filter((notice) => !notice.read_at).length,
+    [notifications],
+  );
+
+  async function saveProfile(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/staff/me', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pps_number: pps, address_line_1: address, phone }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to save profile.');
+      setStaff(data.staff);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save profile.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadPhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPhotoBusy(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const response = await fetch('/api/staff/me', { method: 'POST', body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to upload photograph.');
+      setStaff(data.staff);
+    } catch (photoError) {
+      setError(photoError instanceof Error ? photoError.message : 'Unable to upload photograph.');
+    } finally {
+      setPhotoBusy(false);
+      event.target.value = '';
+    }
+  }
+
+  async function markAllRead() {
+    const response = await fetch('/api/staff/notifications', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    });
+    if (response.ok) setNotifications((items) => items.map((item) => ({ ...item, read_at: new Date().toISOString() })));
+  }
+
+  async function logout() {
+    await fetch('/api/staff/auth/logout', { method: 'POST' });
+    router.replace('/staff/login');
+  }
+
+  if (!staff) {
+    return <main style={{ padding: 40, fontFamily: 'system-ui' }}>{error || 'Loading BIMED Staff Portal…'}</main>;
+  }
+
+  const name = staff.preferred_name || staff.full_name;
+
+  return (
+    <main style={{ minHeight: '100vh', background: '#f4f7fb', color: '#102a43', fontFamily: 'system-ui' }}>
+      <header style={{ background: '#fff', borderBottom: '1px solid #e5eaf0', padding: '16px 5vw', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20 }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1.4, color: '#0f766e', textTransform: 'uppercase' }}>BIMED Healthcare</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>Staff Portal</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontWeight: 800 }}>{name}</div>
+            <div style={{ fontSize: 12, color: '#627d98' }}>{staff.bimed_id}</div>
+          </div>
+          <button onClick={logout} style={{ padding: '9px 12px', border: '1px solid #d9e2ec', background: '#fff', borderRadius: 9 }}>Sign out</button>
+        </div>
+      </header>
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 20px' }}>
+        <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+          {(
+            [
+              ['overview', 'Overview'],
+              ['rota', 'My Rota'],
+              ['pay', 'Payslips'],
+              ['profile', 'My Profile'],
+              ['notifications', `Notifications${unreadCount ? ` (${unreadCount})` : ''}`],
+            ] as Array<[Tab, string]>
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              style={{ padding: '10px 15px', borderRadius: 10, border: '1px solid #d9e2ec', background: tab === id ? '#0f766e' : '#fff', color: tab === id ? '#fff' : '#334e68', fontWeight: 800 }}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {error && <div style={{ ...card, borderColor: '#fed7d7', color: '#9b2c2c', marginBottom: 18 }}>{error}</div>}
+
+        {tab === 'overview' && (
+          <>
+            <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(280px, .8fr)', gap: 18 }}>
+              <div style={card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20 }}>
+                  <div>
+                    <div style={{ color: '#627d98', fontSize: 13 }}>Welcome back</div>
+                    <h1 style={{ fontSize: 32, margin: '4px 0 10px' }}>{name}</h1>
+                    <p style={{ margin: 0, color: '#627d98' }}>Your permanent BIMED ID is <strong>{staff.bimed_id}</strong>. Keep using this account throughout your employment.</p>
+                  </div>
+                  <div style={{ width: 92, height: 92, borderRadius: '50%', overflow: 'hidden', background: '#e6fffb', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    {staff.profile_photo_url ? (
+                      <img src={staff.profile_photo_url} alt="BIMED staff photograph" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontWeight: 900, color: '#0f766e', fontSize: 28 }}>{initials(staff.full_name || '?')}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div style={card}>
+                <div style={{ color: '#627d98', fontSize: 13 }}>Payroll readiness</div>
+                <div style={{ fontSize: 28, fontWeight: 900, margin: '4px 0 12px' }}>{staff.pps_number ? 'PPS added' : 'PPS pending'}</div>
+                <div style={{ fontSize: 12, color: '#627d98' }}>{staff.pps_number ? 'Your PPS number is on your BIMED profile.' : 'Add your PPS number yourself when you receive it in Ireland.'}</div>
+              </div>
+            </section>
+
+            <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 18, marginTop: 18 }}>
+              <div style={card}><div style={{ fontSize: 13, color: '#627d98' }}>Upcoming shifts</div><div style={{ fontSize: 30, fontWeight: 900 }}>{shifts.filter((shift) => shift.status !== 'cancelled').length}</div><button onClick={() => router.push('/staff/rota')} style={{ border: 0, background: 'none', color: '#0f766e', fontWeight: 800, padding: 0 }}>Open rota →</button></div>
+              <div style={card}><div style={{ fontSize: 13, color: '#627d98' }}>Payslips available</div><div style={{ fontSize: 30, fontWeight: 900 }}>{payslips.length}</div><button onClick={() => setTab('pay')} style={{ border: 0, background: 'none', color: '#0f766e', fontWeight: 800, padding: 0 }}>View payslips →</button></div>
+              <div style={card}><div style={{ fontSize: 13, color: '#627d98' }}>Unread notifications</div><div style={{ fontSize: 30, fontWeight: 900 }}>{unreadCount}</div><button onClick={() => setTab('notifications')} style={{ border: 0, background: 'none', color: '#0f766e', fontWeight: 800, padding: 0 }}>Open notifications →</button></div>
+            </section>
+          </>
+        )}
+
+        {tab === 'rota' && (
+          <section style={card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+              <div><h2 style={{ margin: '0 0 5px' }}>My Rota</h2><p style={{ margin: 0, color: '#627d98' }}>Manage your shifts and request available work.</p></div>
+              <button onClick={() => router.push('/staff/rota')} style={{ padding: '10px 14px', border: 0, borderRadius: 9, background: '#0f766e', color: '#fff', fontWeight: 800 }}>Open shift workspace</button>
+            </div>
+            <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
+              {shifts.length === 0 ? <p style={{ color: '#627d98' }}>No assigned shifts yet.</p> : shifts.map((shift) => <div key={shift.id} style={{ border: '1px solid #e5eaf0', borderRadius: 12, padding: 14 }}><strong>{shift.shift_type}</strong><div>{shift.shift_date} · {formatTime(shift.start_at)}–{formatTime(shift.end_at)}</div><div style={{ fontSize: 12, color: '#627d98' }}>{shift.location || 'BIMED'}{shift.role ? ` · ${shift.role}` : ''}</div></div>)}
+            </div>
+            <h3 style={{ marginTop: 24 }}>Recent requests</h3>
+            {requests.length === 0 ? <p style={{ color: '#627d98' }}>No shift requests yet.</p> : requests.slice(0, 6).map((request) => <div key={request.id} style={{ borderTop: '1px solid #edf2f7', padding: '10px 0' }}><strong>{request.request_type}</strong><div style={{ fontSize: 12, color: '#627d98' }}>{request.status}</div></div>)}
+          </section>
+        )}
+
+        {tab === 'pay' && (
+          <section style={card}>
+            <h2 style={{ marginTop: 0 }}>My Payslips</h2>
+            {payslips.length === 0 ? <p style={{ color: '#627d98' }}>Your BIMED payslips will appear here when issued.</p> : <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><th style={{ textAlign: 'left', padding: 10 }}>Pay period</th><th style={{ textAlign: 'right', padding: 10 }}>Gross</th><th style={{ textAlign: 'right', padding: 10 }}>Deductions</th><th style={{ textAlign: 'right', padding: 10 }}>Net pay</th></tr></thead><tbody>{payslips.map((payslip) => { const deductions = Number(payslip.paye || 0) + Number(payslip.prsi || 0) + Number(payslip.usc || 0) + Number(payslip.other_deductions || 0); return <tr key={payslip.id} style={{ borderTop: '1px solid #edf2f7' }}><td style={{ padding: 10 }}>{payslip.pay_period_start} – {payslip.pay_period_end}</td><td style={{ textAlign: 'right', padding: 10 }}>€{Number(payslip.gross_pay || 0).toFixed(2)}</td><td style={{ textAlign: 'right', padding: 10 }}>€{deductions.toFixed(2)}</td><td style={{ textAlign: 'right', padding: 10, fontWeight: 900 }}>€{Number(payslip.net_pay || 0).toFixed(2)}</td></tr>; })}</tbody></table></div>}
+          </section>
+        )}
+
+        {tab === 'profile' && (
+          <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 18 }}>
+            <form onSubmit={saveProfile} style={card}>
+              <h2 style={{ marginTop: 0 }}>My BIMED Profile</h2>
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div><label style={{ display: 'block', fontWeight: 800, fontSize: 13 }}>BIMED ID</label><div style={{ padding: 12, borderRadius: 10, background: '#f4f7fb', fontWeight: 900 }}>{staff.bimed_id}</div></div>
+                <div><label style={{ display: 'block', fontWeight: 800, fontSize: 13 }}>PPS Number</label><input value={pps} onChange={(event) => setPps(event.target.value)} placeholder="Not available yet? Leave blank and add it later." style={{ width: '100%', padding: 12, border: '1px solid #d9e2ec', borderRadius: 10 }} /><div style={{ fontSize: 12, color: '#627d98', marginTop: 5 }}>You can leave this blank before arriving in Ireland and add it later.</div></div>
+                <div><label style={{ display: 'block', fontWeight: 800, fontSize: 13 }}>Phone</label><input value={phone} onChange={(event) => setPhone(event.target.value)} style={{ width: '100%', padding: 12, border: '1px solid #d9e2ec', borderRadius: 10 }} /></div>
+                <div><label style={{ display: 'block', fontWeight: 800, fontSize: 13 }}>Address</label><input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Add your Ireland address when available" style={{ width: '100%', padding: 12, border: '1px solid #d9e2ec', borderRadius: 10 }} /></div>
+                <button disabled={busy} style={{ padding: '12px 16px', border: 0, borderRadius: 10, background: '#0f766e', color: '#fff', fontWeight: 900 }}>{busy ? 'Saving…' : 'Save profile'}</button>
+              </div>
+            </form>
+            <div style={card}>
+              <h2 style={{ marginTop: 0 }}>BIMED Staff Photograph</h2>
+              <div style={{ width: 180, height: 220, borderRadius: 14, overflow: 'hidden', background: '#eef2f7', display: 'grid', placeItems: 'center', marginBottom: 14 }}>
+                {staff.profile_photo_url ? <img src={staff.profile_photo_url} alt="BIMED Staff Photograph" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ color: '#829ab1' }}>No photo</span>}
+              </div>
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy} />
+              <p style={{ fontSize: 12, color: '#627d98' }}>Upload a recent clear photograph. Maximum 5 MB.</p>
+            </div>
+          </section>
+        )}
+
+        {tab === 'notifications' && (
+          <section style={card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div><h2 style={{ margin: 0 }}>BIMED Notifications</h2><p style={{ margin: '5px 0 0', color: '#627d98' }}>Rota, payroll, training and staff communications.</p></div>
+              <button onClick={markAllRead} style={{ padding: '9px 12px', border: '1px solid #d9e2ec', background: '#fff', borderRadius: 9 }}>Mark all read</button>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              {notifications.length === 0 ? <p style={{ color: '#627d98' }}>No notifications yet.</p> : notifications.map((notice) => <div key={notice.id} style={{ padding: '13px 0', borderTop: '1px solid #edf2f7' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><strong>{notice.title}</strong><span style={{ fontSize: 12, color: notice.read_at ? '#829ab1' : '#0f766e' }}>{notice.read_at ? 'Read' : 'New'}</span></div><p style={{ margin: '5px 0', color: '#486581' }}>{notice.body}</p>{notice.action_url && <button onClick={() => router.push(notice.action_url)} style={{ padding: 0, border: 0, background: 'none', color: '#0f766e', fontWeight: 800 }}>Open →</button>}</div>)}
+            </div>
+          </section>
+        )}
+      </div>
+    </main>
+  );
 }
