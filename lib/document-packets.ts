@@ -48,7 +48,16 @@ export async function createPacketAccess(applicationId: string, packetSlug: Pack
 }
 
 export async function getPacketAccess(token: string) {
-  const { data, error } = await db().from('recruitment_document_packet_access').select('id, application_id, packet_slug, expires_at, revoked_at').eq('token_hash', hashToken(token)).maybeSingle();
+  const client = db();
+  const { data, error } = await client.from('recruitment_document_packet_access')
+    .select('id, application_id, packet_slug, expires_at, revoked_at')
+    .eq('token_hash', hashToken(token)).maybeSingle();
   if (error || !data || data.revoked_at || new Date(data.expires_at).getTime() <= Date.now()) return null;
-  return data;
+
+  if (!data.viewed_at) {
+    await client.from('recruitment_document_packet_access')
+      .update({ viewed_at: new Date().toISOString() })
+      .eq('id', data.id).is('viewed_at', null);
+  }
+  return { ...data, viewed_at: data.viewed_at || new Date().toISOString() };
 }
