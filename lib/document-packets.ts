@@ -27,7 +27,7 @@ export function packetList(international: boolean) {
     .map(([slug, packet]) => ({ slug, ...packet }));
 }
 
-export async function createPacketAccess(applicationId: string, packetSlug: PacketSlug, createdBy: string, ttlDays = 30) {
+export async function createPacketAccess(applicationId: string, packetSlug: PacketSlug, issuedBy: string, ttlDays = 30) {
   const token = makeToken();
   const expiresAt = new Date(Date.now() + ttlDays * 86400000).toISOString();
   const { data, error } = await db().from('recruitment_document_packet_access').insert({
@@ -35,14 +35,25 @@ export async function createPacketAccess(applicationId: string, packetSlug: Pack
     packet_slug: packetSlug,
     token_hash: hashToken(token),
     expires_at: expiresAt,
-    created_by: createdBy,
+    issued_by: issuedBy,
   }).select('id, application_id, packet_slug, expires_at, created_at').single();
   if (error || !data) throw new Error(error?.message || 'Unable to create document packet access.');
   return { record: data, token, url: `${getAppUrl()}/candidate/packet/${token}` };
 }
 
 export async function getPacketAccess(token: string) {
-  const { data, error } = await db().from('recruitment_document_packet_access').select('id, application_id, packet_slug, expires_at, revoked_at').eq('token_hash', hashToken(token)).maybeSingle();
+  const { data, error } = await db().from('recruitment_document_packet_access')
+    .select('id, application_id, packet_slug, expires_at, revoked_at, viewed_at')
+    .eq('token_hash', hashToken(token))
+    .maybeSingle();
   if (error || !data || data.revoked_at || new Date(data.expires_at).getTime() <= Date.now()) return null;
+
+  if (!data.viewed_at) {
+    await db().from('recruitment_document_packet_access')
+      .update({ viewed_at: new Date().toISOString() })
+      .eq('id', data.id)
+      .is('viewed_at', null);
+  }
+
   return data;
 }
