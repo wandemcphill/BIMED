@@ -31,7 +31,7 @@ export default function InterviewAnswerInput({
 }: {
   value: InterviewAnswerValue | undefined;
   onChange: (next: InterviewAnswerValue) => void;
-  /** Audio interview segment. Typing remains an explicit fallback if recording is unavailable. */
+  /** Audio interview segment. Typing is always available as a fallback. */
   audioRequired?: boolean;
 }) {
   const [supported, setSupported] = useState(false);
@@ -107,12 +107,10 @@ export default function InterviewAnswerInput({
       recorder.start();
       setRecording(true);
       setSeconds(0);
-    
+
       timerRef.current = setInterval(() => {
         setSeconds((current) => {
-          if (current + 1 >= MAX_RECORDING_SECONDS) {
-            recorder.stop();
-          }
+          if (current + 1 >= MAX_RECORDING_SECONDS) recorder.stop();
           return current + 1;
         });
       }, 1000);
@@ -123,9 +121,7 @@ export default function InterviewAnswerInput({
     }
   };
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-  };
+  const stopRecording = () => mediaRecorderRef.current?.stop();
 
   const removeRecording = () => {
     onChange({ text: '' });
@@ -137,30 +133,13 @@ export default function InterviewAnswerInput({
       <div className="voice-answer">
         <audio controls src={previewUrl} style={{ width: '100%' }} />
         <button type="button" className="secondary" style={{ marginTop: 8 }} onClick={removeRecording}>
-          {audioRequired ? 'Re-record or type instead' : 'Remove voice note and type instead'}
+          {audioRequired ? 'Remove recording and type instead' : 'Remove voice note and type instead'}
         </button>
       </div>
     );
   }
 
   const showTextFallback = audioRequired && (!supported || microphoneFailed);
-
-  if (audioRequired && supported && !microphoneFailed) {
-    return (
-      <div className="voice-answer">
-        {recording ? (
-          <button type="button" className="secondary voice-mic-active" onClick={stopRecording}>
-            Stop recording ({seconds}s / {MAX_RECORDING_SECONDS}s max)
-          </button>
-        ) : (
-          <button type="button" className="primary" onClick={() => void startRecording()}>
-            Record your answer
-          </button>
-        )}
-        {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
-      </div>
-    );
-  }
 
   return (
     <div className="voice-answer">
@@ -177,6 +156,21 @@ export default function InterviewAnswerInput({
               Try recording again
             </button>
           )}
+        </div>
+      )}
+
+      {audioRequired && supported && !microphoneFailed && (
+        <div style={{ marginBottom: 10 }}>
+          <button
+            type="button"
+            className={recording ? 'secondary voice-mic-active' : 'primary'}
+            onClick={recording ? stopRecording : () => void startRecording()}
+          >
+            {recording ? `Stop recording (${seconds}s / ${MAX_RECORDING_SECONDS}s max)` : 'Record your answer'}
+          </button>
+          <span className="muted" style={{ display: 'block', marginTop: 6 }}>
+            Or type your answer below if you prefer not to record audio.
+          </span>
         </div>
       )}
 
