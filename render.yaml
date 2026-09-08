@@ -30,8 +30,6 @@ services:
         value: manager@bimedhealthcare.com
       - key: BIMED_ADMIN_EMAIL
         value: info@bimedhealthcare.com
-      - key: RECRUITMENT_ADMIN_EMAIL
-        sync: false
       - key: ADMIN_BOOTSTRAP_EMAIL
         sync: false
       - key: ADMIN_BOOTSTRAP_PASSWORD
