@@ -50,14 +50,16 @@ export async function createPacketAccess(applicationId: string, packetSlug: Pack
 export async function getPacketAccess(token: string) {
   const client = db();
   const { data, error } = await client.from('recruitment_document_packet_access')
-    .select('id, application_id, packet_slug, expires_at, revoked_at')
+    .select('id, application_id, packet_slug, expires_at, revoked_at, viewed_at')
     .eq('token_hash', hashToken(token)).maybeSingle();
   if (error || !data || data.revoked_at || new Date(data.expires_at).getTime() <= Date.now()) return null;
 
   if (!data.viewed_at) {
+    const viewedAt = new Date().toISOString();
     await client.from('recruitment_document_packet_access')
-      .update({ viewed_at: new Date().toISOString() })
+      .update({ viewed_at: viewedAt })
       .eq('id', data.id).is('viewed_at', null);
+    return { ...data, viewed_at: viewedAt };
   }
-  return { ...data, viewed_at: data.viewed_at || new Date().toISOString() };
+  return data;
 }
