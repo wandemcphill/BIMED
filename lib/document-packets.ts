@@ -4,6 +4,8 @@ import { getAppUrl } from '@/lib/email';
 
 export type PacketSlug =
   | 'candidate-application'
+  | 'role-information'
+  | 'supporting-documents'
   | 'international-sponsorship'
   | 'offer-onboarding'
   | 'welcome-to-ireland'
@@ -13,6 +15,8 @@ export type PacketSlug =
 
 export const PACKETS: Record<PacketSlug, { title: string; description: string; internationalOnly?: boolean; sourcePath?: string }> = {
   'candidate-application': { title: 'Candidate Application Guide', description: 'How to complete the private application and provide requested evidence.', sourcePath: 'docs/candidate-packets/03-candidate-application-guide.md' },
+  'role-information': { title: 'Role Information Pack', description: 'Candidate-facing role, expectations and recruitment information.', sourcePath: 'docs/candidate-packets/01-role-information-pack.md' },
+  'supporting-documents': { title: 'Supporting Documents Checklist', description: 'Checklist of documents and evidence requested during recruitment.', sourcePath: 'docs/candidate-packets/10-supporting-documents-checklist.md' },
   'international-sponsorship': { title: 'International Recruitment & Visa Sponsorship Pack', description: 'Overseas recruitment, work-permission and sponsorship checklist.', internationalOnly: true, sourcePath: 'docs/candidate-packets/04-visa-sponsorship-application-pack.md' },
   'offer-onboarding': { title: 'Offer & Onboarding Guide', description: 'What happens after selection, including contract, induction and next steps.', sourcePath: 'docs/candidate-packets/09-new-starter-onboarding-checklist.md' },
   'welcome-to-ireland': { title: 'Welcome to Ireland Pack', description: 'Practical pre-arrival, arrival and first-weeks orientation for international hires.', internationalOnly: true, sourcePath: 'docs/candidate-packets/06-welcome-to-ireland-pack.md' },
@@ -27,7 +31,9 @@ export function packetList(international: boolean) {
     .map(([slug, packet]) => ({ slug, ...packet }));
 }
 
-export async function createPacketAccess(applicationId: string, packetSlug: PacketSlug, issuedBy: string, ttlDays = 30) {
+export async function createPacketAccess(applicationId: string, packetSlug: PacketSlug, createdBy: string, ttlDays = 30) {
+  const packet = PACKETS[packetSlug];
+  if (!packet) throw new Error('Unknown document packet.');
   const token = makeToken();
   const expiresAt = new Date(Date.now() + ttlDays * 86400000).toISOString();
   const { data, error } = await db().from('recruitment_document_packet_access').insert({
@@ -35,25 +41,14 @@ export async function createPacketAccess(applicationId: string, packetSlug: Pack
     packet_slug: packetSlug,
     token_hash: hashToken(token),
     expires_at: expiresAt,
-    issued_by: issuedBy,
+    created_by: createdBy,
   }).select('id, application_id, packet_slug, expires_at, created_at').single();
   if (error || !data) throw new Error(error?.message || 'Unable to create document packet access.');
   return { record: data, token, url: `${getAppUrl()}/candidate/packet/${token}` };
 }
 
 export async function getPacketAccess(token: string) {
-  const { data, error } = await db().from('recruitment_document_packet_access')
-    .select('id, application_id, packet_slug, expires_at, revoked_at, viewed_at')
-    .eq('token_hash', hashToken(token))
-    .maybeSingle();
+  const { data, error } = await db().from('recruitment_document_packet_access').select('id, application_id, packet_slug, expires_at, revoked_at').eq('token_hash', hashToken(token)).maybeSingle();
   if (error || !data || data.revoked_at || new Date(data.expires_at).getTime() <= Date.now()) return null;
-
-  if (!data.viewed_at) {
-    await db().from('recruitment_document_packet_access')
-      .update({ viewed_at: new Date().toISOString() })
-      .eq('id', data.id)
-      .is('viewed_at', null);
-  }
-
   return data;
 }
