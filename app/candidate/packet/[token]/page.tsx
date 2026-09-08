@@ -4,10 +4,6 @@ import { notFound } from 'next/navigation';
 import { getPacketAccess, PACKETS, type PacketSlug } from '@/lib/document-packets';
 import { db } from '@/lib/db';
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] || c));
-}
-
 function renderMarkdown(source: string) {
   return source.split(/\r?\n/).map((raw, index) => {
     const line = raw.trim();
@@ -16,7 +12,8 @@ function renderMarkdown(source: string) {
     if (line.startsWith('## ')) return <h2 key={index} style={{ margin: '24px 0 10px', color: '#163247', fontSize: 20 }}>{line.slice(3)}</h2>;
     if (line.startsWith('### ')) return <h3 key={index} style={{ margin: '20px 0 8px', color: '#163247' }}>{line.slice(4)}</h3>;
     if (line.startsWith('- ')) return <li key={index} style={{ margin: '6px 0' }}>{line.slice(2).replace(/\*\*(.*?)\*\*/g, '$1')}</li>;
-    const cleaned = line.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\[([ x])\]/gi, '$1' === 'x' ? '☑' : '☐');
+    const checkbox = line.replace(/\[([ x])\]/gi, (_match, mark: string) => mark.toLowerCase() === 'x' ? '☑' : '☐');
+    const cleaned = checkbox.replace(/\*\*(.*?)\*\*/g, '$1');
     return <p key={index} style={{ margin: '0 0 12px', lineHeight: 1.7 }}>{cleaned}</p>;
   });
 }
