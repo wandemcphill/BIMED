@@ -27,7 +27,7 @@ begin
 end $$;
 
 alter table public.recruitment_document_packet_access alter column created_by set default 'system';
-create index if not exists recruitment_document_packet_access_active_idx
+create index if not exists recruitment_document_packet_access_active_hardened_idx
   on public.recruitment_document_packet_access(application_id, packet_slug, issued_at desc)
   where revoked_at is null;
 alter table public.recruitment_document_packet_access enable row level security;

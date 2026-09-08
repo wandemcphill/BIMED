@@ -23,6 +23,6 @@ describe('BIMED document packets', () => {
   });
 
   it('keeps every registered packet backed by a repository source document', () => {
-    for (const packet of Object.values(PACKETS)) expect(packet.sourcePath).toMatch(/^docs\\/candidate-packets\\//);
+    for (const packet of Object.values(PACKETS)) expect(packet.sourcePath).toMatch(/^docs\/candidate-packets\//);
   });
 });
