@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Header from '@/components/Header';
-import { recruitmentCopy } from '@/lib/recruitment-config';
+import { recruitmentContacts, recruitmentCopy } from '@/lib/recruitment-config';
 
 type LifeAtBimedPhoto = {
   src: string;
@@ -56,28 +56,30 @@ export default function Home() {
         <section className="card hero">
           <span className="pill">PRIVATE CANDIDATE PORTAL</span>
           <h1>Bimed Healthcare Recruitment</h1>
-          <p className="muted">
-            {recruitmentCopy.invitationOnly}
-          </p>
+          <p className="muted">{recruitmentCopy.invitationOnly}</p>
+
           <div className="split-grid">
             <div className="subcard">
-              <h2>How it works</h2>
+              <h2>How recruitment works</h2>
               <ol className="steps">
+                <li>Official recruitment channels receive initial candidate enquiries and CVs.</li>
                 <li>Selected candidates receive a private invitation link from Bimed.</li>
-                <li>The link opens a guided online application.</li>
-                <li>Supporting documents are sent separately by email after submission.</li>
+                <li>The invitation opens a guided online application with autosaved progress.</li>
+                <li>Supporting documents are requested separately by email after submission.</li>
               </ol>
             </div>
             <div className="subcard">
-              <h2>What to expect</h2>
+              <h2>Current recruitment information</h2>
               <ul className="notes-list">
-                <li>Invitation-only access</li>
-                <li>Autosaved progress</li>
-                <li>Clear review step before submission</li>
-                <li>Separate document email routing for Ireland and overseas applicants</li>
+                <li>Visa sponsorship may be available to eligible overseas and Ireland-based applicants.</li>
+                <li>Recruitment covers Dublin, Cork, Belfast and Limerick.</li>
+                <li>Local recruitment: {recruitmentContacts.ireland}</li>
+                <li>Overseas recruitment: {recruitmentContacts.overseas}</li>
+                <li>This portal is for invited candidates and is not a public self-registration form.</li>
               </ul>
             </div>
           </div>
+
           <section className="subcard life-section">
             <div className="section-intro">
               <h2>Life at Bimed</h2>
@@ -97,10 +99,11 @@ export default function Home() {
               ))}
             </div>
           </section>
+
           <div className="notice">
             <b>Not invited yet?</b>
             <p className="muted" style={{ marginBottom: 0 }}>
-              If you have not been invited, please continue using Bimed Healthcare&apos;s official recruitment channels.
+              Please use Bimed Healthcare&apos;s official recruitment channels first. The recruitment team will issue a private portal invitation when your application is ready for the online stage.
             </p>
           </div>
         </section>
