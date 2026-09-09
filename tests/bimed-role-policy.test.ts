@@ -6,6 +6,7 @@ import {
   BIMED_DEFAULT_PROBATION,
   BIMED_DEFAULT_START_DATE,
   applyBimedContractDefaults,
+  CANONICAL_RECRUITMENT_ROLES,
   normalizeRecruitmentRole,
 } from '@/lib/bimed-role-policy';
 
@@ -16,6 +17,12 @@ describe('BIMED role policy', () => {
     expect(normalizeRecruitmentRole('Physiotherapist')).toBe('Physiotherapist');
     expect(normalizeRecruitmentRole('Healthcare Worker')).toBe('Healthcare Assistant');
     expect(normalizeRecruitmentRole('Other')).toBeNull();
+    expect([...CANONICAL_RECRUITMENT_ROLES]).toEqual([
+      'Support Worker',
+      'Healthcare Assistant',
+      'Senior Support Worker',
+      'Physiotherapist',
+    ]);
   });
 
   it('applies common contract defaults without changing role-specific terms', () => {
@@ -24,11 +31,14 @@ describe('BIMED role policy', () => {
 
     const resolved = applyBimedContractDefaults(template);
     const field = (label: string) => resolved.editableFields.find((item) => item.label === label)?.value;
+    const probation = resolved.sections.find((section) => section.heading === '2. Commencement of Employment and Probation')?.paragraphs.join('\n') || '';
 
     expect(field('Line manager')).toBe(BIMED_DEFAULT_LINE_MANAGER);
     expect(field('Start date')).toBe(BIMED_DEFAULT_START_DATE);
     expect(field('Pay frequency')).toBe(BIMED_DEFAULT_PAY_FREQUENCY);
-    expect(resolved.sections.find((section) => section.heading === '2. Commencement of Employment and Probation')?.paragraphs.join('\n')).toContain(`first ${BIMED_DEFAULT_PROBATION}`);
+    expect(probation).toContain(`first ${BIMED_DEFAULT_PROBATION}`);
+    expect(probation).toContain('does not ordinarily extend the probationary period beyond 3 months');
+    expect(probation).not.toContain('combined maximum of 6 months');
     expect(field('Contracted hours')).toBe('39 hours per week');
     expect(field('Pay')).toContain('EUR 32,691');
   });
