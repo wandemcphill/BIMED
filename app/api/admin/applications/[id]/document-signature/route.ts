@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
-    let roleSlug: string = '';
+    let roleSlug = '';
     if (docType === 'job_description') {
       const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
       if (!expectedRoleSlug) {
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
 
     const email = await sendDocumentReadyToSignEmail(
-      { application: { ...application, start_date: startDate }, documentLabel, signUrl, signatureId: record.id },
+      { application, documentLabel, signUrl, signatureId: record.id },
       client
     );
 
