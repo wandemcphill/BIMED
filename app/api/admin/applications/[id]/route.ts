@@ -6,6 +6,7 @@ import { sendApplicationStatusUpdateEmails } from '@/lib/email';
 import { MAX_JSON_BYTES, readJsonBody, validateAdminApplicationPatch } from '@/lib/request-validation';
 import { createSignedAudioUrl, INTERVIEW_AUDIO_BUCKET } from '@/lib/interview-audio';
 import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
+import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -33,7 +34,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
   }
 
-  return NextResponse.json({ application, invite, auditLog: auditLog || [], interviewAudioUrls });
+  const canonicalRole = normalizeRecruitmentRole(application.role_applied);
+  const normalizedApplication = canonicalRole
+    ? { ...application, role_applied: canonicalRole }
+    : application;
+  const normalizedInvite = invite?.role
+    ? { ...invite, role: normalizeRecruitmentRole(invite.role) ?? invite.role }
+    : invite;
+
+  return NextResponse.json({ application: normalizedApplication, invite: normalizedInvite, auditLog: auditLog || [], interviewAudioUrls });
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
