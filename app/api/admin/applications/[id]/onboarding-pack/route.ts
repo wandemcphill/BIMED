@@ -72,7 +72,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }));
 
     const email = await sendFullOnboardingPackEmail({
-      application: { ...application, start_date: startDate },
+      application,
       contractSignUrl: contractResult.signUrl,
       jobDescriptionUrl: jobDescResult.signUrl,
       handbookUrl: handbookResult.signUrl,
