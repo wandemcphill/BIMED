@@ -6,6 +6,7 @@ import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendContractReadyToSignEmail } from '@/lib/email';
 import { getContractTemplate } from '@/lib/contract-templates';
 import { createContractSignatureRequest, listContractSignaturesForApplication } from '@/lib/contract-signature';
+import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -29,9 +30,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const bodyResult = await readJsonBody(request, MAX_JSON_BYTES.admin);
+  const bodyResult = await readJsonBody<Record<string, unknown>>(request, MAX_JSON_BYTES.admin);
   if (!bodyResult.ok) return NextResponse.json({ error: bodyResult.error }, { status: 400 });
-  const roleSlug = (bodyResult.data as Record<string, unknown>).role_slug;
+  const roleSlug = bodyResult.data.role_slug;
   if (typeof roleSlug !== 'string' || !getContractTemplate(roleSlug)) {
     return NextResponse.json({ error: 'A valid role_slug is required.' }, { status: 400 });
   }
@@ -47,6 +48,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .maybeSingle();
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+
+    const canonicalApplicationRole = normalizeRecruitmentRole(application.role_applied);
+    if (!canonicalApplicationRole) {
+      return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
+    }
+
+    if (roleSlug !== canonicalApplicationRole.toLowerCase().replaceAll(' ', '-')) {
+      return NextResponse.json(
+        { error: 'The contract role must match the candidate\'s applied role.' },
+        { status: 400 },
+      );
+    }
 
     const { record, signUrl } = await createContractSignatureRequest({
       applicationId: application.id,
