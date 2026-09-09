@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { activationExpiresAt, createActivationToken, hashActivationToken } from './staff-auth';
 import { recruitmentRoleSlug } from './bimed-role-policy';
+import { getOnboardingReadiness } from './onboarding-readiness';
 
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
@@ -45,6 +46,12 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
       await client.from('recruitment_applications').update({ bimed_id: existing.bimed_id, updated_at: new Date().toISOString() }).eq('id', applicationId);
     }
     return { staff: existing, activationToken: null as string | null };
+  }
+
+  const readiness = await getOnboardingReadiness(client, application);
+  if (!readiness.ready) {
+    const missing = readiness.missing.map((item) => item.title).join(', ');
+    throw new Error(`Onboarding is not complete. Complete the following before staff creation: ${missing}`);
   }
 
   const activationToken = createActivationToken();
