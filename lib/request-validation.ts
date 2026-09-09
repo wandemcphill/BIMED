@@ -1,4 +1,5 @@
 import { recruitmentRoles, recruitmentStatuses } from './recruitment-config';
+import { normalizeRecruitmentRole } from './bimed-role-policy';
 import { FIRST_INTERVIEW_ALL_QUESTIONS } from './interview-questions';
 
 const FIRST_INTERVIEW_QUESTION_IDS = new Set(FIRST_INTERVIEW_ALL_QUESTIONS.map((q) => q.id));
@@ -140,8 +141,11 @@ export function validateCandidateApplication(input: unknown): JsonResult<Record<
     const email = stringField(input, 'email', 254, true)!;
     if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(email)) throw new Error('email must be a valid email address.');
 
-    const role = stringField(input, 'role_applied', 100, true)!;
-    if (!recruitmentRoles.includes(role as (typeof recruitmentRoles)[number])) throw new Error('role_applied is invalid.');
+    const roleInput = stringField(input, 'role_applied', 100, true)!;
+    const role = normalizeRecruitmentRole(roleInput);
+    if (!role || (!recruitmentRoles as readonly string[]).includes(role) || recruitmentRoles.length !== 4) {
+      throw new Error('role_applied is invalid.');
+    }
 
     const living = stringField(input, 'living_in_ireland', 10, true)!;
     if (living !== 'Yes' && living !== 'No') throw new Error('living_in_ireland is invalid.');
@@ -223,7 +227,7 @@ export function validateAdminInvite(input: unknown): JsonResult<{ email: string;
     const expiryDate = stringField(input, 'expiryDate', 40);
     if (expiryDate && Number.isNaN(new Date(expiryDate).getTime())) throw new Error('expiryDate must be a valid date.');
     if (expiryDate && new Date(expiryDate).getTime() <= Date.now()) throw new Error('expiryDate must be in the future.');
-    return { ok: true, data: { email, name: stringField(input, 'name', 200), role: stringField(input, 'role', 100), expiryDate } };
+    return { ok: true, data: { email, name: stringField(input, 'name', 200), role: normalizeRecruitmentRole(stringField(input, 'role', 100)), expiryDate } };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Invalid request.' };
   }
