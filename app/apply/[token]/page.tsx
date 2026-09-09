@@ -2,6 +2,7 @@ import Header from '@/components/Header';
 import CandidateForm from '@/components/CandidateForm';
 import { db } from '@/lib/db';
 import { recruitmentContacts } from '@/lib/recruitment-config';
+import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import { hashToken } from '@/lib/token';
 
 type PageProps = {
@@ -69,15 +70,19 @@ export default async function Page({ params }: PageProps) {
       status = 'used';
     } else if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
       status = 'expired';
+    } else if (!normalizeRecruitmentRole(invite.role)) {
+      status = 'invalid';
     }
   } catch {
     status = 'unavailable';
   }
 
+  const canonicalRole = invite ? normalizeRecruitmentRole(invite.role) : null;
+
   return (
     <>
       <Header />
-      <main className="wrap">
+      <main className="wrap">">
         {status === 'invalid' && (
           <GateMessage
             title="Invitation unavailable"
@@ -106,13 +111,13 @@ export default async function Page({ params }: PageProps) {
             note="Once the recruitment environment variables are connected, this link will open the candidate application normally."
           />
         )}
-        {status === 'valid' && (
+        {status === 'valid' && canonicalRole && (
           <CandidateForm
             token={inviteToken}
             invite={{
               candidate_name: invite?.candidate_name,
               candidate_email: invite?.candidate_email,
-              role: invite?.role,
+              role: canonicalRole,
             }}
           />
         )}
