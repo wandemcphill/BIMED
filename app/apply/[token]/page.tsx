@@ -82,7 +82,7 @@ export default async function Page({ params }: PageProps) {
   return (
     <>
       <Header />
-      <main className="wrap">">
+      <main className="wrap">
         {status === 'invalid' && (
           <GateMessage
             title="Invitation unavailable"
