@@ -1,10 +1,15 @@
 import crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { activationExpiresAt, createActivationToken, hashActivationToken } from './staff-auth';
+import { recruitmentRoleSlug } from './bimed-role-policy';
 
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
 export type StaffStatus = 'pre_arrival' | 'active' | 'on_leave' | 'suspended' | 'former';
+
+function defaultStartDate() {
+  return '2027-01-11';
+}
 
 export async function createStaffFromApplication(client: SupabaseClient, applicationId: string) {
   const { data: application, error: applicationError } = await client
@@ -13,6 +18,22 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
     .eq('id', applicationId)
     .single();
   if (applicationError || !application) throw new Error('Application not found.');
+
+  const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
+  if (!expectedRoleSlug) throw new Error('Application has an invalid recruitment role.');
+
+  const { data: signedContract, error: signatureError } = await client
+    .from('recruitment_contract_signatures')
+    .select('id, role_slug, employee_name, employee_address, start_date, status, signed_at')
+    .eq('application_id', applicationId)
+    .eq('doc_type', 'contract')
+    .eq('status', 'signed')
+    .order('signed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (signatureError) throw signatureError;
+  if (!signedContract) throw new Error('The employment contract must be signed before the candidate can be promoted to staff.');
+  if (signedContract.role_slug !== expectedRoleSlug) throw new Error('The signed contract role does not match the candidate\'s applied role.');
 
   const { data: existing } = await client
     .from('recruitment_staff')
@@ -27,11 +48,14 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
   }
 
   const activationToken = createActivationToken();
+  const effectiveStartDate = signedContract.start_date || application.start_date || defaultStartDate();
+  const effectiveName = signedContract.employee_name || application.full_name;
+  const effectiveAddress = signedContract.employee_address || application.address;
   const { data: staff, error } = await client
     .from('recruitment_staff')
     .insert({
       application_id: application.id,
-      full_name: application.full_name,
+      full_name: effectiveName,
       preferred_name: application.preferred_name,
       email: application.email.trim().toLowerCase(),
       phone: application.phone,
@@ -39,7 +63,7 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
       nationality: application.nationality,
       role: application.role_applied,
       employment_type: application.employment_type,
-      employment_start_date: application.start_date,
+      employment_start_date: effectiveStartDate,
       country: 'Ireland',
       status: application.living_in_ireland === 'No' ? 'pre_arrival' : 'active',
       activation_token_hash: hashActivationToken(activationToken),
@@ -49,7 +73,7 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
     .single();
   if (error || !staff) throw error || new Error('Unable to create staff profile.');
 
-  await client.from('recruitment_applications').update({ bimed_id: staff.bimed_id, updated_at: new Date().toISOString() }).eq('id', applicationId);
+  await client.from('recruitment_applications').update({ bimed_id: staff.bimed_id, address: effectiveAddress, start_date: effectiveStartDate, updated_at: new Date().toISOString() }).eq('id', applicationId);
   return { staff, activationToken };
 }
 
