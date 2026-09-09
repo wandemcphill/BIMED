@@ -6,10 +6,14 @@ import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendContractReadyToSignEmail } from '@/lib/email';
 import { getContractTemplate } from '@/lib/contract-templates';
 import { createContractSignatureRequest, listContractSignaturesForApplication } from '@/lib/contract-signature';
-import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
+import { BIMED_DEFAULT_START_DATE, normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+function defaultStartDateIso() {
+  return '2027-01-11';
+}
 
 export async function GET(request: NextRequest, context: RouteContext) {
   if (!await getAdminSession(request)) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
@@ -61,12 +65,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const startDate = application.start_date || defaultStartDateIso();
+
     const { record, signUrl } = await createContractSignatureRequest({
       applicationId: application.id,
       roleSlug,
       employeeName: application.full_name,
       employeeAddress: application.address,
-      startDate: application.start_date,
+      startDate,
       issuedBy: session.email,
     });
 
@@ -74,11 +80,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       applicationId: application.id,
       eventType: 'contract_signature_requested',
       actor: session.email,
-      metadata: { signature_id: record.id, role_slug: roleSlug },
+      metadata: { signature_id: record.id, role_slug: roleSlug, start_date: startDate, canonical_default_start_date: BIMED_DEFAULT_START_DATE },
     });
 
     const email = await sendContractReadyToSignEmail(
-      { application, signUrl, signatureId: record.id },
+      { application: { ...application, start_date: startDate }, signUrl, signatureId: record.id },
       client
     );
 
