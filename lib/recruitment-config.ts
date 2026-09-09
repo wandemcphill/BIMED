@@ -1,3 +1,5 @@
+import { CANONICAL_RECRUITMENT_ROLES } from './bimed-role-policy';
+
 function getEnvValue(primary: string, fallback: string) {
   return process.env[primary]?.trim() || fallback;
 }
@@ -34,9 +36,15 @@ export const countries = [
   'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe', 'Other',
 ] as const;
 
+// Kept as the existing export so current consumers remain source-compatible. The runtime value is
+// replaced with the canonical role list below, eliminating role drift between application,
+// invitation UI and validation.
 export const recruitmentRoles = [
   'Support Worker', 'Healthcare Worker', 'Healthcare Assistant', 'Physiotherapist', 'Other',
 ] as const;
+
+const canonicalRoleRuntimeList = recruitmentRoles as unknown as string[];
+canonicalRoleRuntimeList.splice(0, canonicalRoleRuntimeList.length, ...CANONICAL_RECRUITMENT_ROLES);
 
 export const recruitmentStatuses = [
   'Submitted', 'Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing',
