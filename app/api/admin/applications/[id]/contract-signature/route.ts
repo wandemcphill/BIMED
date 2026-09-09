@@ -6,7 +6,7 @@ import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendContractReadyToSignEmail } from '@/lib/email';
 import { getContractTemplate } from '@/lib/contract-templates';
 import { createContractSignatureRequest, listContractSignaturesForApplication } from '@/lib/contract-signature';
-import { BIMED_DEFAULT_START_DATE, normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
+import { BIMED_DEFAULT_START_DATE, recruitmentRoleSlug } from '@/lib/bimed-role-policy';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -36,8 +36,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const bodyResult = await readJsonBody<Record<string, unknown>>(request, MAX_JSON_BYTES.admin);
   if (!bodyResult.ok) return NextResponse.json({ error: bodyResult.error }, { status: 400 });
-  const roleSlug = bodyResult.data.role_slug;
-  if (typeof roleSlug !== 'string' || !getContractTemplate(roleSlug)) {
+  const requestedRoleSlug = bodyResult.data.role_slug;
+  if (typeof requestedRoleSlug !== 'string' || !getContractTemplate(requestedRoleSlug)) {
     return NextResponse.json({ error: 'A valid role_slug is required.' }, { status: 400 });
   }
 
@@ -53,12 +53,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
-    const canonicalApplicationRole = normalizeRecruitmentRole(application.role_applied);
-    if (!canonicalApplicationRole) {
+    const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
+    if (!expectedRoleSlug) {
       return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
     }
 
-    if (roleSlug !== canonicalApplicationRole.toLowerCase().replaceAll(' ', '-')) {
+    if (requestedRoleSlug !== expectedRoleSlug) {
       return NextResponse.json(
         { error: 'The contract role must match the candidate\'s applied role.' },
         { status: 400 },
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const { record, signUrl } = await createContractSignatureRequest({
       applicationId: application.id,
-      roleSlug,
+      roleSlug: expectedRoleSlug,
       employeeName: application.full_name,
       employeeAddress: application.address,
       startDate,
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       applicationId: application.id,
       eventType: 'contract_signature_requested',
       actor: session.email,
-      metadata: { signature_id: record.id, role_slug: roleSlug, start_date: startDate, canonical_default_start_date: BIMED_DEFAULT_START_DATE },
+      metadata: { signature_id: record.id, role_slug: expectedRoleSlug, start_date: startDate, canonical_default_start_date: BIMED_DEFAULT_START_DATE },
     });
 
     const email = await sendContractReadyToSignEmail(
