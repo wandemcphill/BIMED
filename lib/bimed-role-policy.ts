@@ -1,0 +1,109 @@
+import type { ContractTemplate, ContractSection } from '@/lib/contract-templates';
+
+export const BIMED_DEFAULT_LINE_MANAGER = 'Dezou Maurice';
+export const BIMED_DEFAULT_START_DATE = '11 January 2027';
+export const BIMED_DEFAULT_PROBATION = '3 months';
+export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
+
+export const CANONICAL_RECRUITMENT_ROLES = [
+  'Support Worker',
+  'Healthcare Assistant',
+  'Senior Support Worker',
+  'Physiotherapist',
+] as const;
+
+export type CanonicalRecruitmentRole = (typeof CANONICAL_RECRUITMENT_ROLES)[number];
+
+const ROLE_ALIASES: Record<string, CanonicalRecruitmentRole> = {
+  'healthcare worker': 'Healthcare Assistant',
+};
+
+export function normalizeRecruitmentRole(value: string | null | undefined): CanonicalRecruitmentRole | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const direct = CANONICAL_RECRUITMENT_ROLES.find((role) => role.toLowerCase() === normalized);
+  if (direct) return direct;
+
+  return ROLE_ALIASES[normalized] ?? null;
+}
+
+function replaceText(value: string, replacements: Array<[string, string]>): string {
+  return replacements.reduce((current, [from, to]) => current.split(from).join(to), value);
+}
+
+function applySectionReplacements(section: ContractSection, replacements: Array<[string, string]>): ContractSection {
+  return {
+    ...section,
+    heading: replaceText(section.heading, replacements),
+    paragraphs: section.paragraphs.map((paragraph) => replaceText(paragraph, replacements)),
+    bullets: section.bullets?.map((bullet) => replaceText(bullet, replacements)),
+  };
+}
+
+/**
+ * Applies BIMED-wide contractual defaults without duplicating them in each role template.
+ * Role-specific hours, salary, duties and professional registration remain untouched.
+ */
+export function applyBimedContractDefaults(
+  template: ContractTemplate,
+  overrides?: { employeeName?: string | null; employeeAddress?: string | null; startDate?: string | null }
+): ContractTemplate {
+  const startDate = overrides?.startDate
+    ? new Date(overrides.startDate).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })
+    : BIMED_DEFAULT_START_DATE;
+
+  const replacements: Array<[string, string]> = [
+    ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
+    ['[line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
+    ['[Insert start date]', startDate],
+    ['[start date]', startDate],
+    ['[weekly / fortnightly / monthly]', BIMED_DEFAULT_PAY_FREQUENCY],
+    ['The first 6 months of your employment is a probationary period', `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`],
+    ['extend your probationary period once, up to a combined maximum of 12 months', 'extend your probationary period once, up to a combined maximum of 6 months'],
+  ];
+
+  if (overrides?.employeeName) {
+    replacements.push(['[Insert employee name]', overrides.employeeName], ['[Employee full name]', overrides.employeeName]);
+  }
+  if (overrides?.employeeAddress) {
+    replacements.push(['[Insert employee address]', overrides.employeeAddress], ['[Employee address]', overrides.employeeAddress]);
+  }
+
+  return {
+    ...template,
+    editableFields: template.editableFields.map((field) => ({
+      ...field,
+      value: replaceText(field.value, replacements),
+      note:
+        field.label === 'Line manager'
+          ? 'Bimed default reporting line: Dezou Maurice.'
+          : field.label === 'Start date'
+            ? `Default commencement date: ${BIMED_DEFAULT_START_DATE}. Candidate-specific dates override this default.`
+            : field.label === 'Pay frequency'
+              ? 'Bimed payroll frequency: monthly.'
+              : field.note,
+    })),
+    sections: template.sections.map((section) => applySectionReplacements(section, replacements)),
+    schedules: template.schedules.map((section) => applySectionReplacements(section, replacements)),
+    closingNote: replaceText(template.closingNote, replacements),
+  };
+}
+
+export function applyBimedJobDescriptionDefaults<T extends {
+  sections: Array<{
+    heading: string;
+    paragraphs: string[];
+    bullets?: string[];
+  }>;
+}>(template: T): T {
+  const replacements: Array<[string, string]> = [
+    ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
+    ['[line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
+  ];
+
+  return {
+    ...template,
+    sections: template.sections.map((section) => applySectionReplacements(section as ContractSection, replacements)),
+  } as T;
+}
