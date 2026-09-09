@@ -7,6 +7,7 @@ import { sendDocumentReadyToSignEmail } from '@/lib/email';
 import { getJobDescriptionTemplate } from '@/lib/document-templates';
 import { createDocumentSignatureRequest, listContractSignaturesForApplication, type SignableDocType } from '@/lib/contract-signature';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
+import { normalizeRecruitmentRole, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -14,6 +15,14 @@ function documentLabelFor(docType: SignableDocType, roleSlug: string): string {
   if (docType === 'handbook') return 'Employee Handbook';
   const template = getJobDescriptionTemplate(roleSlug);
   return template ? `${template.roleLabel} Job Description` : 'Job Description';
+}
+
+function roleToSlug(role: string): string {
+  return role.toLowerCase().replaceAll(' ', '-');
+}
+
+function defaultStartDateIso() {
+  return '2027-01-11';
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -47,8 +56,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'A valid doc_type (handbook or job_description) is required.' }, { status: 400 });
   }
 
-  const roleSlug = typeof bodyResult.data.role_slug === 'string' ? bodyResult.data.role_slug : '';
-  if (docType === 'job_description' && !getJobDescriptionTemplate(roleSlug)) {
+  const requestedRoleSlug = typeof bodyResult.data.role_slug === 'string' ? bodyResult.data.role_slug : '';
+  if (docType === 'job_description' && !getJobDescriptionTemplate(requestedRoleSlug)) {
     return NextResponse.json({ error: 'A valid role_slug is required for a job description.' }, { status: 400 });
   }
 
@@ -64,13 +73,30 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
+    let roleSlug = '';
+    if (docType === 'job_description') {
+      const canonicalRole = normalizeRecruitmentRole(application.role_applied);
+      if (!canonicalRole) {
+        return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
+      }
+
+      roleSlug = roleToSlug(canonicalRole);
+      if (requestedRoleSlug !== roleSlug) {
+        return NextResponse.json(
+          { error: 'The job description role must match the candidate\'s applied role.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    const startDate = application.start_date || defaultStartDateIso();
     const { record, signUrl } = await createDocumentSignatureRequest({
       applicationId: application.id,
       docType,
-      roleSlug: docType === 'handbook' ? '' : roleSlug,
+      roleSlug,
       employeeName: application.full_name,
       employeeAddress: application.address,
-      startDate: application.start_date,
+      startDate,
       issuedBy: session.email,
     });
 
@@ -80,11 +106,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       applicationId: application.id,
       eventType: 'document_signature_requested',
       actor: session.email,
-      metadata: { signature_id: record.id, doc_type: docType, role_slug: roleSlug },
+      metadata: {
+        signature_id: record.id,
+        doc_type: docType,
+        role_slug: roleSlug,
+        start_date: startDate,
+        canonical_default_start_date: BIMED_DEFAULT_START_DATE,
+      },
     });
 
     const email = await sendDocumentReadyToSignEmail(
-      { application, documentLabel, signUrl, signatureId: record.id },
+      { application: { ...application, start_date: startDate }, documentLabel, signUrl, signatureId: record.id },
       client
     );
 
