@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getContractTemplate } from '@/lib/contract-templates';
+import { getJobDescriptionTemplate } from '@/lib/document-templates';
 import {
   BIMED_DEFAULT_LINE_MANAGER,
   BIMED_DEFAULT_PAY_FREQUENCY,
@@ -8,6 +9,7 @@ import {
   applyBimedContractDefaults,
   CANONICAL_RECRUITMENT_ROLES,
   normalizeRecruitmentRole,
+  recruitmentRoleSlug,
 } from '@/lib/bimed-role-policy';
 
 describe('BIMED role policy', () => {
@@ -23,6 +25,17 @@ describe('BIMED role policy', () => {
       'Senior Support Worker',
       'Physiotherapist',
     ]);
+  });
+
+  it('maps every canonical recruitment role to a matching contract and job description', () => {
+    for (const role of CANONICAL_RECRUITMENT_ROLES) {
+      const slug = recruitmentRoleSlug(role);
+      expect(slug).toBeTruthy();
+      expect(getContractTemplate(slug!)).toMatchObject({ roleSlug: slug, roleLabel: role });
+      expect(getJobDescriptionTemplate(slug!)).toMatchObject({ slug, roleLabel: role });
+    }
+
+    expect(recruitmentRoleSlug('not-a-bimed-role')).toBeNull();
   });
 
   it('applies common contract defaults without changing role-specific terms', () => {
