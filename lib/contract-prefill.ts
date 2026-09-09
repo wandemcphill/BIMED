@@ -3,16 +3,16 @@ import { db } from '@/lib/db';
 import { ADMIN_SESSION_COOKIE_NAME, getAdminSessionFromToken } from '@/lib/admin-session';
 import { applyContractOverrides, getContractTemplate, type ContractTemplate } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
+import { applyBimedContractDefaults } from '@/lib/bimed-role-policy';
 
 export type ContractPrefillResult =
   | { status: 'template'; template: ContractTemplate; prefilledFor?: { name: string; email: string } }
   | { status: 'unauthorized' }
   | { status: 'not_found' };
 
-// Resolves the contract to render for a role page. With no applicationId this is just the blank,
-// public template (still merged with any admin content edits). With an applicationId, the caller
-// is asking for a real candidate's data to be filled in - that only happens for a verified admin
-// session, otherwise the page must refuse to render the candidate's personal details.
+// Resolves the contract to render for a role page. With no applicationId this is the Bimed-wide
+// default role contract with canonical manager/start/probation/pay-frequency terms. With an
+// applicationId, candidate data is filled only for a verified admin session.
 export async function resolveContractTemplate(roleSlug: string, applicationId?: string): Promise<ContractPrefillResult> {
   const rawTemplate = getContractTemplate(roleSlug);
   if (!rawTemplate) return { status: 'not_found' };
@@ -26,7 +26,7 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
   }
 
   if (!applicationId) {
-    return { status: 'template', template: baseTemplate };
+    return { status: 'template', template: applyBimedContractDefaults(baseTemplate) };
   }
 
   const cookieStore = await cookies();
@@ -48,7 +48,7 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
     return { status: 'not_found' };
   }
 
-  const template = applyContractOverrides(baseTemplate, {
+  const templateWithCandidate = applyContractOverrides(baseTemplate, {
     employeeName: application.full_name,
     employeeAddress: application.address,
     startDate: application.start_date,
@@ -56,7 +56,7 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
 
   return {
     status: 'template',
-    template,
+    template: applyBimedContractDefaults(templateWithCandidate),
     prefilledFor: { name: application.full_name, email: application.email },
   };
 }
