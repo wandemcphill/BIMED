@@ -7,7 +7,7 @@ import { sendDocumentReadyToSignEmail } from '@/lib/email';
 import { getJobDescriptionTemplate } from '@/lib/document-templates';
 import { createDocumentSignatureRequest, listContractSignaturesForApplication, type SignableDocType } from '@/lib/contract-signature';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
-import { normalizeRecruitmentRole, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
+import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -15,10 +15,6 @@ function documentLabelFor(docType: SignableDocType, roleSlug: string): string {
   if (docType === 'handbook') return 'Employee Handbook';
   const template = getJobDescriptionTemplate(roleSlug);
   return template ? `${template.roleLabel} Job Description` : 'Job Description';
-}
-
-function roleToSlug(role: string): string {
-  return role.toLowerCase().replaceAll(' ', '-');
 }
 
 function defaultStartDateIso() {
@@ -73,15 +69,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
-    let roleSlug = '';
+    let roleSlug: string = '';
     if (docType === 'job_description') {
-      const canonicalRole = normalizeRecruitmentRole(application.role_applied);
-      if (!canonicalRole) {
+      const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
+      if (!expectedRoleSlug) {
         return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
       }
 
-      roleSlug = roleToSlug(canonicalRole);
-      if (requestedRoleSlug !== roleSlug) {
+      roleSlug = expectedRoleSlug;
+      if (requestedRoleSlug !== expectedRoleSlug) {
         return NextResponse.json(
           { error: 'The job description role must match the candidate\'s applied role.' },
           { status: 400 },
