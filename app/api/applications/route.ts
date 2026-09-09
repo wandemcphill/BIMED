@@ -6,6 +6,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { uploadInterviewVoiceNotes } from '@/lib/interview-audio';
 import { MAX_JSON_BYTES, readJsonBody, validateCandidateApplication } from '@/lib/request-validation';
+import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 
 // Supabase RPC errors are PostgrestError objects ({ code, message, details, hint }),
 // never instances of the JS Error class, so `error instanceof Error` never matches
@@ -47,6 +48,31 @@ export async function POST(req: NextRequest) {
     const payload = validation.data;
     const tokenHash = hashToken(String(payload.token));
 
+    // The invitation is the authoritative source for the role. This prevents a candidate
+    // from changing the position after receiving an invitation, and keeps the eventual
+    // contract/job-description role in lockstep with the role selected by the administrator.
+    const { data: invitation, error: invitationLookupError } = await client
+      .from('recruitment_invites')
+      .select('role')
+      .eq('token_hash', tokenHash)
+      .maybeSingle();
+
+    if (invitationLookupError) {
+      return NextResponse.json({ error: 'Unable to validate this invitation.' }, { status: 500 });
+    }
+
+    const canonicalInviteRole = normalizeRecruitmentRole(invitation?.role);
+    if (!canonicalInviteRole) {
+      return NextResponse.json({ error: 'This invitation is linked to an invalid recruitment role.' }, { status: 400 });
+    }
+
+    if (payload.role_applied !== canonicalInviteRole) {
+      return NextResponse.json(
+        { error: 'The position on this application must match the position on your invitation.' },
+        { status: 400 },
+      );
+    }
+
     let interviewResponses = payload.interview_responses;
     if (interviewResponses && typeof interviewResponses === 'object') {
       try {
@@ -70,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     const { data: application, error: applicationError } = await client.rpc('create_recruitment_application', {
       p_token_hash: tokenHash,
-      p_payload: { ...payload, interview_responses: interviewResponses },
+      p_payload: { ...payload, role_applied: canonicalInviteRole, interview_responses: interviewResponses },
     });
 
     if (applicationError || !application) {
