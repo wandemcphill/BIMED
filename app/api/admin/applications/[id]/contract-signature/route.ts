@@ -84,7 +84,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
 
     const email = await sendContractReadyToSignEmail(
-      { application: { ...application, start_date: startDate }, signUrl, signatureId: record.id },
+      { application, signUrl, signatureId: record.id },
       client
     );
 
