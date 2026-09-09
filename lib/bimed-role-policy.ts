@@ -13,9 +13,21 @@ export const CANONICAL_RECRUITMENT_ROLES = [
 ] as const;
 
 export type CanonicalRecruitmentRole = (typeof CANONICAL_RECRUITMENT_ROLES)[number];
+export type CanonicalRecruitmentRoleSlug =
+  | 'support-worker'
+  | 'healthcare-assistant'
+  | 'senior-support-worker'
+  | 'physiotherapist';
 
 const ROLE_ALIASES: Record<string, CanonicalRecruitmentRole> = {
   'healthcare worker': 'Healthcare Assistant',
+};
+
+const ROLE_SLUGS: Record<CanonicalRecruitmentRole, CanonicalRecruitmentRoleSlug> = {
+  'Support Worker': 'support-worker',
+  'Healthcare Assistant': 'healthcare-assistant',
+  'Senior Support Worker': 'senior-support-worker',
+  Physiotherapist: 'physiotherapist',
 };
 
 export function normalizeRecruitmentRole(value: string | null | undefined): CanonicalRecruitmentRole | null {
@@ -26,6 +38,11 @@ export function normalizeRecruitmentRole(value: string | null | undefined): Cano
   if (direct) return direct;
 
   return ROLE_ALIASES[normalized] ?? null;
+}
+
+export function recruitmentRoleSlug(value: string | null | undefined): CanonicalRecruitmentRoleSlug | null {
+  const role = normalizeRecruitmentRole(value);
+  return role ? ROLE_SLUGS[role] : null;
 }
 
 function replaceText(value: string, replacements: Array<[string, string]>): string {
