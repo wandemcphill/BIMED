@@ -81,8 +81,8 @@ export function applyBimedContractDefaults(
       `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`,
     ],
     [
-      'The Company may, in exceptional circumstances and where it is in your interest, extend your probationary period once, up to a combined maximum of 12 months. You will be told in writing of any extension and the reasons for it before the original probationary period ends.',
-      'The Company does not ordinarily extend the probationary period beyond 3 months. Any exception would require a specific written agreement consistent with applicable law.',
+      'extend your probationary period once, up to a combined maximum of 12 months',
+      'extend your probationary period once, up to a combined maximum of 6 months',
     ],
   ];
 
