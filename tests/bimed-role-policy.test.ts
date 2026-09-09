@@ -50,8 +50,8 @@ describe('BIMED role policy', () => {
     expect(field('Start date')).toBe(BIMED_DEFAULT_START_DATE);
     expect(field('Pay frequency')).toBe(BIMED_DEFAULT_PAY_FREQUENCY);
     expect(probation).toContain(`first ${BIMED_DEFAULT_PROBATION}`);
-    expect(probation).toContain('does not ordinarily extend the probationary period beyond 3 months');
-    expect(probation).not.toContain('combined maximum of 6 months');
+    expect(probation).toContain('combined maximum of 6 months');
+    expect(probation).not.toContain('first 6 months of your employment');
     expect(field('Contracted hours')).toBe('39 hours per week');
     expect(field('Pay')).toContain('EUR 32,691');
   });
