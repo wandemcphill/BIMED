@@ -1,18 +1,14 @@
 import { db } from '@/lib/db';
 import { getJobDescriptionTemplate, type DocumentTemplate } from '@/lib/document-templates';
 import { getDocumentOverride, mergeDocumentTemplate } from '@/lib/document-overrides';
+import { applyBimedJobDescriptionDefaults } from '@/lib/bimed-role-policy';
 
 export type JobDescriptionResult =
   | { status: 'template'; template: DocumentTemplate }
   | { status: 'not_found' };
 
-// Mirrors resolveContractTemplate (lib/contract-prefill.ts): merges any admin content edits, and
-// when issued for a specific candidate, adds their name to the Role Summary so the document reads
-// as theirs without any manual typing.
-//
-// Unlike the contract pre-fill page, this link is emailed directly to the candidate with no admin
-// session involved - the applicationId itself (an unguessable UUID) is what's shown here, and the
-// document only carries the candidate's name, not their address or other sensitive fields.
+// Mirrors resolveContractTemplate (lib/contract-prefill.ts): merges admin content edits, then
+// applies BIMED's canonical reporting line before an issued job description is rendered.
 export async function resolveJobDescriptionTemplate(slug: string, applicationId?: string): Promise<JobDescriptionResult> {
   const rawTemplate = getJobDescriptionTemplate(slug);
   if (!rawTemplate) return { status: 'not_found' };
@@ -24,6 +20,8 @@ export async function resolveJobDescriptionTemplate(slug: string, applicationId?
   } catch {
     // Fall back to the code-defined template if the override lookup fails.
   }
+
+  template = applyBimedJobDescriptionDefaults(template);
 
   if (!applicationId) {
     return { status: 'template', template };
