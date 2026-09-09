@@ -8,8 +8,17 @@ import { createDocumentSignatureRequest } from '@/lib/contract-signature';
 import { createPacketAccess, packetList } from '@/lib/document-packets';
 import { sendFullOnboardingPackEmail } from '@/lib/full-onboarding-pack';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
+import { normalizeRecruitmentRole, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+function roleToSlug(role: string): string {
+  return role.toLowerCase().replaceAll(' ', '-');
+}
+
+function defaultStartDateIso() {
+  return '2027-01-11';
+}
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const session = await getAdminSession(request);
@@ -19,8 +28,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const bodyResult = await readJsonBody(request, MAX_JSON_BYTES.admin);
   if (!bodyResult.ok) return NextResponse.json({ error: bodyResult.error }, { status: 400 });
-  const roleSlug = (bodyResult.data as Record<string, unknown>).role_slug;
-  if (typeof roleSlug !== 'string' || !getContractTemplate(roleSlug)) return NextResponse.json({ error: 'A valid role_slug is required.' }, { status: 400 });
+  const requestedRoleSlug = (bodyResult.data as Record<string, unknown>).role_slug;
+  if (typeof requestedRoleSlug !== 'string' || !getContractTemplate(requestedRoleSlug)) {
+    return NextResponse.json({ error: 'A valid role_slug is required.' }, { status: 400 });
+  }
 
   const { id: applicationId } = await context.params;
   const client = db();
@@ -32,7 +43,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
-    const contractInfo = { applicationId: application.id, employeeName: application.full_name, employeeAddress: application.address, startDate: application.start_date, issuedBy: session.email };
+    const canonicalRole = normalizeRecruitmentRole(application.role_applied);
+    if (!canonicalRole) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
+
+    const roleSlug = roleToSlug(canonicalRole);
+    if (requestedRoleSlug !== roleSlug) {
+      return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
+    }
+
+    const startDate = application.start_date || defaultStartDateIso();
+    const contractInfo = {
+      applicationId: application.id,
+      employeeName: application.full_name,
+      employeeAddress: application.address,
+      startDate,
+      issuedBy: session.email,
+    };
+
     const [contractResult, jobDescResult, handbookResult] = await Promise.all([
       createDocumentSignatureRequest({ ...contractInfo, docType: 'contract', roleSlug }),
       createDocumentSignatureRequest({ ...contractInfo, docType: 'job_description', roleSlug }),
@@ -47,9 +74,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
       url: result.url,
     }));
 
-    const email = await sendFullOnboardingPackEmail({ application, contractSignUrl: contractResult.signUrl, jobDescriptionUrl: jobDescResult.signUrl, handbookUrl: handbookResult.signUrl, packetLinks, packId: contractResult.record.id }, client);
+    const email = await sendFullOnboardingPackEmail({
+      application: { ...application, start_date: startDate },
+      contractSignUrl: contractResult.signUrl,
+      jobDescriptionUrl: jobDescResult.signUrl,
+      handbookUrl: handbookResult.signUrl,
+      packetLinks,
+      packId: contractResult.record.id,
+    }, client);
     const previousStatus = application.status;
-    if (previousStatus !== 'Offer Issued') await client.from('recruitment_applications').update({ status: 'Offer Issued', updated_at: new Date().toISOString() }).eq('id', applicationId);
+    if (previousStatus !== 'Offer Issued') {
+      await client.from('recruitment_applications').update({ status: 'Offer Issued', updated_at: new Date().toISOString() }).eq('id', applicationId);
+    }
 
     await recordRecruitmentAudit(client, {
       applicationId: application.id,
@@ -61,11 +97,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
         handbook_signature_id: handbookResult.record.id,
         packet_access_ids: packetResults.map((result) => result.record.id),
         packet_slugs: packetResults.map((result) => result.record.packet_slug),
-        international, role_slug: roleSlug, previous_status: previousStatus, email_status: email.status,
+        international,
+        role_slug: roleSlug,
+        previous_status: previousStatus,
+        start_date: startDate,
+        canonical_default_start_date: BIMED_DEFAULT_START_DATE,
+        email_status: email.status,
       },
     });
 
-    return NextResponse.json({ signature: contractResult.record, signUrl: contractResult.signUrl, jobDescriptionUrl: jobDescResult.signUrl, handbookUrl: handbookResult.signUrl, packetLinks, international, email });
+    return NextResponse.json({
+      signature: contractResult.record,
+      signUrl: contractResult.signUrl,
+      jobDescriptionUrl: jobDescResult.signUrl,
+      handbookUrl: handbookResult.signUrl,
+      packetLinks,
+      international,
+      email,
+    });
   } catch (error) {
     console.error(JSON.stringify({ level: 'error', event: 'onboarding_pack.send_failed', application_id: applicationId, reason: error instanceof Error ? error.message : 'unknown' }));
     return NextResponse.json({ error: 'Unable to send the onboarding pack right now.' }, { status: 500 });
