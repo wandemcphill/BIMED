@@ -33,7 +33,7 @@ export const jobDescriptionTemplates: DocumentTemplate[] = contractTemplates.map
     documentTitle: `Job Description - ${template.roleLabel}`,
     roleLabel: template.roleLabel,
     effectiveDate: template.effectiveDate,
-    intro: 'Republic of Ireland - Care & Support Worker Roles',
+    intro: 'Republic of Ireland - Bimed Healthcare Roles',
     templateNotes: [
       'This job description is issued alongside the employment contract and Schedule 2 (Job Description) referenced in it.',
     ],
@@ -72,7 +72,7 @@ export const employeeHandbookTemplate: DocumentTemplate = {
   slug: 'employee-handbook',
   documentTitle: 'Employee Handbook',
   effectiveDate: '18 August 2026',
-  intro: 'Bimed Healthcare Limited - all care and support roles, Republic of Ireland',
+  intro: 'Bimed Healthcare Limited - all employees, Republic of Ireland',
   templateNotes: [
     'This handbook is referred to throughout the Contract of Employment and is kept consistent with it.',
   ],
