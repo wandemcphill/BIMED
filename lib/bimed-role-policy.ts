@@ -59,8 +59,14 @@ export function applyBimedContractDefaults(
     ['[Insert start date]', startDate],
     ['[start date]', startDate],
     ['[weekly / fortnightly / monthly]', BIMED_DEFAULT_PAY_FREQUENCY],
-    ['The first 6 months of your employment is a probationary period', `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`],
-    ['extend your probationary period once, up to a combined maximum of 12 months', 'extend your probationary period once, up to a combined maximum of 6 months'],
+    [
+      'The first 6 months of your employment is a probationary period',
+      `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`,
+    ],
+    [
+      'The Company may, in exceptional circumstances and where it is in your interest, extend your probationary period once, up to a combined maximum of 12 months. You will be told in writing of any extension and the reasons for it before the original probationary period ends.',
+      'The Company does not ordinarily extend the probationary period beyond 3 months. Any exception would require a specific written agreement consistent with applicable law.',
+    ],
   ];
 
   if (overrides?.employeeName) {
