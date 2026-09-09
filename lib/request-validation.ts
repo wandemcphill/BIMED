@@ -143,9 +143,7 @@ export function validateCandidateApplication(input: unknown): JsonResult<Record<
 
     const roleInput = stringField(input, 'role_applied', 100, true)!;
     const role = normalizeRecruitmentRole(roleInput);
-    if (!role || (!recruitmentRoles as readonly string[]).includes(role) || recruitmentRoles.length !== 4) {
-      throw new Error('role_applied is invalid.');
-    }
+    if (!role) throw new Error('role_applied is invalid.');
 
     const living = stringField(input, 'living_in_ireland', 10, true)!;
     if (living !== 'Yes' && living !== 'No') throw new Error('living_in_ireland is invalid.');
@@ -227,7 +225,9 @@ export function validateAdminInvite(input: unknown): JsonResult<{ email: string;
     const expiryDate = stringField(input, 'expiryDate', 40);
     if (expiryDate && Number.isNaN(new Date(expiryDate).getTime())) throw new Error('expiryDate must be a valid date.');
     if (expiryDate && new Date(expiryDate).getTime() <= Date.now()) throw new Error('expiryDate must be in the future.');
-    return { ok: true, data: { email, name: stringField(input, 'name', 200), role: normalizeRecruitmentRole(stringField(input, 'role', 100)), expiryDate } };
+    const role = normalizeRecruitmentRole(stringField(input, 'role', 100));
+    if (!role) throw new Error('role is invalid.');
+    return { ok: true, data: { email, name: stringField(input, 'name', 200), role, expiryDate } };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Invalid request.' };
   }
