@@ -36,15 +36,9 @@ export const countries = [
   'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe', 'Other',
 ] as const;
 
-// Kept as the existing export so current consumers remain source-compatible. The runtime value is
-// replaced with the canonical role list below, eliminating role drift between application,
-// invitation UI and validation.
-export const recruitmentRoles = [
-  'Support Worker', 'Healthcare Worker', 'Healthcare Assistant', 'Physiotherapist', 'Other',
-] as const;
-
-const canonicalRoleRuntimeList = recruitmentRoles as unknown as string[];
-canonicalRoleRuntimeList.splice(0, canonicalRoleRuntimeList.length, ...CANONICAL_RECRUITMENT_ROLES);
+// One canonical role list powers the candidate form, admin invitation UI and validation.
+// Legacy "Healthcare Worker" invitations are normalized to "Healthcare Assistant" on the server.
+export const recruitmentRoles = CANONICAL_RECRUITMENT_ROLES;
 
 export const recruitmentStatuses = [
   'Submitted', 'Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing',
