@@ -8,13 +8,9 @@ import { createDocumentSignatureRequest } from '@/lib/contract-signature';
 import { createPacketAccess, packetList } from '@/lib/document-packets';
 import { sendFullOnboardingPackEmail } from '@/lib/full-onboarding-pack';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
-import { normalizeRecruitmentRole, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
+import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-function roleToSlug(role: string): string {
-  return role.toLowerCase().replaceAll(' ', '-');
-}
 
 function defaultStartDateIso() {
   return '2027-01-11';
@@ -43,11 +39,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
-    const canonicalRole = normalizeRecruitmentRole(application.role_applied);
-    if (!canonicalRole) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
+    const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
+    if (!expectedRoleSlug) {
+      return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
+    }
 
-    const roleSlug = roleToSlug(canonicalRole);
-    if (requestedRoleSlug !== roleSlug) {
+    if (requestedRoleSlug !== expectedRoleSlug) {
       return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
     }
 
@@ -61,8 +58,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     };
 
     const [contractResult, jobDescResult, handbookResult] = await Promise.all([
-      createDocumentSignatureRequest({ ...contractInfo, docType: 'contract', roleSlug }),
-      createDocumentSignatureRequest({ ...contractInfo, docType: 'job_description', roleSlug }),
+      createDocumentSignatureRequest({ ...contractInfo, docType: 'contract', roleSlug: expectedRoleSlug }),
+      createDocumentSignatureRequest({ ...contractInfo, docType: 'job_description', roleSlug: expectedRoleSlug }),
       createDocumentSignatureRequest({ ...contractInfo, docType: 'handbook', roleSlug: '' }),
     ]);
 
@@ -98,7 +95,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         packet_access_ids: packetResults.map((result) => result.record.id),
         packet_slugs: packetResults.map((result) => result.record.packet_slug),
         international,
-        role_slug: roleSlug,
+        role_slug: expectedRoleSlug,
         previous_status: previousStatus,
         start_date: startDate,
         canonical_default_start_date: BIMED_DEFAULT_START_DATE,
