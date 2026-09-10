@@ -9,7 +9,7 @@
     "test": "vitest run"
   },
   "engines": {
-    "node": ">=20.9.0 <21.0.0"
+    "node": ">=22.0.0 <23.0.0"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.57.4",
