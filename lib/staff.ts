@@ -12,6 +12,16 @@ function defaultStartDate() {
   return '2027-01-11';
 }
 
+function mapResidentialAddress(address: string | null | undefined) {
+  const value = address?.trim();
+  if (!value) return {};
+
+  // Applications currently store the residential address as one free-text value.
+  // Preserve it losslessly in address_line_1 rather than guessing how a candidate
+  // formatted their street/city/eircode. Admins can refine the structured fields later.
+  return { address_line_1: value };
+}
+
 export async function createStaffFromApplication(client: SupabaseClient, applicationId: string) {
   const { data: application, error: applicationError } = await client
     .from('recruitment_applications')
@@ -69,10 +79,12 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
       date_of_birth: application.date_of_birth,
       nationality: application.nationality,
       role: application.role_applied,
+      job_title: application.role_applied,
       employment_type: application.employment_type,
       employment_start_date: effectiveStartDate,
       country: 'Ireland',
       status: application.living_in_ireland === 'No' ? 'pre_arrival' : 'active',
+      ...mapResidentialAddress(effectiveAddress),
       activation_token_hash: hashActivationToken(activationToken),
       activation_expires_at: activationExpiresAt(),
     })
