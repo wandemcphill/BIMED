@@ -5,6 +5,12 @@ export const BIMED_DEFAULT_START_DATE = '11 January 2027';
 export const BIMED_DEFAULT_PROBATION = '3 months';
 export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
 
+export const BIMED_ROLE_SALARIES: Partial<Record<CanonicalRecruitmentRoleSlug, string>> = {
+  'healthcare-assistant': '€36,000 per annum',
+  'senior-support-worker': '€41,000 per annum',
+  physiotherapist: '€55,000 per annum',
+};
+
 export const CANONICAL_RECRUITMENT_ROLES = [
   'Support Worker',
   'Healthcare Assistant',
@@ -70,6 +76,7 @@ export function applyBimedContractDefaults(
     ? new Date(overrides.startDate).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })
     : BIMED_DEFAULT_START_DATE;
 
+  const roleSalary = BIMED_ROLE_SALARIES[template.roleSlug as CanonicalRecruitmentRoleSlug];
   const replacements: Array<[string, string]> = [
     ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
@@ -85,6 +92,10 @@ export function applyBimedContractDefaults(
       'extend your probationary period once, up to a combined maximum of 6 months',
     ],
   ];
+
+  if (roleSalary) {
+    replacements.push(['[Insert pay rate for this role]', roleSalary]);
+  }
 
   if (overrides?.employeeName) {
     replacements.push(['[Insert employee name]', overrides.employeeName], ['[Employee full name]', overrides.employeeName]);
@@ -103,9 +114,13 @@ export function applyBimedContractDefaults(
           ? 'Bimed default reporting line: Dezou Maurice.'
           : field.label === 'Start date'
             ? `Default commencement date: ${BIMED_DEFAULT_START_DATE}. Candidate-specific dates override this default.`
-            : field.label === 'Pay frequency'
-              ? 'Bimed payroll frequency: monthly.'
-              : field.note,
+            : field.label === 'Pay'
+              ? roleSalary
+                ? `Agreed BIMED salary: ${roleSalary}.`
+                : field.note
+              : field.label === 'Pay frequency'
+                ? 'Bimed payroll frequency: monthly.'
+                : field.note,
     })),
     sections: template.sections.map((section) => applySectionReplacements(section, replacements)),
     schedules: template.schedules.map((section) => applySectionReplacements(section, replacements)),
