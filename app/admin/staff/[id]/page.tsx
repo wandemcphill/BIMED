@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { BIMED_ROLE_SALARIES, recruitmentRoleSlug } from '@/lib/bimed-role-policy';
 
 type Row = Record<string, any>;
 
@@ -79,6 +80,8 @@ export default function AdminStaffDetailPage() {
   const auditLog: Row[] = staff.auditLog || [];
   const upcomingShifts = shifts.filter((s) => new Date(s.start_at).getTime() > Date.now() && !['cancelled', 'completed'].includes(s.status)).length;
   const pendingLeave = leaveRequests.filter((leave) => leave.status === 'pending').length;
+  const salary = BIMED_ROLE_SALARIES[recruitmentRoleSlug(staff.role) || 'support-worker'];
+  const residentialAddress = staff.address_line_1 || [staff.address_line_2, staff.city, staff.county, staff.eircode, staff.country].filter(Boolean).join(', ');
 
   return (
     <main style={{ minHeight: '100vh', background: '#f7f9fc', padding: '32px 5vw', fontFamily: 'system-ui', color: '#102a43' }}>
@@ -103,7 +106,11 @@ export default function AdminStaffDetailPage() {
         </section>
 
         <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginTop: 18 }}>
-          <div style={card}><h2 style={{ marginTop: 0 }}>Employment</h2><Info label='BIMED ID' value={staff.bimed_id} /><Info label='Status' value={staff.status} /><Info label='Role' value={staff.role} /><Info label='Department' value={staff.department} /><Info label='Employment type' value={staff.employment_type} /><Info label='Start date' value={staff.employment_start_date} /><Info label='Primary location' value={staff.primary_location} /></div>
+          <div style={card}><h2 style={{ marginTop: 0 }}>Employment</h2><Info label='BIMED ID' value={staff.bimed_id} /><Info label='Status' value={staff.status} /><Info label='Role' value={staff.role} /><Info label='Agreed annual salary' value={salary || 'Not configured'} /><Info label='Department' value={staff.department} /><Info label='Employment type' value={staff.employment_type} /><Info label='Start date' value={staff.employment_start_date} /><Info label='Primary location' value={staff.primary_location} /></div>
+          <div style={card}><h2 style={{ marginTop: 0 }}>Employee residential details</h2><Info label='Address' value={residentialAddress} /><Info label='Phone' value={staff.phone} /><Info label='Email' value={staff.email} /><Info label='Date of birth' value={staff.date_of_birth} /><Info label='Nationality' value={staff.nationality} /></div>
+        </section>
+
+        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginTop: 18 }}>
           <div style={card}><h2 style={{ marginTop: 0 }}>Payroll / Irish details</h2><Info label='PPS number' value={staff.pps_number || 'Pending'} /><Info label='PPS status' value={staff.pps_status || 'pending'} /><Info label='Tax status' value={staff.tax_status || 'pending'} /><Info label='Revenue reference' value={staff.revenue_reference || 'Not provided'} /><Info label='IBAN' value={staff.iban || 'Not provided'} /><Info label='BIC' value={staff.bic || 'Not provided'} /><Info label='Bank' value={staff.bank_name || 'Not provided'} /></div>
         </section>
 
