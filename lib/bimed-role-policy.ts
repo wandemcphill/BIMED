@@ -6,6 +6,7 @@ export const BIMED_DEFAULT_PROBATION = '3 months';
 export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
 
 export const BIMED_ROLE_SALARIES: Partial<Record<CanonicalRecruitmentRoleSlug, string>> = {
+  'support-worker': '€36,000 per annum',
   'healthcare-assistant': '€36,000 per annum',
   'senior-support-worker': '€41,000 per annum',
   physiotherapist: '€55,000 per annum',
