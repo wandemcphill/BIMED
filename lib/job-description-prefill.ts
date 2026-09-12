@@ -7,8 +7,6 @@ export type JobDescriptionResult =
   | { status: 'template'; template: DocumentTemplate }
   | { status: 'not_found' };
 
-// Mirrors resolveContractTemplate (lib/contract-prefill.ts): merges admin content edits, then
-// applies BIMED's canonical reporting line before an issued job description is rendered.
 export async function resolveJobDescriptionTemplate(slug: string, applicationId?: string): Promise<JobDescriptionResult> {
   const rawTemplate = getJobDescriptionTemplate(slug);
   if (!rawTemplate) return { status: 'not_found' };
@@ -30,7 +28,7 @@ export async function resolveJobDescriptionTemplate(slug: string, applicationId?
   try {
     const { data: application } = await db()
       .from('recruitment_applications')
-      .select('full_name')
+      .select('full_name,address')
       .eq('id', applicationId)
       .maybeSingle();
     if (!application) return { status: 'template', template };
@@ -38,10 +36,16 @@ export async function resolveJobDescriptionTemplate(slug: string, applicationId?
     const [roleSummary, ...restSections] = template.sections;
     if (!roleSummary) return { status: 'template', template };
 
+    const preparedFor = `Prepared for: ${application.full_name}`;
+    const employeeAddress = application.address?.trim() ? `Employee residential address: ${application.address.trim()}` : null;
+
     template = {
       ...template,
       sections: [
-        { ...roleSummary, paragraphs: [`Prepared for: ${application.full_name}`, ...roleSummary.paragraphs] },
+        {
+          ...roleSummary,
+          paragraphs: [preparedFor, ...(employeeAddress ? [employeeAddress] : []), ...roleSummary.paragraphs],
+        },
         ...restSections,
       ],
     };
