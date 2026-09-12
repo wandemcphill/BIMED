@@ -5,7 +5,6 @@ import PrintContractButton from '@/components/PrintContractButton';
 
 export default function EmploymentContractDocument({
   template,
-  prefilledFor,
   employeeSignatureSlot,
 }: {
   template: ContractTemplate;
@@ -21,16 +20,6 @@ export default function EmploymentContractDocument({
           <span className="pill">CONTRACT OF EMPLOYMENT</span>
           <PrintContractButton />
         </div>
-
-        {prefilledFor && (
-          <div className="contract-callout">
-            <strong>Pre-filled from application</strong>
-            <p>
-              Employee details below were pulled automatically from {prefilledFor.name}&apos;s application ({prefilledFor.email}
-              ). Review before issue.
-            </p>
-          </div>
-        )}
 
         <div className="contract-meta">
           <div>
@@ -54,36 +43,15 @@ export default function EmploymentContractDocument({
         <h1>{template.roleLabel} Employment Contract</h1>
         <p className="contract-intro">{template.intro}</p>
 
-        <div className="contract-callout">
-          <strong>Notes</strong>
-          <ul className="contract-bullets">
-            {template.templateNotes.map((note) => (
-              <li key={note}>{withPlaceholders(note)}</li>
+        <div className="contract-panel">
+          <h2>Employment details</h2>
+          <div className="contract-field-grid">
+            {template.editableFields.map((field) => (
+              <div className="contract-field" key={field.label}>
+                <span>{field.label}</span>
+                <strong>{withPlaceholders(field.value)}</strong>
+              </div>
             ))}
-          </ul>
-        </div>
-
-        <div className="contract-grid">
-          <div className="contract-panel">
-            <h2>How this document is issued</h2>
-            <ul className="contract-bullets">
-              {template.howToUse.map((point) => (
-                <li key={point}>{withPlaceholders(point)}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="contract-panel">
-            <h2>Employee details</h2>
-            <div className="contract-field-grid">
-              {template.editableFields.map((field) => (
-                <div className="contract-field" key={field.label}>
-                  <span>{field.label}</span>
-                  <strong>{withPlaceholders(field.value)}</strong>
-                  {field.note ? <small>{field.note}</small> : null}
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -163,8 +131,6 @@ function formatSignatureDate(): string {
 
 const placeholderPattern = /(\[[^[\]]+\])/g;
 
-// Every fill-in-the-blank in the templates is wrapped in square brackets. Highlight each one so a
-// drafter cannot mistake an unfilled blank for finished contract wording.
 function withPlaceholders(text: string): ReactNode[] {
   return text.split(placeholderPattern).map((part, index) =>
     index % 2 === 1 ? (
