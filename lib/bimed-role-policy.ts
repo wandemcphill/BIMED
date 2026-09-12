@@ -65,10 +65,6 @@ function applySectionReplacements(section: ContractSection, replacements: Array<
   };
 }
 
-/**
- * Applies BIMED-wide contractual defaults without duplicating them in each role template.
- * Role-specific hours, salary, duties and professional registration remain untouched.
- */
 export function applyBimedContractDefaults(
   template: ContractTemplate,
   overrides?: { employeeName?: string | null; employeeAddress?: string | null; startDate?: string | null }
@@ -84,19 +80,12 @@ export function applyBimedContractDefaults(
     ['[Insert start date]', startDate],
     ['[start date]', startDate],
     ['[weekly / fortnightly / monthly]', BIMED_DEFAULT_PAY_FREQUENCY],
-    [
-      'The first 6 months of your employment is a probationary period',
-      `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`,
-    ],
-    [
-      'extend your probationary period once, up to a combined maximum of 12 months',
-      'extend your probationary period once, up to a combined maximum of 6 months',
-    ],
+    ['Job title: [insert] Reports to: [insert]', `Job title: ${template.roleLabel} Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`],
+    ['The first 6 months of your employment is a probationary period', `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`],
+    ['extend your probationary period once, up to a combined maximum of 12 months', 'extend your probationary period once, up to a combined maximum of 6 months'],
   ];
 
-  if (roleSalary) {
-    replacements.push(['[Insert pay rate for this role]', roleSalary]);
-  }
+  if (roleSalary) replacements.push(['[Insert pay rate for this role]', roleSalary]);
 
   if (overrides?.employeeName) {
     replacements.push(['[Insert employee name]', overrides.employeeName], ['[Employee full name]', overrides.employeeName]);
@@ -116,9 +105,7 @@ export function applyBimedContractDefaults(
           : field.label === 'Start date'
             ? `Default commencement date: ${BIMED_DEFAULT_START_DATE}. Candidate-specific dates override this default.`
             : field.label === 'Pay'
-              ? roleSalary
-                ? `Agreed BIMED salary: ${roleSalary}.`
-                : field.note
+              ? roleSalary ? `Agreed BIMED salary: ${roleSalary}.` : field.note
               : field.label === 'Pay frequency'
                 ? 'Bimed payroll frequency: monthly.'
                 : field.note,
@@ -130,11 +117,7 @@ export function applyBimedContractDefaults(
 }
 
 export function applyBimedJobDescriptionDefaults<T extends {
-  sections: Array<{
-    heading: string;
-    paragraphs: string[];
-    bullets?: string[];
-  }>;
+  sections: Array<{ heading: string; paragraphs: string[]; bullets?: string[] }>;
 }>(template: T): T {
   const replacements: Array<[string, string]> = [
     ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
