@@ -42,7 +42,7 @@ export const recruitmentRoles = CANONICAL_RECRUITMENT_ROLES;
 
 export const recruitmentStatuses = [
   'Submitted', 'Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing',
-  'Visa/Immigration Processing', 'Onboarding', 'Rejected', 'Withdrawn',
+  'Visa/Immigration Processing', 'Onboarding', 'Hired', 'Rejected', 'Withdrawn',
 ] as const;
 
 export const candidateSupportDocuments = [
@@ -58,7 +58,7 @@ export const candidateStepTitles = [
 
 export const recruitmentStatusGroups = {
   new: ['Submitted'],
-  active: ['Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing', 'Visa/Immigration Processing', 'Onboarding'],
+  active: ['Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing', 'Visa/Immigration Processing', 'Onboarding', 'Hired'],
   closed: ['Rejected', 'Withdrawn'],
 } as const;
 
