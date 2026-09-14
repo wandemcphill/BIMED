@@ -23,7 +23,6 @@ import {
   onboardingPackEmail,
   recruitmentInviteEmail,
   secondInterviewInviteEmail,
-  staffActivationEmail,
 } from './templates';
 import { sendTransactionalEmail, type SendResult } from './transport';
 
@@ -76,15 +75,7 @@ export async function sendRecruitmentInviteEmail(input: { inviteId: string; cand
 
 export async function sendApplicationReceivedEmails(application: ApplicationEmailRecord, client?: SupabaseClient | null): Promise<{ candidate: SendResult; internal: SendResult[] }> {
   const international = isInternationalRoutingCandidate(application);
-  const candidate = await sendTransactionalEmail({
-    to: application.email,
-    content: applicationReceivedEmail({ candidateName: application.full_name, role: application.role_applied, applicationId: application.id, supportingDocumentsEmail: supportingDocumentsEmail(application) }),
-    emailType: 'application_received',
-    dedupeKey: `application_received:${application.id}`,
-    applicationId: application.id,
-    client,
-    replyTo: supportingDocumentsEmail(application),
-  });
+  const candidate = await sendTransactionalEmail({ to: application.email, content: applicationReceivedEmail({ candidateName: application.full_name, role: application.role_applied, applicationId: application.id, supportingDocumentsEmail: supportingDocumentsEmail(application) }), emailType: 'application_received', dedupeKey: `application_received:${application.id}`, applicationId: application.id, client, replyTo: supportingDocumentsEmail(application) });
   const adminContent = adminNewApplicationEmail({ candidateName: application.full_name, candidateEmail: application.email, phone: application.phone, role: application.role_applied, countryOfResidence: application.country_of_residence, pathway: international ? 'International' : 'Ireland-based', workPermission: application.work_permission, submittedLabel: submittedLabel(application.submitted_at), adminRecordUrl: adminRecordUrl(application.id), applicationId: application.id });
   const internal = await Promise.all(recruitmentInternalRecipients(international).map((recipient) => sendTransactionalEmail({ to: recipient, content: adminContent, emailType: 'admin_new_application', dedupeKey: `admin_new_application:${application.id}:${recipient}`, applicationId: application.id, client, replyTo: application.email })));
   return { candidate, internal };
@@ -110,16 +101,7 @@ export async function sendApplicationStatusUpdateEmails(input: { application: Ap
   const { application, status, previousStatus } = input;
   const notifyCandidate = input.notifyCandidate !== false && isCandidateNotifiableStatus(status);
   const international = isInternationalRoutingCandidate(application);
-  const candidate = notifyCandidate ? await sendTransactionalEmail({
-    to: application.email,
-    content: applicationStatusUpdateEmail({ candidateName: application.full_name, role: application.role_applied, applicationId: application.id, status, nextSteps: CANDIDATE_STATUS_GUIDANCE[status] }),
-    emailType: 'application_status_update',
-    dedupeKey: `application_status_update:${application.id}:${status}`,
-    dedupeWindowMs: DUPLICATE_WINDOW_MS,
-    applicationId: application.id,
-    client,
-    replyTo: supportingDocumentsEmail(application),
-  }) : null;
+  const candidate = notifyCandidate ? await sendTransactionalEmail({ to: application.email, content: applicationStatusUpdateEmail({ candidateName: application.full_name, role: application.role_applied, applicationId: application.id, status, nextSteps: CANDIDATE_STATUS_GUIDANCE[status] }), emailType: 'application_status_update', dedupeKey: `application_status_update:${application.id}:${status}`, dedupeWindowMs: DUPLICATE_WINDOW_MS, applicationId: application.id, client, replyTo: supportingDocumentsEmail(application) }) : null;
   const adminContent = adminStatusChangeNotificationEmail({ candidateName: application.full_name, role: application.role_applied, applicationId: application.id, previousStatus, status, actor: input.actor, adminRecordUrl: adminRecordUrl(application.id) });
   const internal = await Promise.all(recruitmentInternalRecipients(international).map((recipient) => sendTransactionalEmail({ to: recipient, content: adminContent, emailType: 'admin_status_change', dedupeKey: `admin_status_change:${application.id}:${status}:${recipient}`, dedupeWindowMs: DUPLICATE_WINDOW_MS, applicationId: application.id, client })));
   return { candidate, internal };
@@ -167,17 +149,6 @@ export async function sendOnboardingPackEmail(input: { application: ApplicationE
 
 export async function sendContractReadyToSignEmail(input: { application: ApplicationEmailRecord; signUrl: string; signatureId: string }, client?: SupabaseClient | null): Promise<SendResult> {
   return sendTransactionalEmail({ to: input.application.email, content: contractReadyToSignEmail({ candidateName: input.application.full_name, role: input.application.role_applied, applicationId: input.application.id, signUrl: input.signUrl }), emailType: 'contract_ready_to_sign', dedupeKey: `contract_ready_to_sign:${input.signatureId}`, applicationId: input.application.id, client, replyTo: recruitmentContacts.ireland });
-}
-
-export async function sendStaffActivationEmail(input: { staffName: string; jobTitle?: string | null; bimedId: string; activationUrl: string }, client?: SupabaseClient | null): Promise<SendResult> {
-  return sendTransactionalEmail({
-    to: input.staffName.includes('@') ? input.staffName : '',
-    content: staffActivationEmail({ candidateName: input.staffName, jobTitle: input.jobTitle, bimedId: input.bimedId, activationUrl: input.activationUrl }),
-    emailType: 'staff_activation',
-    dedupeKey: `staff_activation:${input.bimedId}`,
-    client,
-    replyTo: recruitmentContacts.admin,
-  });
 }
 
 export async function sendAdminContractSignedEmail(input: { application: ApplicationEmailRecord; signedName: string; signedAtLabel: string; signatureId: string }, client?: SupabaseClient | null): Promise<SendResult[]> {
