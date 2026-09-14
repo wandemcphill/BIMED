@@ -67,7 +67,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'This document does not require candidate input.' }, { status: 400 });
   }
 
-  const body = await readJsonBody(request, MAX_JSON_BYTES.candidate);
+  const body = await readJsonBody(request, MAX_JSON_BYTES.candidateApplication);
   if (!body.ok) return NextResponse.json({ error: body.error }, { status: 400 });
 
   let responseData: Record<string, unknown>;
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'This document cannot be submitted from this page.' }, { status: 400 });
   }
 
-  const body = await readJsonBody(request, MAX_JSON_BYTES.candidate);
+  const body = await readJsonBody(request, MAX_JSON_BYTES.candidateApplication);
   if (!body.ok) return NextResponse.json({ error: body.error }, { status: 400 });
 
   let responseData: Record<string, unknown>;
