@@ -41,7 +41,8 @@ export type EmailType =
   | 'onboarding_pack'
   | 'recruitment_invite'
   | 'second_interview_invite'
-  | 'admin_second_interview_completed';
+  | 'admin_second_interview_completed'
+  | 'staff_portal_welcome';
 
 export type SendResult =
   | { status: 'sent'; messageId: string | null }
@@ -297,7 +298,7 @@ export async function sendTransactionalEmail(request: SendRequest): Promise<Send
     }
   }
 
-  const payload = {
+  const senderPayload = {
     from: getResendFromEmail(),
     to: recipient,
     subject: sanitizeSubject(request.content.subject),
@@ -310,7 +311,7 @@ export async function sendTransactionalEmail(request: SendRequest): Promise<Send
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
-      const result = await withTimeout(sender(payload), SEND_TIMEOUT_MS, 'Resend send');
+      const result = await withTimeout(sender(senderPayload), SEND_TIMEOUT_MS, 'Resend send');
 
       log('info', 'email.sent', {
         email_type: request.emailType,
