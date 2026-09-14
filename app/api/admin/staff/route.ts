@@ -8,6 +8,7 @@ import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 const INTERNAL_DEPARTMENTS = ['Administration', 'Finance', 'HR', 'Recruitment', 'Operations', 'Management', 'Other'] as const;
 const EMPLOYMENT_TYPES = ['Permanent', 'Fixed-term', 'Part-time', 'Contract'] as const;
 const INTERNAL_ROLE_LABEL = 'BIMED Staff';
+const PROMOTION_STATUSES = ['Hired', 'Onboarding', 'Offer Issued', 'Documents Awaiting', 'Permit Processing', 'Visa/Immigration Processing'] as const;
 
 function createBimedId() {
   return `BIM-${new Date().getFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -26,10 +27,35 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const status = url.searchParams.get('status');
   const search = url.searchParams.get('search')?.trim();
+  const mode = url.searchParams.get('mode');
+
+  if (mode === 'promotion_candidates') {
+    const { data: applications, error: applicationError } = await client
+      .from('recruitment_applications')
+      .select('id,full_name,email,role_applied,status,living_in_ireland,country_of_residence,submitted_at,start_date,bimed_id')
+      .in('status', [...PROMOTION_STATUSES])
+      .order('submitted_at', { ascending: false })
+      .limit(250);
+    if (applicationError) return NextResponse.json({ error: 'Unable to load recruitment intakes.' }, { status: 500 });
+
+    const applicationIds = (applications || []).map((item) => item.id);
+    const { data: existingStaff } = applicationIds.length
+      ? await client.from('recruitment_staff').select('application_id,bimed_id,status').in('application_id', applicationIds)
+      : { data: [] as any[] };
+    const byApplication = new Map((existingStaff || []).map((item) => [item.application_id, item]));
+
+    const candidates = (applications || []).map((application) => ({
+      ...application,
+      already_staff: byApplication.has(application.id),
+      staff: byApplication.get(application.id) || null,
+    }));
+
+    return NextResponse.json({ candidates });
+  }
 
   let query = client
     .from('recruitment_staff')
-    .select('id,bimed_id,status,full_name,preferred_name,email,phone,role,department,employment_type,employment_start_date,primary_location,pps_number,pps_status,tax_status,profile_photo_path,activated_at,created_at,updated_at')
+    .select('id,application_id,bimed_id,status,full_name,preferred_name,email,phone,role,department,employment_type,employment_start_date,primary_location,pps_number,pps_status,tax_status,profile_photo_path,activated_at,created_at,updated_at,department_namespace,portal_handle,portal_address')
     .order('created_at', { ascending: false })
     .limit(250);
   if (status) query = query.eq('status', status);
@@ -149,6 +175,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unsupported action.' }, { status: 400 });
   } catch (error) {
     console.error(JSON.stringify({ level: 'error', event: 'staff_admin_api_failed', reason: error instanceof Error ? error.message : 'unknown' }));
-    return NextResponse.json({ error: 'Unable to complete the staff action.' }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to complete the staff action.' }, { status: 500 });
   }
 }

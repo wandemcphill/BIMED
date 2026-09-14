@@ -47,17 +47,19 @@ export default function NewBimedStaffPage() {
           <button onClick={() => router.push('/admin')} style={secondaryButton}>Recruitment dashboard</button>
         </div>
         <section style={card}>
-          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1.3, color: '#0f766e' }}>BIMED Healthcare</div>
-          <h1 style={{ margin: '4px 0 6px' }}>Create BIMED staff member</h1>
-          <p style={{ color: '#627d98', marginTop: 0 }}>For internal BIMED employees. Care and clinical roles must be created through recruitment.</p>
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1.3, color: '#0f766e' }}>BIMED Healthcare · INTERNAL WORKFORCE</div>
+          <h1 style={{ margin: '4px 0 6px' }}>Create internal BIMED staff</h1>
+          <p style={{ color: '#627d98', marginTop: 0 }}>Use this pathway for administration, HR, finance, recruitment, operations and management staff. New care or clinical intakes must be promoted from recruitment.</p>
+          <div style={{ margin: '16px 0', padding: 14, borderRadius: 12, background: '#eef6ff', border: '1px solid #cfe2ff', color: '#334e68' }}><strong>BIMED ID is automatic.</strong><div style={{ fontSize: 13, marginTop: 4 }}>You do not enter, choose or recycle a BIMED ID. The system assigns the permanent identity when the account is created.</div></div>
           {error && <div style={errorBox}>{error}</div>}
           {staff ? (
             <div style={successBox}>
-              <strong>Staff record created</strong>
+              <strong>Internal BIMED staff account created</strong>
               <div style={{ marginTop: 8 }}>BIMED ID: <strong>{staff.bimed_id}</strong></div>
               <div>Email: {staff.email}</div>
               <div>Job title: {staff.job_title}</div>
-              {activationUrl && <><p style={{ marginBottom: 8 }}>Activation link:</p><textarea readOnly value={activationUrl} rows={3} style={{ width: '100%', boxSizing: 'border-box', padding: 10, border: '1px solid #a7f3d0', borderRadius: 9 }} /><button onClick={() => void copyActivation()} style={{ ...primaryButton, marginTop: 8 }}>Copy activation link</button></>}
+              <p style={{ marginTop: 10, marginBottom: 8 }}>Give the employee the secure activation link below. After activation they can set their password, upload a profile photograph and use the BIMED Staff Portal.</p>
+              {activationUrl && <><textarea readOnly value={activationUrl} rows={3} style={{ width: '100%', boxSizing: 'border-box', padding: 10, border: '1px solid #a7f3d0', borderRadius: 9 }} /><button onClick={() => void copyActivation()} style={{ ...primaryButton, marginTop: 8 }}>Copy activation link</button></>}
               <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button onClick={() => router.push(`/admin/staff/${staff.id}`)} style={primaryButton}>Open staff record</button>
                 <button onClick={() => router.push('/admin/staff/new')} style={secondaryButton}>Create another</button>
@@ -80,7 +82,7 @@ export default function NewBimedStaffPage() {
                 <Field label="Eircode" value={form.eircode} onChange={(v) => update('eircode', v)} />
               </div>
               <div style={{ marginTop: 20, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button disabled={busy} type="submit" style={primaryButton}>{busy ? 'Creating…' : 'Create BIMED staff account'}</button>
+                <button disabled={busy} type="submit" style={primaryButton}>{busy ? 'Creating…' : 'Create internal staff account'}</button>
                 <button type="button" onClick={() => router.push('/admin/staff')} style={secondaryButton}>Cancel</button>
               </div>
             </form>
