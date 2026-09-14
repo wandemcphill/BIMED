@@ -6,10 +6,13 @@ import PrintContractButton from '@/components/PrintContractButton';
 export default function EmploymentContractDocument({
   template,
   employeeSignatureSlot,
+  prefilledFor,
 }: {
   template: ContractTemplate;
   /** Replaces the default blank employee signature line - used by the live e-signing page. */
   employeeSignatureSlot?: ReactNode;
+  /** Candidate identity shown when the contract was opened from a specific application. */
+  prefilledFor?: { name: string; email: string };
 }) {
   const employeeName = template.editableFields.find((field) => field.label === 'Employee name')?.value || 'Employee';
   return (
@@ -19,6 +22,15 @@ export default function EmploymentContractDocument({
           <span className="pill">CONTRACT OF EMPLOYMENT</span>
           <PrintContractButton />
         </div>
+
+        {prefilledFor ? (
+          <div className="contract-prefill-notice" role="status">
+            <strong>Candidate details</strong>
+            <span>
+              This employment contract has been populated for {prefilledFor.name}. The employment details below come from the candidate's recruitment record.
+            </span>
+          </div>
+        ) : null}
 
         <div className="contract-meta">
           <div>
