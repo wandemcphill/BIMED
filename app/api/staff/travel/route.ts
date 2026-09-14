@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStaffSession } from '@/lib/staff-auth';
 import { db } from '@/lib/db';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 import { submitFlightTravelRequest } from '@/lib/flight-travel-request';
 import { resolveWorldwideHomeAirport } from '@/lib/worldwide-home-airport';
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   if (!permit) return NextResponse.json({ error: 'Overseas permit case not initialized.' }, { status: 404 });
   try {
     const origin = await resolveWorldwideHomeAirport(String(application?.country_of_residence || ''));
-    const { data: saved } = await client.from('recruitment_flight_itineraries').select('*').eq('permit_case_id', permit.id).maybeSingle();
+    const { data: saved } = await client.from('recruitment_flight_itineraries').select('id,permit_case_id,route,departure_airport_code,departure_airport_name,destination_airport_code,destination_airport_name,travel_date,passenger_count,cabin_class,passengers,status,airline_note,change_notice_hours,baggage_note,airport_pickup_included,booking_status,airline,flight_number,booking_reference,arrival_at,booked_at').eq('permit_case_id', permit.id).maybeSingle();
     const { data: pickup } = await client.from('recruitment_arrival_transfers').select('status,pickup_airport_code,destination_name,supplier_name,supplier_confirmed_at,driver_name,driver_phone,vehicle_description,driver_meet_point').eq('permit_case_id', permit.id).maybeSingle();
     return NextResponse.json({ homeCountry: application?.country_of_residence || null, origin, destination: { code: 'DUB', name: 'Dublin Airport', country: 'Ireland' }, permit, itinerary: saved || null, pickup: pickup || null });
   } catch (error) {
@@ -40,6 +41,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getStaffSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+  const limiter = await checkRateLimit({ key: `staff-travel-submit:${session.staff_id}`, limit: 10, windowMs: 60 * 60 * 1000, request });
+  if (!limiter.allowed) return NextResponse.json({ error: 'Travel requests are temporarily rate-limited. Please try again later.' }, { status: 429, headers: { 'Retry-After': String(limiter.retryAfterSeconds || 60) } });
   const body = await request.json().catch(() => null) as any;
   const client = db();
   const { data: staff } = await client.from('recruitment_staff').select('id,full_name,bimed_id,status,application_id').eq('id', session.staff_id).maybeSingle();
