@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { activationExpiresAt, createActivationToken, hashActivationToken } from './staff-auth';
 import { recruitmentRoleSlug } from './bimed-role-policy';
 import { getOnboardingReadiness } from './onboarding-readiness';
+import { generateBimedPortalEmail } from './staff-email';
 
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
@@ -15,14 +16,14 @@ function defaultStartDate() {
 function mapResidentialAddress(address: string | null | undefined) {
   const value = address?.trim();
   if (!value) return {};
-
-  // Applications currently store the residential address as one free-text value.
-  // Preserve it losslessly in address_line_1 rather than guessing how a candidate
-  // formatted their street/city/eircode. Admins can refine the structured fields later.
   return { address_line_1: value };
 }
 
-export async function createStaffFromApplication(client: SupabaseClient, applicationId: string) {
+export async function createStaffFromApplication(
+  client: SupabaseClient,
+  applicationId: string,
+  options?: { refreshActivation?: boolean },
+) {
   const { data: application, error: applicationError } = await client
     .from('recruitment_applications')
     .select('*')
@@ -55,6 +56,23 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
     if (application.bimed_id !== existing.bimed_id) {
       await client.from('recruitment_applications').update({ bimed_id: existing.bimed_id, updated_at: new Date().toISOString() }).eq('id', applicationId);
     }
+
+    if (options?.refreshActivation && !existing.activated_at) {
+      const activationToken = createActivationToken();
+      const { data: refreshed, error: refreshError } = await client
+        .from('recruitment_staff')
+        .update({
+          activation_token_hash: hashActivationToken(activationToken),
+          activation_expires_at: activationExpiresAt(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+        .select('*')
+        .single();
+      if (refreshError || !refreshed) throw refreshError || new Error('Unable to refresh the staff activation link.');
+      return { staff: refreshed, activationToken };
+    }
+
     return { staff: existing, activationToken: null as string | null };
   }
 
@@ -69,6 +87,7 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
   const effectiveName = signedContract.employee_name || application.full_name;
   const effectiveAddress = signedContract.employee_address || application.address;
   const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
+  const portalEmail = await generateBimedPortalEmail(client, effectiveName);
 
   const { data: staff, error } = await client
     .from('recruitment_staff')
@@ -76,7 +95,7 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
       application_id: application.id,
       full_name: effectiveName,
       preferred_name: application.preferred_name,
-      email: application.email.trim().toLowerCase(),
+      email: portalEmail,
       phone: application.phone,
       date_of_birth: application.date_of_birth,
       nationality: application.nationality,
@@ -105,7 +124,7 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
     staffId: staff.id,
     category: 'welcome',
     title: 'Welcome to the BIMED Staff Portal',
-    body: `Your permanent BIMED staff account is ready for your ${staff.job_title || staff.role || 'BIMED'} position. Use Messages to contact BIMED Admin / HR, My Rota for shifts and work requests, Attendance for attendance records, Payslips for payroll records, My Profile for your details and profile photograph, and Notifications for workplace updates.${staff.application_id ? ' Your Onboarding workspace remains available for your recruitment-linked requirements.' : ''}`,
+    body: `Your permanent BIMED staff account is ready for your ${staff.job_title || staff.role || 'BIMED'} position. Your BIMED email is ${staff.email}. Sign in with your BIMED ID or BIMED email after activation. Use Messages to contact BIMED Admin / HR, My Rota for shifts and work requests, Attendance for attendance records, Payslips for payroll records, My Profile for your details and profile photograph, and Notifications for workplace updates.${staff.application_id ? ' Your Onboarding workspace remains available for your recruitment-linked requirements.' : ''}`,
     actionUrl: '/staff',
   });
 
