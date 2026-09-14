@@ -55,7 +55,26 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
     if (application.bimed_id !== existing.bimed_id) {
       await client.from('recruitment_applications').update({ bimed_id: existing.bimed_id, updated_at: new Date().toISOString() }).eq('id', applicationId);
     }
-    return { staff: existing, activationToken: null as string | null };
+
+    let staff = existing;
+    let activationToken: string | null = null;
+    if (!existing.activated_at) {
+      activationToken = createActivationToken();
+      const { data: refreshed, error: refreshError } = await client
+        .from('recruitment_staff')
+        .update({
+          activation_token_hash: hashActivationToken(activationToken),
+          activation_expires_at: activationExpiresAt(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+        .select('*')
+        .single();
+      if (refreshError || !refreshed) throw refreshError || new Error('Unable to refresh the staff activation link.');
+      staff = refreshed;
+    }
+
+    return { staff, activationToken };
   }
 
   const readiness = await getOnboardingReadiness(client, application);
