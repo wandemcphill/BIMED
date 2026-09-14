@@ -43,6 +43,7 @@ async function sendSupplierEmail(input: { staff: any; transfer: any }) {
 }
 
 export async function dispatchArrivalTransfer(input: { client: SupabaseClient; staff: any; permit: any; itinerary: any; transfer: any; actor: string }) {
+  // Supplier dispatch remains server-side and only exposes operational details to the supplier.
   if (!input.itinerary || input.itinerary.booking_status !== 'booked') throw new Error('Book the flight and save the confirmed flight details before dispatching the airport pickup.');
   if (!input.transfer.destination_address?.trim()) throw new Error('Set the BIMED accommodation address before dispatching the airport pickup.');
   if (!input.itinerary.flight_number?.trim() || !input.itinerary.arrival_at) throw new Error('Confirmed flight number and arrival time are required before pickup dispatch.');
