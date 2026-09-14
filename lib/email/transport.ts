@@ -41,8 +41,7 @@ export type EmailType =
   | 'onboarding_pack'
   | 'recruitment_invite'
   | 'second_interview_invite'
-  | 'admin_second_interview_completed'
-  | 'staff_activation';
+  | 'admin_second_interview_completed';
 
 export type SendResult =
   | { status: 'sent'; messageId: string | null }
@@ -53,33 +52,54 @@ export type SendRequest = {
   to: string;
   content: EmailContent;
   emailType: EmailType;
+  /**
+   * Stable key identifying this logical email. A second attempt to claim the same key is
+   * treated as a duplicate and skipped. Omit to disable duplicate protection.
+   */
   dedupeKey?: string;
+  /** When set, a claim older than this window is allowed to send again. */
   dedupeWindowMs?: number;
   applicationId?: string | null;
+  /** Optional Supabase client; without one, duplicate protection and logging are skipped. */
   client?: SupabaseClient | null;
   replyTo?: string;
 };
 
 const EMAIL_PATTERN = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 
+/**
+ * A single, plain address only. Rejects commas, semicolons, angle brackets and CR/LF so a
+ * user-controlled value cannot smuggle in extra recipients or header lines.
+ */
 export function isValidRecipient(value: string | null | undefined): boolean {
-  if (!value) return false;
+  if (!value) {
+    return false;
+  }
+
   const trimmed = value.trim();
   return trimmed.length <= 254 && EMAIL_PATTERN.test(trimmed) && !/[\r\n\t]/.test(trimmed);
 }
 
+/** Logs are structured and deliberately lossy: never a full address, never a token. */
 export function maskEmail(value: string): string {
   const [local, domain] = value.split('@');
-  if (!domain) return '***';
+  if (!domain) {
+    return '***';
+  }
   const visible = local.slice(0, 2);
   return `${visible}${local.length > 2 ? '***' : ''}@${domain}`;
 }
 
 function log(level: 'info' | 'warn' | 'error', event: string, fields: Record<string, unknown>) {
   const line = JSON.stringify({ level, event, at: new Date().toISOString(), ...fields });
-  if (level === 'error') console.error(line);
-  else if (level === 'warn') console.warn(line);
-  else console.log(line);
+
+  if (level === 'error') {
+    console.error(line);
+  } else if (level === 'warn') {
+    console.warn(line);
+  } else {
+    console.log(line);
+  }
 }
 
 export function isEmailConfigured(): boolean {
@@ -91,14 +111,22 @@ let cachedKey: string | null = null;
 
 function getResendClient(): Resend | null {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) return null;
+
+  if (!apiKey) {
+    return null;
+  }
+
   if (!cachedClient || cachedKey !== apiKey) {
     cachedClient = new Resend(apiKey);
     cachedKey = apiKey;
   }
+
   return cachedClient;
 }
 
+/**
+ * Test seam: lets unit tests substitute the provider without a network call or an API key.
+ */
 export type EmailSender = (payload: {
   from: string;
   to: string;
@@ -132,6 +160,13 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Claims dedupeKey. Returns false when this email was already sent (or is in flight),
+ * in which case the caller must not send.
+ *
+ * A claim failure caused by the database being unreachable returns true: losing duplicate
+ * protection is preferable to silently dropping a candidate's only notification.
+ */
 async function claimDedupeKey(
   client: SupabaseClient,
   input: { dedupeKey: string; emailType: EmailType; applicationId?: string | null; recipientHint: string; windowMs?: number }
@@ -144,7 +179,10 @@ async function claimDedupeKey(
         .select('id, created_at')
         .eq('dedupe_key', input.dedupeKey)
         .maybeSingle();
-      if (existing && existing.created_at && existing.created_at > cutoff) return false;
+
+      if (existing && existing.created_at && existing.created_at > cutoff) {
+        return false;
+      }
 
       const { error: upsertError } = await client.from('recruitment_email_log').upsert(
         {
@@ -159,7 +197,11 @@ async function claimDedupeKey(
         },
         { onConflict: 'dedupe_key' }
       );
-      if (upsertError) throw upsertError;
+
+      if (upsertError) {
+        throw upsertError;
+      }
+
       return true;
     }
 
@@ -171,10 +213,15 @@ async function claimDedupeKey(
       status: 'pending',
       attempts: 0,
     });
+
     if (error) {
-      if (error.code === '23505') return false;
+      // 23505 = unique_violation: another request already claimed this exact email.
+      if (error.code === '23505') {
+        return false;
+      }
       throw error;
     }
+
     return true;
   } catch (error) {
     log('warn', 'email.dedupe_unavailable', {
@@ -191,28 +238,47 @@ async function finalizeLog(
   dedupeKey: string | undefined,
   patch: { status: string; provider_message_id?: string | null; error_message?: string | null; attempts: number }
 ) {
-  if (!client || !dedupeKey) return;
+  if (!client || !dedupeKey) {
+    return;
+  }
+
+  // Bookkeeping only: a logging problem must never surface to the caller, because the
+  // email itself may already have been delivered.
   try {
     const { error } = await client
       .from('recruitment_email_log')
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq('dedupe_key', dedupeKey);
-    if (error) log('warn', 'email.log_update_failed', { dedupe_key: dedupeKey, reason: error.message });
+
+    if (error) {
+      log('warn', 'email.log_update_failed', { dedupe_key: dedupeKey, reason: error.message });
+    }
   } catch (error) {
-    log('warn', 'email.log_update_failed', { dedupe_key: dedupeKey, reason: error instanceof Error ? error.message : 'unknown' });
+    log('warn', 'email.log_update_failed', {
+      dedupe_key: dedupeKey,
+      reason: error instanceof Error ? error.message : 'unknown',
+    });
   }
 }
 
+/**
+ * Sends one transactional email. Never throws.
+ */
 export async function sendTransactionalEmail(request: SendRequest): Promise<SendResult> {
   const recipient = request.to?.trim() || '';
+
   if (!isValidRecipient(recipient)) {
     log('warn', 'email.invalid_recipient', { email_type: request.emailType });
     return { status: 'skipped', reason: 'invalid_recipient' };
   }
 
   const sender = senderOverride ?? buildResendSender();
+
   if (!sender) {
-    log('warn', 'email.not_configured', { email_type: request.emailType, detail: 'RESEND_API_KEY is not set; email was not sent.' });
+    log('warn', 'email.not_configured', {
+      email_type: request.emailType,
+      detail: 'RESEND_API_KEY is not set; email was not sent.',
+    });
     return { status: 'skipped', reason: 'not_configured' };
   }
 
@@ -224,6 +290,7 @@ export async function sendTransactionalEmail(request: SendRequest): Promise<Send
       recipientHint: maskEmail(recipient),
       windowMs: request.dedupeWindowMs,
     });
+
     if (!claimed) {
       log('info', 'email.duplicate_suppressed', { email_type: request.emailType, dedupe_key: request.dedupeKey });
       return { status: 'skipped', reason: 'duplicate' };
@@ -240,28 +307,62 @@ export async function sendTransactionalEmail(request: SendRequest): Promise<Send
   };
 
   let lastError = 'unknown error';
+
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       const result = await withTimeout(sender(payload), SEND_TIMEOUT_MS, 'Resend send');
-      log('info', 'email.sent', { email_type: request.emailType, recipient: maskEmail(recipient), attempt, message_id: result.id });
-      await finalizeLog(request.client, request.dedupeKey, { status: 'sent', provider_message_id: result.id, error_message: null, attempts: attempt });
+
+      log('info', 'email.sent', {
+        email_type: request.emailType,
+        recipient: maskEmail(recipient),
+        attempt,
+        message_id: result.id,
+      });
+
+      await finalizeLog(request.client, request.dedupeKey, {
+        status: 'sent',
+        provider_message_id: result.id,
+        error_message: null,
+        attempts: attempt,
+      });
+
       return { status: 'sent', messageId: result.id };
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'unknown error';
       const retryable = attempt < MAX_ATTEMPTS && isRetryable(error);
-      log(retryable ? 'warn' : 'error', 'email.send_failed', { email_type: request.emailType, recipient: maskEmail(recipient), attempt, retrying: retryable, reason: lastError });
-      if (!retryable) break;
+
+      log(retryable ? 'warn' : 'error', 'email.send_failed', {
+        email_type: request.emailType,
+        recipient: maskEmail(recipient),
+        attempt,
+        retrying: retryable,
+        reason: lastError,
+      });
+
+      if (!retryable) {
+        break;
+      }
+
       await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
     }
   }
 
-  await finalizeLog(request.client, request.dedupeKey, { status: 'failed', error_message: lastError.slice(0, 500), attempts: MAX_ATTEMPTS });
+  await finalizeLog(request.client, request.dedupeKey, {
+    status: 'failed',
+    error_message: lastError.slice(0, 500),
+    attempts: MAX_ATTEMPTS,
+  });
+
   return { status: 'failed', reason: lastError };
 }
 
 function buildResendSender(): EmailSender | null {
   const client = getResendClient();
-  if (!client) return null;
+
+  if (!client) {
+    return null;
+  }
+
   return async (payload) => {
     const { data, error } = await client.emails.send({
       from: payload.from,
@@ -271,11 +372,13 @@ function buildResendSender(): EmailSender | null {
       text: payload.text,
       ...(payload.replyTo ? { replyTo: payload.replyTo } : {}),
     });
+
     if (error) {
       const failure = new Error(error.message || 'Resend rejected the message') as Error & { name: string };
       failure.name = error.name || 'ResendError';
       throw failure;
     }
+
     return { id: data?.id ?? null };
   };
 }
@@ -285,7 +388,14 @@ function isRetryable(error: unknown): boolean {
   const message = error.message.toLowerCase();
   if (message.includes('timed out')) return true;
   if (/\b(429|500|502|503|504)\b/.test(message)) return true;
-  return message.includes('rate limit') || message.includes('econnreset') || message.includes('etimedout') || message.includes('enotfound') || message.includes('socket hang up') || message.includes('fetch failed');
+  return (
+    message.includes('rate limit') ||
+    message.includes('econnreset') ||
+    message.includes('etimedout') ||
+    message.includes('enotfound') ||
+    message.includes('socket hang up') ||
+    message.includes('fetch failed')
+  );
 }
 
 export { log as logEmailEvent };
