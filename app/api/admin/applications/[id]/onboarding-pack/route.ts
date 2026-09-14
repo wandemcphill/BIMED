@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
@@ -8,6 +7,7 @@ import { createDocumentSignatureRequest } from '@/lib/contract-signature';
 import { createPacketAccess, packetList } from '@/lib/document-packets';
 import { sendFullOnboardingPackEmail } from '@/lib/full-onboarding-pack';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
+import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -40,13 +40,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
     const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
-    if (!expectedRoleSlug) {
-      return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
-    }
-
-    if (requestedRoleSlug !== expectedRoleSlug) {
-      return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
-    }
+    if (!expectedRoleSlug) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
+    if (requestedRoleSlug !== expectedRoleSlug) return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
 
     const startDate = application.start_date || defaultStartDateIso();
     const contractInfo = {
@@ -64,7 +59,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     ]);
 
     const international = application.living_in_ireland === 'No';
-    const packetEntries = packetList(international);
+    const packetEntries = packetList(international).filter((packet) => packet.onboardingEmail !== false);
     const packetResults = await Promise.all(packetEntries.map((packet) => createPacketAccess(application.id, packet.slug, session.email)));
     const packetLinks = packetResults.map((result) => ({
       label: packetEntries.find((packet) => packet.slug === result.record.packet_slug)?.title || 'Open BIMED document',
@@ -79,6 +74,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       packetLinks,
       packId: contractResult.record.id,
     }, client);
+
     const previousStatus = application.status;
     if (previousStatus !== 'Offer Issued') {
       await client.from('recruitment_applications').update({ status: 'Offer Issued', updated_at: new Date().toISOString() }).eq('id', applicationId);
