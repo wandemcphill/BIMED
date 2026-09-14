@@ -21,7 +21,7 @@ export type StaffSession = {
 };
 
 function getSessionSecret() {
-  return process.env.STAFF_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET || '';
+  return process.env.STAFF_SESSION_SECRET?.trim() || '';
 }
 
 function normalizeEmail(value: string) {
@@ -76,7 +76,7 @@ function safeEqual(left: string, right: string) {
 
 export function createStaffSessionToken(staff: Pick<StaffSession, 'staff_id' | 'bimed_id' | 'email' | 'session_version'>) {
   const secret = getSessionSecret();
-  if (!secret) throw new Error('STAFF_SESSION_SECRET or ADMIN_SESSION_SECRET is required.');
+  if (!secret) throw new Error('STAFF_SESSION_SECRET is required.');
   const payload: StaffSession = {
     staff_id: staff.staff_id,
     bimed_id: staff.bimed_id,
@@ -114,7 +114,7 @@ export async function getStaffSessionFromToken(token: string | undefined | null,
       .eq('id', tokenSession.staff_id)
       .maybeSingle();
     if (error || !staff) return null;
-    if (staff.status === 'suspended') return null;
+    if (!['active', 'pre_arrival', 'on_leave'].includes(staff.status)) return null;
     if (staff.session_version !== tokenSession.session_version) return null;
     if (staff.bimed_id !== tokenSession.bimed_id || normalizeEmail(staff.email) !== tokenSession.email) return null;
     return tokenSession;
