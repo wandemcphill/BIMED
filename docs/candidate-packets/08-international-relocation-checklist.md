@@ -1,75 +1,27 @@
 # BIMED International Relocation & First-Month Checklist
 
-**Candidate:** [NAME]  
-**Role:** [ROLE]  
-**Proposed start date:** [DATE]  
-**BIMED contact:** [NAME / CONTACT]
+Use the interactive checklist on this page to track your move and first month with BIMED.
 
-This checklist is an operational aid. It does not replace official immigration, employment, tax, housing, or healthcare requirements.
+This is an operational aid. It does not replace official immigration, employment, tax, housing, or healthcare requirements.
 
-## Phase 1 — Offer accepted
+## Offer accepted
 
-- [ ] Signed/accepted BIMED employment documentation received.
-- [ ] Identity information confirmed.
-- [ ] Role, location, hours, pay, and expected start date confirmed.
-- [ ] International recruitment route confirmed.
-- [ ] Outstanding candidate evidence listed.
-- [ ] BIMED contact for questions confirmed.
+Confirm that your BIMED employment documentation, identity information, role, location, hours, pay, expected start date, and international recruitment route are clear. Raise any outstanding evidence requests with BIMED.
 
-## Phase 2 — Pre-travel
+## Before travel
 
-- [ ] Passport valid for intended travel.
-- [ ] Relevant immigration/permission documentation reviewed.
-- [ ] Employment-permit documentation handled through the approved process where applicable.
-- [ ] Travel date shared with BIMED.
-- [ ] Accommodation plan confirmed.
-- [ ] Airport/arrival plan confirmed.
-- [ ] First reporting/induction appointment confirmed.
-- [ ] Emergency and BIMED contact details saved.
-- [ ] Digital and physical copies of critical documents retained securely.
+Make sure your passport and relevant immigration or permission documents are ready. Share your travel date with BIMED, confirm accommodation and airport arrangements, confirm your first reporting or induction appointment, save your emergency contacts, and keep secure copies of critical documents.
 
-## Phase 3 — Arrival in Ireland
+## Arrival in Ireland
 
-- [ ] Arrival confirmation sent to BIMED contact.
-- [ ] Accommodation reached safely.
-- [ ] Route to workplace tested.
-- [ ] First induction attendance confirmed.
-- [ ] Outstanding immigration/registration steps identified, if any.
-- [ ] Payroll/bank details submitted through the secure BIMED process.
+Confirm safe arrival, reach your accommodation safely, test your route to work, attend the agreed induction, and complete any outstanding immigration or registration steps. Submit payroll information only through the secure BIMED process.
 
-## Phase 4 — First week
+## First week
 
-- [ ] BIMED induction completed.
-- [ ] Service orientation completed.
-- [ ] Safeguarding training/orientation completed.
-- [ ] Confidentiality/data-protection orientation completed.
-- [ ] Infection-prevention/manual-handling training completed as required.
-- [ ] Rota access active.
-- [ ] Attendance/clock-in access active.
-- [ ] Supervisor assigned and first check-in completed.
-- [ ] Outstanding compliance documents uploaded/provided.
+Your first week may include BIMED induction, service orientation, safeguarding, confidentiality, infection prevention, manual handling, rota and attendance setup, supervisor check-ins, and outstanding compliance tasks.
 
-## Phase 5 — First month
+## First month
 
-- [ ] Required mandatory training completed.
-- [ ] Required credentials verified or follow-up plan recorded.
-- [ ] First-month supervision/check-in completed.
-- [ ] Employee understands escalation routes.
-- [ ] Employee understands leave and sickness procedures.
-- [ ] Employee understands payroll/pay-slip process.
-- [ ] Any relocation or onboarding issues closed or escalated.
+Complete required mandatory training, follow up on outstanding credentials, attend your first-month supervision or check-in, and make sure you understand escalation routes, leave, sickness reporting, payroll, and any remaining onboarding actions.
 
-## BIMED internal owner checklist
-
-**Recruitment:** [ ]  
-**HR/onboarding:** [ ]  
-**Manager/service:** [ ]  
-**Compliance:** [ ]  
-**Payroll:** [ ]  
-**Staff portal activation:** [ ]
-
-**Outstanding actions:**
-
-1. [ ] ______________________________________________
-2. [ ] ______________________________________________
-3. [ ] ______________________________________________
+Use the secure form above to save your progress. You can return to the same private link before the expiry date.
