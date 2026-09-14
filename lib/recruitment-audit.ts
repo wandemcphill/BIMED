@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 type AuditEvent = {
   applicationId?: string | null;
   inviteId?: string | null;
+  staffId?: string | null;
   eventType: string;
   actor: string;
   metadata?: Record<string, unknown>;
@@ -14,7 +15,10 @@ export async function recordRecruitmentAudit(client: SupabaseClient, event: Audi
     invite_id: event.inviteId || null,
     event_type: event.eventType,
     actor: event.actor,
-    metadata: event.metadata || {},
+    metadata: {
+      ...(event.metadata || {}),
+      ...(event.staffId ? { staff_id: event.staffId } : {}),
+    },
     created_at: new Date().toISOString(),
   });
 
