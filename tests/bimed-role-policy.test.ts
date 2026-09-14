@@ -6,6 +6,7 @@ import {
   BIMED_DEFAULT_PAY_FREQUENCY,
   BIMED_DEFAULT_PROBATION,
   BIMED_DEFAULT_START_DATE,
+  BIMED_ROLE_SALARIES,
   applyBimedContractDefaults,
   applyBimedJobDescriptionDefaults,
   CANONICAL_RECRUITMENT_ROLES,
@@ -39,6 +40,29 @@ describe('BIMED role policy', () => {
     expect(recruitmentRoleSlug('not-a-bimed-role')).toBeNull();
   });
 
+  it('removes unresolved placeholders from every canonical contract after applying BIMED defaults', () => {
+    for (const role of CANONICAL_RECRUITMENT_ROLES) {
+      const slug = recruitmentRoleSlug(role)!;
+      const template = getContractTemplate(slug);
+      if (!template) throw new Error(`${role} template missing`);
+
+      const resolved = applyBimedContractDefaults(template);
+      const allContractText = [
+        ...resolved.editableFields.map((item) => item.value),
+        ...resolved.sections.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
+        ...resolved.schedules.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
+        resolved.closingNote,
+      ].join('\n');
+
+      expect(allContractText).not.toMatch(/\[[^\]]+\]/);
+      expect(allContractText).toContain(`Job title: ${role}`);
+      expect(allContractText).toContain(`Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`);
+      expect(resolved.editableFields.find((item) => item.label === 'Start date')?.value).toBe(BIMED_DEFAULT_START_DATE);
+      expect(resolved.editableFields.find((item) => item.label === 'Pay frequency')?.value).toBe(BIMED_DEFAULT_PAY_FREQUENCY);
+      expect(resolved.editableFields.find((item) => item.label === 'Pay')?.value).toBe(BIMED_ROLE_SALARIES[slug]);
+    }
+  });
+
   it('applies common contract defaults without changing role-specific terms', () => {
     const template = getContractTemplate('healthcare-assistant');
     if (!template) throw new Error('Healthcare Assistant template missing');
@@ -47,12 +71,6 @@ describe('BIMED role policy', () => {
     const field = (label: string) => resolved.editableFields.find((item) => item.label === label)?.value;
     const probation = resolved.sections.find((section) => section.heading === '2. Commencement of Employment and Probation')?.paragraphs.join('\n') || '';
     const schedule2 = resolved.schedules.find((section) => section.heading === 'Schedule 2 - Job Description')?.paragraphs.join('\n') || '';
-    const allContractText = [
-      ...resolved.editableFields.map((item) => item.value),
-      ...resolved.sections.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
-      ...resolved.schedules.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
-      resolved.closingNote,
-    ].join('\n');
 
     expect(field('Line manager')).toBe(BIMED_DEFAULT_LINE_MANAGER);
     expect(field('Start date')).toBe(BIMED_DEFAULT_START_DATE);
@@ -61,11 +79,10 @@ describe('BIMED role policy', () => {
     expect(probation).toContain('combined maximum of 6 months');
     expect(probation).not.toContain('first 6 months of your employment');
     expect(field('Contracted hours')).toBe('39 hours per week');
-    expect(field('Pay')).toContain('EUR 32,691');
+    expect(field('Pay')).toBe(BIMED_ROLE_SALARIES['healthcare-assistant']);
     expect(schedule2).toContain('Job title: Healthcare Assistant');
     expect(schedule2).toContain(`Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`);
     expect(schedule2).not.toContain('[insert]');
-    expect(allContractText).not.toMatch(/\[[^\]]+\]/);
   });
 
   it('resolves employee-specific placeholders when preparing a candidate contract', () => {
@@ -108,7 +125,7 @@ describe('BIMED role policy', () => {
     const field = (label: string) => resolved.editableFields.find((item) => item.label === label)?.value;
 
     expect(field('Contracted hours')).toBe('35 hours per week');
-    expect(field('Pay')).toContain('EUR 45,514');
+    expect(field('Pay')).toBe(BIMED_ROLE_SALARIES.physiotherapist);
     expect(resolved.sections.find((section) => section.heading === '16. Right to Work')?.paragraphs.join('\n')).toContain('CORU');
   });
 });
