@@ -46,6 +46,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ci-diagnostics
-          path: /tmp/*-log
+          path: /tmp/*.log
           if-no-files-found: warn
           retention-days: 3
