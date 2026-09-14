@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { createStaffSessionToken, setStaffSessionCookie, verifyStaffPassword } from '@/lib/staff-auth';
 
 export async function POST(request: NextRequest) {
@@ -9,13 +10,21 @@ export async function POST(request: NextRequest) {
   const password = body.password || '';
   if (!identifier || !password) return NextResponse.json({ error: 'Enter your BIMED ID or BIMED email and password.' }, { status: 400 });
 
-  const client = db();
   const isEmail = identifier.includes('@');
   const lookup = identifier.toLowerCase();
+  const normalizedId = isEmail ? lookup : identifier.toUpperCase();
+  const ipLimit = await checkRateLimit({ key: 'staff-login-ip', limit: 20, windowMs: 15 * 60 * 1000, request });
+  const identityLimit = await checkRateLimit({ key: `staff-login-identity:${normalizedId}`, limit: 8, windowMs: 15 * 60 * 1000, request });
+  if (!ipLimit.allowed || !identityLimit.allowed) {
+    const retryAfter = Math.max(ipLimit.retryAfterSeconds || 60, identityLimit.retryAfterSeconds || 60);
+    return NextResponse.json({ error: 'Too many sign-in attempts. Please try again later.' }, { status: 429, headers: { 'Retry-After': String(retryAfter) } });
+  }
+
+  const client = db();
   const query = client.from('recruitment_staff').select('id,bimed_id,email,status,password_hash,session_version');
-  const { data: staff, error } = await (isEmail ? query.eq('email', lookup) : query.eq('bimed_id', identifier.toUpperCase())).maybeSingle();
+  const { data: staff, error } = await (isEmail ? query.eq('email', lookup) : query.eq('bimed_id', normalizedId)).maybeSingle();
   if (error) return NextResponse.json({ error: 'Unable to sign in right now.' }, { status: 500 });
-  if (!staff || !staff.password_hash || staff.status === 'suspended' || !verifyStaffPassword(password, staff.password_hash)) {
+  if (!staff || !staff.password_hash || !['active', 'pre_arrival', 'on_leave'].includes(staff.status) || !verifyStaffPassword(password, staff.password_hash)) {
     return NextResponse.json({ error: 'The BIMED ID/email or password is incorrect.' }, { status: 401 });
   }
 
