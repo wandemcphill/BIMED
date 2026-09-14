@@ -24,7 +24,7 @@ export default async function AccommodationInvoicePage({ params, searchParams }:
 
   return <main style={{ minHeight: '100vh', background: '#eef2f5', padding: 20, fontFamily: 'Arial,sans-serif' }}>
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginBottom: 14 }}><button onClick={() => window.print()} style={{ padding: '10px 14px', border: 0, borderRadius: 8, background: '#0f766e', color: '#fff', fontWeight: 800 }}>Print / Save as PDF</button>{receipt && receiptMode !== '1' && <a href={`${publicUrl}?receipt=1`} style={{ padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: 8, background: '#fff', color: '#334e68', textDecoration: 'none', fontWeight: 800 }}>View payment receipt</a>}</div>
+      <div style={{ padding: '10px 14px', marginBottom: 14, background: '#fff', border: '1px solid #d9e2ec', borderRadius: 8, color: '#627d98', fontSize: 13 }}>Use your browser Print command and choose <strong>Save as PDF</strong> to keep a PDF copy. {receipt && receiptMode !== '1' ? <a href={`${publicUrl}?receipt=1`} style={{ marginLeft: 12, fontWeight: 800 }}>View payment receipt</a> : null}</div>
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   </main>;
