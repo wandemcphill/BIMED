@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStaffSession } from '@/lib/staff-auth';
 import { db } from '@/lib/db';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { getStaffSession } from '@/lib/staff-auth';
 import { ensureStaffMailbox, findStaffByPortalAddress, getOrCreateAdminConversation, getOrCreateDirectConversation, participantConversationIds } from '@/lib/staff-messaging';
 import { BIMED_ADMIN_EMAILS, BIMED_ADMIN_PROBATION_NOTICE, BIMED_MONITORING_NOTICE } from '@/lib/bimed-admin-directory';
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   }
   const base = { mailbox: { ...mailbox, address: `${mailbox.handle}@${mailbox.namespace}` }, staffType: staff.application_id ? 'recruitment_intake' : 'internal_staff', adminRecipients, notices: { probation: BIMED_ADMIN_PROBATION_NOTICE, monitoring: BIMED_MONITORING_NOTICE } };
   if (!ids.length) return NextResponse.json({ ...base, conversations: [], unreadCount: 0 });
-  const { data: conversations } = await client.from('recruitment_staff_conversations').select('id,created_at,updated_at,last_message_at').in('id', ids).order('last_message_at', { ascending: false, nullsFirst: false });
+  const { data: conversations } = await client.from('recruitment_staff_conversations').select('id,created_at,updated_at,last_message_at').in('id', ids).order('last_message_at', { ascending: false, nullsFirst: false }).limit(200);
   const rows = [] as any[];
   for (const conversation of conversations || []) {
     const { data: participants } = await client.from('recruitment_staff_conversation_participants').select('staff_id,last_read_at').eq('conversation_id', conversation.id);
@@ -40,6 +41,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getStaffSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+  const limiter = await checkRateLimit({ key: `staff-message-send:${session.staff_id}`, limit: 30, windowMs: 60 * 1000, request });
+  if (!limiter.allowed) return NextResponse.json({ error: 'You are sending messages too quickly. Please wait a moment.' }, { status: 429, headers: { 'Retry-After': String(limiter.retryAfterSeconds || 60) } });
   const body = await request.json().catch(() => null) as any;
   const to = safeText(body?.to);
   const message = safeText(body?.message);
