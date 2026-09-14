@@ -42,7 +42,7 @@ export const recruitmentRoles = CANONICAL_RECRUITMENT_ROLES;
 
 export const recruitmentStatuses = [
   'Submitted', 'Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing',
-  'Visa/Immigration Processing', 'Onboarding', 'Rejected', 'Withdrawn',
+  'Visa/Immigration Processing', 'Onboarding', 'Hired', 'Rejected', 'Withdrawn',
 ] as const;
 
 export const candidateSupportDocuments = [
@@ -116,18 +116,4 @@ export function isInternationalCandidate(input: {
 /** Routing is based only on the candidate's explicit living-in-Ireland answer. */
 export function isInternationalRoutingCandidate(input: { living_in_ireland?: string | null }) {
   return input.living_in_ireland === 'No';
-}
-
-export function supportingDocumentsEmail(input: { living_in_ireland?: string | null }) {
-  return isInternationalRoutingCandidate(input) ? recruitmentContacts.overseas : recruitmentContacts.ireland;
-}
-
-/**
- * Internal transactional notifications are intentionally centralized to the client's
- * monitoring inbox. Recruitment, overseas and manager inboxes remain available for normal
- * correspondence and document handling, but the portal does not send automated notifications
- * to them.
- */
-export function recruitmentInternalRecipients(_international: boolean) {
-  return [recruitmentContacts.admin];
 }
