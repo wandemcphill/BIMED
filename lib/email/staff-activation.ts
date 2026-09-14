@@ -19,7 +19,12 @@ function displayDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IE', { dateStyle: 'long' });
 }
 
-export async function sendStaffPortalActivationEmail(client: SupabaseClient, staff: any, token: string) {
+export async function sendStaffPortalActivationEmail(
+  client: SupabaseClient,
+  staff: any,
+  token: string,
+  recipientEmail?: string | null,
+) {
   const mailbox = await ensureStaffMailbox(client, staff);
   const address = `${mailbox.handle}@${mailbox.namespace}`;
   const activationUrl = `${getAppUrl()}/staff/activate?token=${encodeURIComponent(token)}&email=${encodeURIComponent(staff.email)}`;
@@ -28,6 +33,7 @@ export async function sendStaffPortalActivationEmail(client: SupabaseClient, sta
   const role = staff.job_title || staff.role || 'BIMED Staff';
   const statusLabel = staff.status === 'pre_arrival' ? 'Pre-arrival' : 'Active';
   const startDate = displayDate(staff.employment_start_date);
+  const deliveryAddress = recipientEmail?.trim().toLowerCase() || staff.email;
 
   const html = `<!doctype html>
 <html lang="en">
@@ -43,11 +49,12 @@ export async function sendStaffPortalActivationEmail(client: SupabaseClient, sta
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:20px 0;border-top:1px solid #d7e1e6;border-bottom:1px solid #d7e1e6">
         <tr><td style="padding:9px 0;font-weight:700;color:#66717a">Position</td><td style="padding:9px 0">${escapeHtml(role)}</td></tr>
         <tr><td style="padding:9px 0;font-weight:700;color:#66717a">BIMED ID</td><td style="padding:9px 0">${escapeHtml(String(staff.bimed_id))}</td></tr>
+        <tr><td style="padding:9px 0;font-weight:700;color:#66717a">BIMED email</td><td style="padding:9px 0">${escapeHtml(String(staff.email))}</td></tr>
         <tr><td style="padding:9px 0;font-weight:700;color:#66717a">Start date</td><td style="padding:9px 0">${escapeHtml(startDate)}</td></tr>
         <tr><td style="padding:9px 0;font-weight:700;color:#66717a">Employment status</td><td style="padding:9px 0">${escapeHtml(statusLabel)}</td></tr>
         <tr><td style="padding:9px 0;font-weight:700;color:#66717a">BIMED internal address</td><td style="padding:9px 0">${escapeHtml(address)}</td></tr>
       </table>
-      <div style="background:#e8f4f8;border-left:4px solid #0a8ec6;border-radius:4px;padding:14px 16px;line-height:1.6"><strong>Your first step:</strong> activate your Staff Portal account and create your password. The activation link is private and expires after seven days.</div>
+      <div style="background:#e8f4f8;border-left:4px solid #0a8ec6;border-radius:4px;padding:14px 16px;line-height:1.6"><strong>Your first step:</strong> open the activation link, create a password of at least 10 characters, then use your <strong>BIMED ID</strong> or <strong>BIMED email</strong> to sign in.</div>
       <p><a href="${escapeHtml(activationUrl)}" style="display:inline-block;background:#0a8ec6;color:#fff;padding:13px 20px;border-radius:7px;text-decoration:none;font-weight:800">Activate your Staff Portal</a></p>
       <h2 style="font-size:18px;color:#163247;margin:24px 0 10px">How your Staff Portal works</h2>
       <ul style="padding-left:20px;line-height:1.65">
@@ -60,6 +67,7 @@ export async function sendStaffPortalActivationEmail(client: SupabaseClient, sta
         ${staff.application_id ? '<li><strong>Onboarding:</strong> review your recruitment-linked onboarding readiness and any outstanding compliance items.</li>' : ''}
         <li><strong>Notifications:</strong> keep up with rota, payroll, training and workplace notices.</li>
       </ul>
+      <div style="background:#fff8e1;border-left:4px solid #c98a00;border-radius:4px;padding:14px 16px;line-height:1.6;margin-top:20px"><strong>Profile picture:</strong> after you activate your account, open My Profile and upload a clear recent photograph for your BIMED profile picture.</div>
       <p style="margin-top:22px"><a href="${escapeHtml(portalUrl)}" style="color:#0a8ec6;font-weight:800">Open the BIMED Staff Portal</a></p>
       <p style="color:#66717a;font-size:13px;margin-top:24px">Never share your activation link or password. BIMED staff communications are private to the Staff Portal.</p>
       <p style="margin-top:24px">Welcome to the BIMED team,<br><strong>BIMED Healthcare</strong></p>
@@ -77,12 +85,15 @@ export async function sendStaffPortalActivationEmail(client: SupabaseClient, sta
     '',
     `Position: ${role}`,
     `BIMED ID: ${staff.bimed_id}`,
+    `BIMED email: ${staff.email}`,
     `Start date: ${startDate}`,
     `Employment status: ${statusLabel}`,
     `BIMED internal address: ${address}`,
     '',
     `Activate your Staff Portal: ${activationUrl}`,
     `Open the BIMED Staff Portal: ${portalUrl}`,
+    '',
+    'After activation, sign in using either your BIMED ID or BIMED email and the password you create.',
     '',
     'Staff Portal guide:',
     '- Overview: see your BIMED identity and key workforce information.',
@@ -94,6 +105,7 @@ export async function sendStaffPortalActivationEmail(client: SupabaseClient, sta
     ...(staff.application_id ? ['- Onboarding: review recruitment-linked onboarding readiness.'] : []),
     '- Notifications: keep up with workforce notices.',
     '',
+    'Please upload a clear recent profile photograph on My Profile after activation.',
     'The activation link expires after seven days. Never share it or your password.',
     '',
     'Welcome to the BIMED team,',
@@ -107,7 +119,7 @@ export async function sendStaffPortalActivationEmail(client: SupabaseClient, sta
   };
 
   return sendTransactionalEmail({
-    to: staff.email,
+    to: deliveryAddress,
     content,
     emailType: 'staff_portal_welcome',
     dedupeKey: `staff_portal_welcome:${staff.id}:${staff.activation_token_hash || token}`,
