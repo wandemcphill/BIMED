@@ -80,6 +80,8 @@ export function applyBimedContractDefaults(
     ['[Insert start date]', startDate],
     ['[start date]', startDate],
     ['[weekly / fortnightly / monthly]', BIMED_DEFAULT_PAY_FREQUENCY],
+    ['Job title: [insert]', `Job title: ${template.roleLabel}`],
+    ['Reports to: [insert]', `Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`],
     ['Job title: [insert] Reports to: [insert]', `Job title: ${template.roleLabel} Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`],
     ['The first 6 months of your employment is a probationary period', `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`],
     ['extend your probationary period once, up to a combined maximum of 12 months', 'extend your probationary period once, up to a combined maximum of 6 months'],
