@@ -2,10 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getResendFromEmail } from '@/lib/recruitment-config';
 import { Resend } from 'resend';
 
-export const ARRIVAL_TRANSFER_SUPPLIER = {
-  name: 'Avatravel',
-  email: 'info@avatravel.ie',
-} as const;
+export const ARRIVAL_TRANSFER_SUPPLIER = { name: 'Avatravel', email: 'info@avatravel.ie' } as const;
 
 function escapeHtml(value: string) {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -15,7 +12,7 @@ function validEmail(value: string) {
   return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(value) && !/[\r\n\t]/.test(value);
 }
 
-async function sendSupplierEmail(input: { permitCaseId: string; staff: any; transfer: any }) {
+async function sendSupplierEmail(input: { staff: any; transfer: any }) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) return { status: 'not_configured' as const };
   if (!validEmail(input.transfer.supplier_email)) return { status: 'invalid_recipient' as const };
@@ -35,19 +32,12 @@ async function sendSupplierEmail(input: { permitCaseId: string; staff: any; tran
     `Arrival: ${input.transfer.flight_arrival_at || ''}`,
     `Passengers: ${input.transfer.passenger_count}`,
     `Names: ${passengerNames.join(', ')}`,
-    `Special instructions: ${input.transfer.special_instructions || 'Meet and greet in arrivals with passenger name sign. Monitor live flight status.'`,
+    `Special instructions: ${input.transfer.special_instructions || 'Meet and greet in arrivals with passenger name sign. Monitor live flight status.'}`,
     '', 'Please confirm booking and return supplier reference, driver, vehicle and meet point details.',
   ].join('\n');
 
   const resend = new Resend(apiKey);
-  const { data, error } = await resend.emails.send({
-    from: getResendFromEmail(),
-    to: input.transfer.supplier_email,
-    subject,
-    html,
-    text,
-    replyTo: 'overseas@bimedhealthcare.com',
-  });
+  const { data, error } = await resend.emails.send({ from: getResendFromEmail(), to: input.transfer.supplier_email, subject, html, text, replyTo: 'overseas@bimedhealthcare.com' });
   if (error) return { status: 'failed' as const, reason: error.message };
   return { status: 'sent' as const, messageId: data?.id || null };
 }
@@ -58,20 +48,8 @@ export async function dispatchArrivalTransfer(input: { client: SupabaseClient; s
   if (!input.itinerary.flight_number?.trim() || !input.itinerary.arrival_at) throw new Error('Confirmed flight number and arrival time are required before pickup dispatch.');
 
   const now = new Date().toISOString();
-  const transfer = {
-    ...input.transfer,
-    status: 'supplier_requested',
-    supplier_name: ARRIVAL_TRANSFER_SUPPLIER.name,
-    supplier_email: ARRIVAL_TRANSFER_SUPPLIER.email,
-    flight_number: input.itinerary.flight_number,
-    flight_booking_reference: input.itinerary.booking_reference,
-    flight_arrival_at: input.itinerary.arrival_at,
-    passenger_count: input.itinerary.passenger_count,
-    passenger_names: input.itinerary.passengers,
-    updated_at: now,
-  };
-
-  const result = await sendSupplierEmail({ permitCaseId: input.permit.id, staff: input.staff, transfer });
+  const transfer = { ...input.transfer, status: 'supplier_requested', supplier_name: ARRIVAL_TRANSFER_SUPPLIER.name, supplier_email: ARRIVAL_TRANSFER_SUPPLIER.email, flight_number: input.itinerary.flight_number, flight_booking_reference: input.itinerary.booking_reference, flight_arrival_at: input.itinerary.arrival_at, passenger_count: input.itinerary.passenger_count, passenger_names: input.itinerary.passengers, updated_at: now };
+  const result = await sendSupplierEmail({ staff: input.staff, transfer });
   if (result.status !== 'sent') {
     const status = result.status === 'not_configured' ? 'not_configured' : result.status === 'invalid_recipient' ? 'invalid_recipient' : result.reason;
     await input.client.from('recruitment_arrival_transfers').update({ status: 'failed', last_error: status, updated_at: now }).eq('id', input.transfer.id);
