@@ -8,11 +8,10 @@ export default function EmploymentContractDocument({
   employeeSignatureSlot,
 }: {
   template: ContractTemplate;
-  prefilledFor?: { name: string; email: string };
   /** Replaces the default blank employee signature line - used by the live e-signing page. */
   employeeSignatureSlot?: ReactNode;
 }) {
-  const employeeName = template.editableFields.find((field) => field.label === 'Employee name')?.value || '[Insert employee name]';
+  const employeeName = template.editableFields.find((field) => field.label === 'Employee name')?.value || 'Employee';
   return (
     <EmploymentContractLetterhead>
       <section className="contract-section">
@@ -115,7 +114,7 @@ export default function EmploymentContractDocument({
               <>
                 <div className="signature-line" />
                 <strong>{withPlaceholders(employeeName)}</strong>
-                <small>Dated: [Insert date signed]</small>
+                <small>Date signed: ____________________</small>
               </>
             )}
           </div>
