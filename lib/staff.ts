@@ -120,12 +120,33 @@ export async function createStaffFromApplication(
     updated_at: new Date().toISOString(),
   }).eq('id', applicationId);
 
+  if (effectiveStatus === 'pre_arrival') {
+    const { error: permitError } = await client.from('recruitment_staff_permit_cases').upsert({
+      staff_id: staff.id,
+      status: 'not_started',
+      accommodation_offered: true,
+      accommodation_period_months: 3,
+      accommodation_amount_eur: 4000,
+      accommodation_currency: 'EUR',
+      accommodation_start_date: effectiveStartDate,
+      accommodation_end_date: new Date(new Date(`${effectiveStartDate}T12:00:00Z`).setMonth(new Date(`${effectiveStartDate}T12:00:00Z`).getMonth() + 3)).toISOString().slice(0, 10),
+      accommodation_refund_amount_eur: 4000,
+      accommodation_refund_installments: 4,
+      accommodation_refund_status: 'planned',
+      accommodation_payment_status: 'not_due',
+      work_authorised: false,
+      shift_eligibility: 'blocked',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'staff_id' });
+    if (permitError) console.error(JSON.stringify({ level: 'error', event: 'staff.permit_case_init_failed', staff_id: staff.id, reason: permitError.message }));
+  }
+
   await createStaffNotification(client, {
     staffId: staff.id,
     category: 'welcome',
     title: 'Welcome to the BIMED Staff Portal',
-    body: `Your permanent BIMED staff account is ready for your ${staff.job_title || staff.role || 'BIMED'} position. Your BIMED email is ${staff.email}. Sign in with your BIMED ID or BIMED email after activation. Use Messages to contact BIMED Admin / HR, My Rota for shifts and work requests, Attendance for attendance records, Payslips for payroll records, My Profile for your details and profile photograph, and Notifications for workplace updates.${staff.application_id ? ' Your Onboarding workspace remains available for your recruitment-linked requirements.' : ''}`,
-    actionUrl: '/staff',
+    body: `Your permanent BIMED staff account is ready for your ${staff.job_title || staff.role || 'BIMED'} position. Your BIMED email is ${staff.email}. Sign in with your BIMED ID or BIMED email after activation. Use Messages to contact BIMED Admin / HR, My Rota for shifts and work requests, Attendance for attendance records, Payslips for payroll records, My Profile for your details and profile photograph, and Notifications for workplace updates.${staff.application_id ? ' Your Onboarding workspace remains available for your recruitment-linked requirements.' : ''}${effectiveStatus === 'pre_arrival' ? ' Your employment-permit and accommodation workspace is also available. You are not eligible to take shifts until the required permission to work is confirmed.' : ''}`,
+    actionUrl: effectiveStatus === 'pre_arrival' ? '/staff/permit' : '/staff',
   });
 
   return { staff, activationToken };
