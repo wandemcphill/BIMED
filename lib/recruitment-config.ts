@@ -22,7 +22,7 @@ export const countries = [
   'Finland', 'France', 'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala',
   'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran',
   'Iraq', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kosovo', 'Kuwait', 'Laos',
-  'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
+  'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Madagascar',
   'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico',
   'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia',
   'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea',
@@ -36,8 +36,6 @@ export const countries = [
   'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe', 'Other',
 ] as const;
 
-// One canonical role list powers the candidate form, admin invitation UI and validation.
-// Legacy "Healthcare Worker" invitations are normalized to "Healthcare Assistant" on the server.
 export const recruitmentRoles = CANONICAL_RECRUITMENT_ROLES;
 
 export const recruitmentStatuses = [
@@ -58,7 +56,7 @@ export const candidateStepTitles = [
 
 export const recruitmentStatusGroups = {
   new: ['Submitted'],
-  active: ['Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing', 'Visa/Immigration Processing', 'Onboarding'],
+  active: ['Under Review', 'Interview', 'Selected', 'Offer Issued', 'Documents Awaiting', 'Permit Processing', 'Visa/Immigration Processing', 'Onboarding', 'Hired'],
   closed: ['Rejected', 'Withdrawn'],
 } as const;
 
@@ -95,7 +93,6 @@ export function getResendFromEmail() {
   return `Bimed Healthcare <${configuredValue}>`;
 }
 
-/** Returns true only when all international pathway fields are complete. */
 export function isInternationalCandidate(input: {
   living_in_ireland?: string | null;
   country_of_residence?: string | null;
@@ -105,15 +102,9 @@ export function isInternationalCandidate(input: {
   relocation_readiness?: string | null;
 }) {
   if (input.living_in_ireland !== 'No') return false;
-  return Boolean(
-    input.current_country?.trim() &&
-    input.work_permission?.trim() &&
-    input.requires_employment_permit?.trim() &&
-    input.relocation_readiness?.trim()
-  );
+  return Boolean(input.current_country?.trim() && input.work_permission?.trim() && input.requires_employment_permit?.trim() && input.relocation_readiness?.trim());
 }
 
-/** Routing is based only on the candidate's explicit living-in-Ireland answer. */
 export function isInternationalRoutingCandidate(input: { living_in_ireland?: string | null }) {
   return input.living_in_ireland === 'No';
 }
