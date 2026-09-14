@@ -4,6 +4,8 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendContractSignedNotificationEmails } from '@/lib/email';
 import { getContractSignatureByToken, markContractSignatureSigned } from '@/lib/contract-signature';
+import { createStaffFromApplication } from '@/lib/staff';
+import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 
 type RouteContext = { params: Promise<{ token: string }> };
@@ -76,6 +78,26 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
     });
 
+    let staffProvisioning: { staff: any; activationSent: boolean } | null = null;
+    try {
+      const provisioned = await createStaffFromApplication(client, updated.application_id);
+      if (provisioned.activationToken && provisioned.staff) {
+        const activation = await sendStaffPortalActivationEmail(client, provisioned.staff, provisioned.activationToken);
+        staffProvisioning = { staff: provisioned.staff, activationSent: activation.status === 'sent' };
+      } else if (provisioned.staff) {
+        staffProvisioning = { staff: provisioned.staff, activationSent: false };
+      }
+      await recordRecruitmentAudit(client, {
+        applicationId: updated.application_id,
+        staffId: provisioned.staff?.id,
+        actor: 'system',
+        eventType: 'staff_portal_provisioned_after_contract',
+        metadata: { bimed_id: provisioned.staff?.bimed_id, activation_sent: staffProvisioning?.activationSent || false },
+      });
+    } catch (staffError) {
+      console.error(JSON.stringify({ level: 'error', event: 'staff_portal.provision_failed', application_id: updated.application_id, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
+    }
+
     if (application) {
       await sendContractSignedNotificationEmails(
         {
@@ -88,7 +110,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    return NextResponse.json({ signature: updated });
+    return NextResponse.json({ signature: updated, staffPortal: staffProvisioning ? { bimed_id: staffProvisioning.staff.bimed_id, address: staffProvisioning.staff.portal_address, activationSent: staffProvisioning.activationSent } : null });
   } catch (error) {
     console.error(JSON.stringify({
       level: 'error',
