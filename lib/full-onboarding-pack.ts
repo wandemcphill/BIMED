@@ -3,7 +3,6 @@ import { recruitmentContacts } from '@/lib/recruitment-config';
 import { sendTransactionalEmail, type SendResult } from '@/lib/email/transport';
 
 type Application = { id: string; full_name: string; email: string; role_applied?: string | null };
-
 type Link = { label: string; url: string };
 
 function escapeHtml(value: unknown) {
@@ -30,15 +29,17 @@ export async function sendFullOnboardingPackEmail(input: {
     'BIMED HEALTHCARE', '',
     `Dear ${input.application.full_name},`,
     '',
-    'Your BIMED employment and onboarding pack is ready.',
+    'Your BIMED employment and onboarding documents are ready.',
     `Position: ${input.application.role_applied || 'To be confirmed'}`,
+    '',
+    'Some documents require your signature, while others contain information or forms you need to complete.',
     '',
     ...links.map((link) => `${link.label}: ${link.url}`),
     '',
-    'Please review each document carefully. International candidates should complete the sponsorship and relocation materials supplied by BIMED before travelling.',
+    'Complete the items that request a response and submit them through their private BIMED pages. International candidates should complete the sponsorship and relocation materials before travelling.',
     `Recruitment: ${recruitmentContacts.ireland}`,
   ].join('\n');
-  const html = `<!doctype html><html><body style="margin:0;background:#f3f7f9;font-family:Arial,sans-serif;color:#243039"><div style="max-width:620px;margin:30px auto;background:#fff;border:1px solid #d7e1e6;border-radius:10px;overflow:hidden"><div style="background:#163247;color:#fff;padding:22px 26px"><strong style="font-size:19px">Bimed Healthcare</strong><div style="font-size:12px;color:#a9c4d4;margin-top:4px">Love. Care. Comfort.</div></div><div style="padding:28px"><h1 style="font-size:22px;color:#163247;margin:0 0 16px">Your onboarding documents are ready</h1><p>Dear ${escapeHtml(input.application.full_name)},</p><p>Your BIMED employment and onboarding pack is ready. Please review each document carefully before your start date.</p><p><strong>Position:</strong> ${escapeHtml(input.application.role_applied || 'To be confirmed')}</p>${linkHtml}<div style="background:#e8f4f8;border-left:4px solid #0a8ec6;padding:14px;margin-top:22px"><strong>Important:</strong> International candidates should complete the sponsorship and relocation materials supplied by BIMED before travelling. Immigration, tax and legal decisions remain subject to the relevant authorities and approved BIMED guidance.</div><p style="font-size:12px;color:#66717a;margin-top:22px">Never send passwords, PINs, banking security codes or one-time authentication codes by email.</p><p>Kind regards,<br/>Bimed Healthcare Recruitment Team</p></div><div style="padding:18px 26px;border-top:1px solid #d7e1e6;font-size:12px;color:#66717a">Bimed Healthcare Limited · Dublin, Ireland<br/>Recruitment: ${escapeHtml(recruitmentContacts.ireland)} · Admin: ${escapeHtml(recruitmentContacts.admin)}</div></div></body></html>`;
+  const html = `<!doctype html><html><body style="margin:0;background:#f3f7f9;font-family:Arial,sans-serif;color:#243039"><div style="max-width:620px;margin:30px auto;background:#fff;border:1px solid #d7e1e6;border-radius:10px;overflow:hidden"><div style="background:#163247;color:#fff;padding:22px 26px"><strong style="font-size:19px">Bimed Healthcare</strong><div style="font-size:12px;color:#a9c4d4;margin-top:4px">Love. Care. Comfort.</div></div><div style="padding:28px"><h1 style="font-size:22px;color:#163247;margin:0 0 16px">Your onboarding documents are ready</h1><p>Dear ${escapeHtml(input.application.full_name)},</p><p>Your BIMED employment and onboarding documents are ready. Some require your signature, while others contain information or forms you need to complete.</p><p><strong>Position:</strong> ${escapeHtml(input.application.role_applied || 'To be confirmed')}</p>${linkHtml}<div style="background:#e8f4f8;border-left:4px solid #0a8ec6;padding:14px;margin-top:22px"><strong>Important:</strong> International candidates should complete the sponsorship and relocation materials before travelling. Immigration, tax and legal decisions remain subject to the relevant authorities and approved BIMED guidance.</div><p style="font-size:12px;color:#66717a;margin-top:22px">Never send passwords, PINs, banking security codes or one-time authentication codes by email.</p><p>Kind regards,<br/>Bimed Healthcare Recruitment Team</p></div><div style="padding:18px 26px;border-top:1px solid #d7e1e6;font-size:12px;color:#66717a">Bimed Healthcare Limited · Dublin, Ireland<br/>Recruitment: ${escapeHtml(recruitmentContacts.ireland)} · Admin: ${escapeHtml(recruitmentContacts.admin)}</div></div></body></html>`;
   return sendTransactionalEmail({
     to: input.application.email,
     content: { subject, html, text },
