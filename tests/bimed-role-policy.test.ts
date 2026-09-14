@@ -7,6 +7,7 @@ import {
   BIMED_DEFAULT_PROBATION,
   BIMED_DEFAULT_START_DATE,
   applyBimedContractDefaults,
+  applyBimedJobDescriptionDefaults,
   CANONICAL_RECRUITMENT_ROLES,
   normalizeRecruitmentRole,
   recruitmentRoleSlug,
@@ -45,6 +46,13 @@ describe('BIMED role policy', () => {
     const resolved = applyBimedContractDefaults(template);
     const field = (label: string) => resolved.editableFields.find((item) => item.label === label)?.value;
     const probation = resolved.sections.find((section) => section.heading === '2. Commencement of Employment and Probation')?.paragraphs.join('\n') || '';
+    const schedule2 = resolved.schedules.find((section) => section.heading === 'Schedule 2 - Job Description')?.paragraphs.join('\n') || '';
+    const allContractText = [
+      ...resolved.editableFields.map((item) => item.value),
+      ...resolved.sections.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
+      ...resolved.schedules.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
+      resolved.closingNote,
+    ].join('\n');
 
     expect(field('Line manager')).toBe(BIMED_DEFAULT_LINE_MANAGER);
     expect(field('Start date')).toBe(BIMED_DEFAULT_START_DATE);
@@ -54,6 +62,42 @@ describe('BIMED role policy', () => {
     expect(probation).not.toContain('first 6 months of your employment');
     expect(field('Contracted hours')).toBe('39 hours per week');
     expect(field('Pay')).toContain('EUR 32,691');
+    expect(schedule2).toContain('Job title: Healthcare Assistant');
+    expect(schedule2).toContain(`Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`);
+    expect(schedule2).not.toContain('[insert]');
+    expect(allContractText).not.toMatch(/\[[^\]]+\]/);
+  });
+
+  it('resolves employee-specific placeholders when preparing a candidate contract', () => {
+    const template = getContractTemplate('support-worker');
+    if (!template) throw new Error('Support Worker template missing');
+
+    const resolved = applyBimedContractDefaults(template, {
+      employeeName: 'Gabriel Oliveira de Lima',
+      employeeAddress: 'Example residential address, Dublin',
+      startDate: '2027-01-11',
+    });
+    const allContractText = [
+      ...resolved.editableFields.map((item) => item.value),
+      ...resolved.sections.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
+      ...resolved.schedules.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
+      resolved.closingNote,
+    ].join('\n');
+
+    expect(allContractText).toContain('Gabriel Oliveira de Lima');
+    expect(allContractText).toContain('Example residential address, Dublin');
+    expect(allContractText).toContain('11 January 2027');
+    expect(allContractText).not.toMatch(/\[[^\]]+\]/);
+  });
+
+  it('resolves the reporting line in job descriptions', () => {
+    const template = getJobDescriptionTemplate('healthcare-assistant');
+    if (!template) throw new Error('Healthcare Assistant job description missing');
+
+    const resolved = applyBimedJobDescriptionDefaults(template);
+    const roleSummary = resolved.sections.find((section) => section.heading === 'Role Summary');
+    expect(roleSummary?.paragraphs).toContain(`Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`);
+    expect(roleSummary?.paragraphs.join('\n')).not.toContain('[Insert line manager name/title]');
   });
 
   it('preserves Physiotherapist-specific hours, pay and registration requirements', () => {
