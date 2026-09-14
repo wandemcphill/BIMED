@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStaffSession } from '@/lib/staff-auth';
 import { db } from '@/lib/db';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
-import { createVirtualFlightItinerary, getHomeDepartureAirport } from '@/lib/live-flight-travel';
+import { createVirtualFlightItinerary } from '@/lib/live-flight-travel';
+import { resolveWorldwideHomeAirport } from '@/lib/worldwide-home-airport';
 
 function getDate(value: unknown) {
   const date = typeof value === 'string' ? value : '';
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
   ]);
   if (!permit) return NextResponse.json({ error: 'Overseas permit case not initialized.' }, { status: 404 });
   try {
-    const origin = getHomeDepartureAirport(String(application?.country_of_residence || ''));
+    const origin = await resolveWorldwideHomeAirport(String(application?.country_of_residence || ''));
     const { data: saved } = await client.from('recruitment_flight_itineraries').select('*').eq('permit_case_id', permit.id).maybeSingle();
     return NextResponse.json({ homeCountry: application?.country_of_residence || null, origin, destination: { code: 'DUB', name: 'Dublin Airport', country: 'Ireland' }, permit, itinerary: saved || null });
   } catch (error) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     const travelDate = getDate(body?.travel_date);
     const passengers = Array.isArray(body?.passengers) ? body.passengers.slice(0, 3).map((passenger: any) => ({ full_name: String(passenger?.full_name || '').trim(), date_of_birth: String(passenger?.date_of_birth || '').trim() })) : [];
     if (!application?.country_of_residence) throw new Error('Your home country is missing from the recruitment profile. BIMED must update it before a travel itinerary can be generated.');
-    const origin = getHomeDepartureAirport(application.country_of_residence);
+    const origin = await resolveWorldwideHomeAirport(application.country_of_residence);
     const result = await createVirtualFlightItinerary({ client, staff, permit, origin, travelDate, passengers });
     await createStaffNotification(client, { staffId: staff.id, category: 'travel', title: 'Virtual Dublin flight itinerary created', body: `BIMED generated a live-price economy flight itinerary from ${origin.code} to Dublin for ${travelDate}. The itinerary has been sent to Overseas Recruitment for future booking after visa clearance.`, actionUrl: '/staff/travel' });
     await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'flight_virtual_itinerary_created', metadata: { origin: origin.code, destination: 'DUB', travel_date: travelDate, passenger_count: passengers.length, total_amount: result.generated.total_amount, currency: result.generated.currency, provider: 'Duffel live flight offers' } });
