@@ -43,10 +43,12 @@ async function sendSupplierEmail(input: { staff: any; transfer: any }) {
 }
 
 export async function dispatchArrivalTransfer(input: { client: SupabaseClient; staff: any; permit: any; itinerary: any; transfer: any; actor: string }) {
-  // Supplier dispatch remains server-side and only exposes operational details to the supplier.
   if (!input.itinerary || input.itinerary.booking_status !== 'booked') throw new Error('Book the flight and save the confirmed flight details before dispatching the airport pickup.');
   if (!input.transfer.destination_address?.trim()) throw new Error('Set the BIMED accommodation address before dispatching the airport pickup.');
   if (!input.itinerary.flight_number?.trim() || !input.itinerary.arrival_at) throw new Error('Confirmed flight number and arrival time are required before pickup dispatch.');
+  if (input.transfer.supplier_request_message_id || ['supplier_requested','supplier_confirmed','driver_assigned','en_route','arrived','completed'].includes(input.transfer.status)) {
+    throw new Error('This airport pickup has already been dispatched or progressed. Use the pickup status controls instead of sending another supplier request.');
+  }
 
   const now = new Date().toISOString();
   const transfer = { ...input.transfer, status: 'supplier_requested', supplier_name: ARRIVAL_TRANSFER_SUPPLIER.name, supplier_email: ARRIVAL_TRANSFER_SUPPLIER.email, flight_number: input.itinerary.flight_number, flight_booking_reference: input.itinerary.booking_reference, flight_arrival_at: input.itinerary.arrival_at, passenger_count: input.itinerary.passenger_count, passenger_names: input.itinerary.passengers, updated_at: now };
