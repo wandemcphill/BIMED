@@ -16,11 +16,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const { data: application } = await client.from('recruitment_applications').select('id, full_name, living_in_ireland').eq('id', id).maybeSingle();
   if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
   const { data: access, error } = await client.from('recruitment_document_packet_access')
-    .select('id, packet_slug, created_by, issued_at, expires_at, viewed_at, revoked_at, created_at')
+    .select('id, packet_slug, created_by, issued_at, expires_at, viewed_at, revoked_at, created_at, response_data, last_saved_at, completed_at')
     .eq('application_id', id).order('issued_at', { ascending: false });
   if (error) return NextResponse.json({ error: 'Unable to load packet history.' }, { status: 500 });
   const international = isInternationalRoutingCandidate(application);
-  const required = packetList(international).map((packet) => packet.slug);
+  const required = packetList(international).filter((packet) => packet.onboardingEmail !== false).map((packet) => packet.slug);
   return NextResponse.json({
     application: { id: application.id, full_name: application.full_name, international },
     required,
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
   const international = isInternationalRoutingCandidate(application);
   const packet = PACKETS[packetSlug as PacketSlug];
+  if (!packet.candidateVisible) return NextResponse.json({ error: 'This document is internal and cannot be issued to a candidate.' }, { status: 400 });
   if (packet.internationalOnly && !international) return NextResponse.json({ error: 'This packet is restricted to international candidates.' }, { status: 400 });
 
   const result = await createPacketAccess(id, packetSlug as PacketSlug, session.email);
