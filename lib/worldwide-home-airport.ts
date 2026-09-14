@@ -30,8 +30,7 @@ const FIXED: Record<string, Airport> = {
   MX: { code: 'MEX', name: 'Mexico City International Airport', city: 'Mexico City', country_code: 'MX', country_name: 'Mexico' },
   TR: { code: 'IST', name: 'Istanbul Airport', city: 'Istanbul', country_code: 'TR', country_name: 'Türkiye' },
   EG: { code: 'CAI', name: 'Cairo International Airport', city: 'Cairo', country_code: 'EG', country_name: 'Egypt' },
-  MA: { code: 'CMN', name: 'Mohammed V International Airport', city: 'Casablanca', country_code: 'MA', country_name: 'Morocco' },
-  NG: { code: 'LOS', name: 'Murtala Muhammed International Airport', city: 'Lagos', country_code: 'NG', country_name: 'Nigeria' }
+  MA: { code: 'CMN', name: 'Mohammed V International Airport', city: 'Casablanca', country_code: 'MA', country_name: 'Morocco' }
 };
 
 const ALIASES: Record<string, string> = {
@@ -39,23 +38,49 @@ const ALIASES: Record<string, string> = {
 };
 
 function csv(line: string) {
-  const cells: string[] = []; let current = ''; let quote = false;
-  for (let i = 0; i < line.length; i += 1) { const ch = line[i]; if (ch === '"') { if (quote && line[i + 1] === '"') { current += '"'; i += 1; } else quote = !quote; continue; } if (ch === ',' && !quote) { cells.push(current); current = ''; continue; } current += ch; } cells.push(current); return cells;
+  const cells: string[] = [];
+  let current = '';
+  let quote = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (quote && line[i + 1] === '"') { current += '"'; i += 1; }
+      else quote = !quote;
+      continue;
+    }
+    if (ch === ',' && !quote) { cells.push(current); current = ''; continue; }
+    current += ch;
+  }
+  cells.push(current);
+  return cells;
 }
 
 let cache: { at: number; airports: Airport[] } | null = null;
+
 async function directory() {
   if (cache && Date.now() - cache.at < 24 * 60 * 60 * 1000) return cache.airports;
   const response = await fetch(DIRECTORY_URL, { cache: 'force-cache' });
   if (!response.ok) throw new Error('Unable to load the global airport directory.');
   const lines = (await response.text()).split(/\r?\n/).filter(Boolean);
-  const headers = csv(lines.shift() || '').map((value) => value.trim()); const index = new Map(headers.map((name, i) => [name, i])); const rows: Airport[] = [];
-  for (const line of lines) { const row = csv(line); const code = row[index.get('iata_code') ?? -1] || ''; const country = row[index.get('iso_country') ?? -1] || ''; const type = row[index.get('type') ?? -1] || ''; const scheduled = row[index.get('scheduled_service') ?? -1] || ''; if (!code || !country || scheduled === 'no' || !['large_airport','medium_airport'].includes(type)) continue; rows.push({ code, name: row[index.get('name') ?? -1] || code, city: row[index.get('municipality') ?? -1] || code, country_code: country, country_name: country }); }
-  cache = { at: Date.now(), airports: rows }; return rows;
+  const headers = csv(lines.shift() || '').map((value) => value.trim());
+  const index = new Map(headers.map((name, i) => [name, i]));
+  const rows: Airport[] = [];
+  for (const line of lines) {
+    const row = csv(line);
+    const code = row[index.get('iata_code') ?? -1] || '';
+    const country = row[index.get('iso_country') ?? -1] || '';
+    const type = row[index.get('type') ?? -1] || '';
+    const scheduled = row[index.get('scheduled_service') ?? -1] || '';
+    if (!code || !country || scheduled === 'no' || !['large_airport', 'medium_airport'].includes(type)) continue;
+    rows.push({ code, name: row[index.get('name') ?? -1] || code, city: row[index.get('municipality') ?? -1] || code, country_code: country, country_name: country });
+  }
+  cache = { at: Date.now(), airports: rows };
+  return rows;
 }
 
 export async function resolveWorldwideHomeAirport(countryValue: string): Promise<Airport> {
-  const normalized = countryValue.trim(); const code = /^[A-Za-z]{2}$/.test(normalized) ? normalized.toUpperCase() : ALIASES[normalized.toLowerCase()];
+  const normalized = countryValue.trim();
+  const code = /^[A-Za-z]{2}$/.test(normalized) ? normalized.toUpperCase() : ALIASES[normalized.toLowerCase()];
   if (!code) throw new Error('BIMED could not identify the candidate home country.');
   if (FIXED[code]) return FIXED[code];
   const airports = (await directory()).filter((airport) => airport.country_code === code).sort((a, b) => a.name.localeCompare(b.name));

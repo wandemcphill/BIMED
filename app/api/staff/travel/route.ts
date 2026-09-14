@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStaffSession } from '@/lib/staff-auth';
 import { db } from '@/lib/db';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
-import { createVirtualFlightItinerary } from '@/lib/live-flight-travel';
+import { submitFlightTravelRequest } from '@/lib/flight-travel-request';
 import { resolveWorldwideHomeAirport } from '@/lib/worldwide-home-airport';
 
 function getDate(value: unknown) {
@@ -29,16 +30,19 @@ export async function GET(request: NextRequest) {
   if (!permit) return NextResponse.json({ error: 'Overseas permit case not initialized.' }, { status: 404 });
   try {
     const origin = await resolveWorldwideHomeAirport(String(application?.country_of_residence || ''));
-    const { data: saved } = await client.from('recruitment_flight_itineraries').select('*').eq('permit_case_id', permit.id).maybeSingle();
-    return NextResponse.json({ homeCountry: application?.country_of_residence || null, origin, destination: { code: 'DUB', name: 'Dublin Airport', country: 'Ireland' }, permit, itinerary: saved || null });
+    const { data: saved } = await client.from('recruitment_flight_itineraries').select('id,permit_case_id,route,departure_airport_code,departure_airport_name,destination_airport_code,destination_airport_name,travel_date,passenger_count,cabin_class,passengers,status,airline_note,change_notice_hours,baggage_note,airport_pickup_included,booking_status,airline,flight_number,booking_reference,arrival_at,booked_at').eq('permit_case_id', permit.id).maybeSingle();
+    const { data: pickup } = await client.from('recruitment_arrival_transfers').select('status,pickup_airport_code,destination_name,supplier_name,supplier_confirmed_at,driver_name,driver_phone,vehicle_description,driver_meet_point').eq('permit_case_id', permit.id).maybeSingle();
+    return NextResponse.json({ homeCountry: application?.country_of_residence || null, origin, destination: { code: 'DUB', name: 'Dublin Airport', country: 'Ireland' }, permit, itinerary: saved || null, pickup: pickup || null });
   } catch (error) {
-    return NextResponse.json({ homeCountry: application?.country_of_residence || null, origin: null, destination: { code: 'DUB', name: 'Dublin Airport', country: 'Ireland' }, permit, itinerary: null, warning: error instanceof Error ? error.message : 'Unable to resolve the home-country airport.' });
+    return NextResponse.json({ homeCountry: application?.country_of_residence || null, origin: null, destination: { code: 'DUB', name: 'Dublin Airport', country: 'Ireland' }, permit, itinerary: null, pickup: null, warning: error instanceof Error ? error.message : 'Unable to resolve the home-country airport.' });
   }
 }
 
 export async function POST(request: NextRequest) {
   const session = await getStaffSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+  const limiter = await checkRateLimit({ key: `staff-travel-submit:${session.staff_id}`, limit: 10, windowMs: 60 * 60 * 1000, request });
+  if (!limiter.allowed) return NextResponse.json({ error: 'Travel requests are temporarily rate-limited. Please try again later.' }, { status: 429, headers: { 'Retry-After': String(limiter.retryAfterSeconds || 60) } });
   const body = await request.json().catch(() => null) as any;
   const client = db();
   const { data: staff } = await client.from('recruitment_staff').select('id,full_name,bimed_id,status,application_id').eq('id', session.staff_id).maybeSingle();
@@ -51,13 +55,13 @@ export async function POST(request: NextRequest) {
   try {
     const travelDate = getDate(body?.travel_date);
     const passengers = Array.isArray(body?.passengers) ? body.passengers.slice(0, 3).map((passenger: any) => ({ full_name: String(passenger?.full_name || '').trim(), date_of_birth: String(passenger?.date_of_birth || '').trim() })) : [];
-    if (!application?.country_of_residence) throw new Error('Your home country is missing from the recruitment profile. BIMED must update it before a travel itinerary can be generated.');
+    if (!application?.country_of_residence) throw new Error('Your home country is missing from the recruitment profile. BIMED must update it before a travel request can be submitted.');
     const origin = await resolveWorldwideHomeAirport(application.country_of_residence);
-    const result = await createVirtualFlightItinerary({ client, staff, permit, origin, travelDate, passengers });
-    await createStaffNotification(client, { staffId: staff.id, category: 'travel', title: 'Virtual Dublin flight itinerary created', body: `BIMED generated a live-price economy flight itinerary from ${origin.code} to Dublin for ${travelDate}. The itinerary has been sent to Overseas Recruitment for future booking after visa clearance.`, actionUrl: '/staff/travel' });
-    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'flight_virtual_itinerary_created', metadata: { origin: origin.code, destination: 'DUB', travel_date: travelDate, passenger_count: passengers.length, total_amount: result.generated.total_amount, currency: result.generated.currency, provider: 'Duffel live flight offers' } });
+    const result = await submitFlightTravelRequest({ client, staff, permit, origin, travelDate, passengers });
+    await createStaffNotification(client, { staffId: staff.id, category: 'travel', title: 'Travel request sent to BIMED', body: `Your economy travel request from ${origin.code} to Dublin for ${travelDate} has been sent to Overseas Recruitment. BIMED will handle the actual flight booking and airport pickup after clearance.`, actionUrl: '/staff/travel' });
+    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'flight_travel_request_submitted', metadata: { origin: origin.code, destination: 'DUB', travel_date: travelDate, passenger_count: passengers.length, provider: 'BIMED booking workflow' } });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to create the virtual flight itinerary.' }, { status: 400 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to submit the travel request.' }, { status: 400 });
   }
 }

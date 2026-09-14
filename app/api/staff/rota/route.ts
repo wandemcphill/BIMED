@@ -4,11 +4,14 @@ import { db } from '@/lib/db';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 
 async function getShiftEligibility(client: ReturnType<typeof db>, staffId: string) {
-  const { data } = await client.from('recruitment_staff_permit_cases').select('work_authorised,shift_eligibility').eq('staff_id', staffId).maybeSingle();
-  if (!data) return { eligible: true, reason: null as string | null };
-  if (data.shift_eligibility !== 'eligible' || !data.work_authorised) {
-    return { eligible: false, reason: 'Your overseas employment permit/work-authorisation journey is not yet complete. Staff Portal access is available for onboarding, but shifts remain blocked until BIMED confirms your right to work.' };
-  }
+  const [{ data: staff }, { data: permit }] = await Promise.all([
+    client.from('recruitment_staff').select('status').eq('id', staffId).maybeSingle(),
+    client.from('recruitment_staff_permit_cases').select('work_authorised,shift_eligibility').eq('staff_id', staffId).maybeSingle(),
+  ]);
+  if (!staff) return { eligible: false, reason: 'Your BIMED staff record could not be found.' };
+  if (staff.status !== 'active') return { eligible: false, reason: 'Shift requests are available only to active BIMED staff. Your Staff Portal remains available for the functions appropriate to your current status.' };
+  if (!permit) return { eligible: true, reason: null as string | null };
+  if (permit.shift_eligibility !== 'eligible' || !permit.work_authorised) return { eligible: false, reason: 'Your overseas employment permit/work-authorisation journey is not yet complete. Staff Portal access is available for onboarding, but shifts remain blocked until BIMED confirms your right to work.' };
   return { eligible: true, reason: null as string | null };
 }
 
@@ -40,18 +43,8 @@ export async function GET(request: NextRequest) {
   if (swapFor) {
     if (!eligibility.eligible) return NextResponse.json({ error: eligibility.reason }, { status: 403 });
     const { data: ownShift } = await client.from('recruitment_workforce_shifts').select('id,staff_id,status,start_at').eq('id', swapFor).single();
-    if (!ownShift || ownShift.staff_id !== session.staff_id || !['assigned', 'confirmed'].includes(ownShift.status) || new Date(ownShift.start_at).getTime() <= Date.now()) {
-      return NextResponse.json({ error: 'That shift is not eligible for swapping.' }, { status: 409 });
-    }
-    const { data, error } = await client
-      .from('recruitment_workforce_shifts')
-      .select('id,shift_date,start_at,end_at,shift_type,role,location,status,staff:recruitment_staff(id,bimed_id,full_name,preferred_name,role,profile_photo_path)')
-      .neq('staff_id', session.staff_id)
-      .in('status', ['assigned', 'confirmed'])
-      .gt('start_at', new Date().toISOString())
-      .order('shift_date', { ascending: true })
-      .order('start_at', { ascending: true })
-      .limit(100);
+    if (!ownShift || ownShift.staff_id !== session.staff_id || !['assigned', 'confirmed'].includes(ownShift.status) || new Date(ownShift.start_at).getTime() <= Date.now()) return NextResponse.json({ error: 'That shift is not eligible for swapping.' }, { status: 409 });
+    const { data, error } = await client.from('recruitment_workforce_shifts').select('id,shift_date,start_at,end_at,shift_type,role,location,status,staff:recruitment_staff(id,bimed_id,full_name,preferred_name,role,profile_photo_path)').neq('staff_id', session.staff_id).in('status', ['assigned', 'confirmed']).gt('start_at', new Date().toISOString()).order('shift_date', { ascending: true }).order('start_at', { ascending: true }).limit(100);
     if (error) return NextResponse.json({ error: 'Unable to load swap options.' }, { status: 500 });
     swapCandidates = data || [];
   }
@@ -67,9 +60,7 @@ export async function POST(request: NextRequest) {
   const client = db();
   const eligibility = await getShiftEligibility(client, session.staff_id);
 
-  if (['request_shift','request_cancellation','request_swap'].includes(body.action || '') && !eligibility.eligible) {
-    return NextResponse.json({ error: eligibility.reason }, { status: 403 });
-  }
+  if (['request_shift','request_cancellation','request_swap','request_leave'].includes(body.action || '') && !eligibility.eligible) return NextResponse.json({ error: eligibility.reason }, { status: 403 });
 
   if (body.action === 'request_shift') {
     if (!body.shiftId) return NextResponse.json({ error: 'shiftId is required.' }, { status: 400 });
