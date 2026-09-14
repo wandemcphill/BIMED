@@ -58,7 +58,6 @@ beforeEach(() => {
 describe('session token signing', () => {
   it('round-trips a session it just issued', () => {
     const session = verifyAdminSessionToken(validToken());
-
     expect(session).not.toBeNull();
     expect(session!.email).toBe(LIVE_ADMIN.email);
     expect(session!.session_version).toBe(1);
@@ -74,7 +73,6 @@ describe('session token signing', () => {
     const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     decoded.session_version = 99;
     const forged = Buffer.from(JSON.stringify(decoded)).toString('base64url');
-
     expect(verifyAdminSessionToken(`${forged}.${signature}`)).toBeNull();
   });
 
@@ -101,7 +99,7 @@ describe('session token signing', () => {
     expect(verifyAdminSessionToken(validToken({ role: 'viewer' }))).toBeNull();
   });
 
-  it('accepts a known future delegated role at token-validation time', () => {
+  it('accepts a known delegated role at token-validation time', () => {
     expect(verifyAdminSessionToken(validToken({ role: 'finance' }))).not.toBeNull();
   });
 
@@ -193,6 +191,18 @@ describe('revocation and RBAC against the live admin record', () => {
     expect(await getAdminSession(requestWithToken(token, '/api/admin/permit'))).not.toBeNull();
     expect(await getAdminSession(requestWithToken(token, '/api/admin/applications/123'))).not.toBeNull();
     expect(await getAdminSession(requestWithToken(token, '/api/admin/payslips'))).toBeNull();
+  });
+
+  it('blocks finance from staff permit case routes', async () => {
+    seed({ role: 'finance' });
+    const token = validToken({ role: 'finance' });
+    expect(await getAdminSession(requestWithToken(token, '/api/admin/staff/staff-1/permit'))).toBeNull();
+  });
+
+  it('blocks international recruitment from staff payroll routes', async () => {
+    seed({ role: 'international_recruitment' });
+    const token = validToken({ role: 'international_recruitment' });
+    expect(await getAdminSession(requestWithToken(token, '/api/admin/staff/staff-1/billing'))).toBeNull();
   });
 
   it('fails closed for unknown admin API routes for delegated roles', async () => {
