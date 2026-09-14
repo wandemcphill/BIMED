@@ -1,8 +1,6 @@
 # BIMED Care in Ireland Handbook
 
-**Audience:** New healthcare support workers and care staff  
-**Purpose:** Orientation to safe, person-centred practice in the Irish care environment  
-**Status:** Controlled training/induction source. BIMED policy and applicable Irish law take precedence.
+This handbook introduces safe, person-centred practice expected in the Irish care environment. BIMED policies, role-specific training, care plans, and applicable Irish law take precedence.
 
 ## 1. The BIMED standard
 
@@ -29,18 +27,14 @@ If you observe or receive a concern:
 1. Make sure there is no immediate danger and seek urgent help where needed.
 2. Listen calmly without promising secrecy.
 3. Record factual observations and, where appropriate, the person's own words.
-4. Report through BIMED's approved safeguarding/escalation route without delay.
+4. Report through BIMED's approved safeguarding and escalation route without delay.
 5. Do not investigate allegations yourself unless specifically authorised to do so.
-
-Never ignore a concern because you are unsure whether it is significant enough. Escalate and let the appropriate person assess it.
 
 ## 4. Recognising changes in health and wellbeing
 
-A care worker is not expected to diagnose. Your responsibility is to notice relevant changes, provide the support authorised by the care plan, and escalate appropriately.
+A care worker is not expected to diagnose. Notice relevant changes, provide the support authorised by the care plan, and escalate appropriately.
 
-Examples that may require escalation include a significant change in alertness, breathing, mobility, behaviour, intake, pain, skin condition, mood, or general presentation.
-
-When describing a concern, use clear observations: what you saw, what the person reported, when it happened, and what action you took.
+Examples include significant changes in alertness, breathing, mobility, behaviour, intake, pain, skin condition, mood, or general presentation.
 
 ## 5. Infection prevention
 
@@ -50,25 +44,17 @@ Do not improvise beyond your training. Ask your supervisor when a situation is u
 
 ## 6. Medication boundaries
 
-Only undertake medication-related tasks that you are authorised, trained, and assessed to perform under BIMED's policy and the person's care arrangements. Never guess a dose, change instructions independently, or administer a medication outside your authorisation.
+Only undertake medication-related tasks that you are authorised, trained, and assessed to perform. Never guess a dose, change instructions independently, or administer medication outside your authorisation.
 
 ## 7. Manual handling and falls
 
-Use the person's approved moving-and-handling plan and available equipment. Do not attempt a manoeuvre that is outside your training or the documented plan.
+Use the person's approved moving-and-handling plan and available equipment. Do not attempt a manoeuvre outside your training or the documented plan.
 
 Report falls, near misses, equipment problems, and changes in mobility through the approved incident route.
 
 ## 8. Confidentiality
 
-Protect service-user information at all times.
-
-Never:
-
-- Discuss service users in public places.
-- Photograph records or care information using a personal device unless explicitly authorised by policy.
-- Share passwords or access codes.
-- Leave records visible to unauthorised people.
-- Post workplace or service-user information on social media.
+Protect service-user information at all times. Never discuss service users in public places, share passwords or access codes, leave records visible to unauthorised people, or post workplace or service-user information on social media.
 
 ## 9. Professional boundaries
 
@@ -78,13 +64,9 @@ Be warm, respectful, and supportive without becoming personally dependent on a s
 
 Good handover is factual, relevant, timely, and respectful. Report changes and concerns rather than assuming someone else has noticed them.
 
-When communication barriers exist, use approved supports and reasonable adjustments. Never ridicule or dismiss a person because communication is difficult.
-
 ## 11. Equality, dignity and cultural awareness
 
-Treat people fairly and with respect. Be aware that language, customs, food, family structures, disability, age, gender, faith, and personal identity can affect how a person experiences care.
-
-Ask rather than assume.
+Treat people fairly and with respect. Ask rather than assume when language, customs, food, family structures, disability, age, faith, or personal identity may affect the person's experience of care.
 
 ## 12. Recording and documentation
 
@@ -92,7 +74,7 @@ Records should be accurate, contemporaneous, objective, and relevant. Avoid spec
 
 ## 13. Escalation mindset
 
-When something does not look right, pause and escalate. The safest worker is not the one who never asks for help; it is the one who recognises the boundary of their role and acts early.
+When something does not look right, pause and escalate. Recognise the boundary of your role and act early when you need help.
 
 ## 14. Induction expectations
 
@@ -109,7 +91,3 @@ Discuss these with your supervisor:
 - What tasks am I authorised and competent to perform?
 - What documentation must I complete on every shift?
 - What should I do if a care plan does not match what I observe?
-
-**Employee:** __________________________  
-**Supervisor:** __________________________  
-**Date:** __________________________
