@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendApplicationStatusUpdateEmails } from '@/lib/email';
+import { applicationStatusUpdateEmail } from '@/lib/email/templates';
+import { sendTransactionalEmail } from '@/lib/email/transport';
 import { MAX_JSON_BYTES, readJsonBody, validateAdminApplicationPatch } from '@/lib/request-validation';
 import { createSignedAudioUrl, INTERVIEW_AUDIO_BUCKET } from '@/lib/interview-audio';
 import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
@@ -60,6 +62,31 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { data: before } = await client.from('recruitment_applications').select('status').eq('id', applicationId).maybeSingle();
   const previousStatus = before?.status || null;
 
+  let staffIdentity: { bimed_id: string; activationUrl: string | null } | null = null;
+  if (body.status === 'Hired') {
+    try {
+      const result = await createStaffFromApplication(client, applicationId);
+      const origin = new URL(request.url).origin;
+      staffIdentity = {
+        bimed_id: result.staff.bimed_id,
+        activationUrl: result.activationToken
+          ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}`
+          : null,
+      };
+      await createStaffAudit(client, {
+        staffId: result.staff.id,
+        actor: session.email,
+        eventType: 'recruitment_hired_to_staff',
+        metadata: { application_id: applicationId, recruitment_status: 'Hired' },
+      });
+    } catch (staffError) {
+      return NextResponse.json(
+        { error: staffError instanceof Error ? staffError.message : 'Unable to promote this candidate to BIMED staff.' },
+        { status: 400 }
+      );
+    }
+  }
+
   const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
   if (body.status) updatePayload.status = body.status;
   if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
@@ -77,14 +104,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     metadata: { status: body.status || data.status, previous_status: previousStatus, notes_updated: body.notes !== undefined },
   });
 
-  let staffIdentity: { bimed_id: string; activationUrl: string | null } | null = null;
   if (body.status && ['Selected', 'Offer Issued', 'Onboarding'].includes(body.status)) {
     try {
       const result = await createStaffFromApplication(client, applicationId);
       const origin = new URL(request.url).origin;
       staffIdentity = {
         bimed_id: result.staff.bimed_id,
-        activationUrl: result.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}` : null,
+        activationUrl: result.activationToken
+          ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}`
+          : null,
       };
       await createStaffAudit(client, { staffId: result.staff.id, actor: session.email, eventType: 'recruitment_status_linked_to_staff', metadata: { application_id: applicationId, recruitment_status: body.status } });
     } catch (staffError) {
@@ -103,6 +131,30 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         notifyCandidate: body.notify_candidate !== false,
       }, client);
       statusEmail = emails.candidate;
+
+      if (body.status === 'Hired') {
+        const origin = new URL(request.url).origin;
+        const loginUrl = `${origin}/staff/login`;
+        const nextSteps = staffIdentity?.activationUrl
+          ? `Your BIMED employee account is ready. Use this secure one-time activation link to set your password and access the Employee Dashboard: ${staffIdentity.activationUrl}`
+          : `Your BIMED employee account is active. Sign in to the Employee Dashboard here: ${loginUrl}`;
+
+        statusEmail = await sendTransactionalEmail({
+          to: data.email,
+          content: applicationStatusUpdateEmail({
+            candidateName: data.full_name,
+            role: data.role_applied,
+            applicationId: data.id,
+            status: 'Hired',
+            nextSteps,
+          }),
+          emailType: 'application_status_update',
+          dedupeKey: `staff_activation:${data.id}:${new Date().toISOString().slice(0, 13)}`,
+          applicationId: data.id,
+          client,
+          replyTo: 'recruitment@bimedhealthcare.com',
+        });
+      }
     } catch (emailError) {
       console.error(JSON.stringify({ level: 'error', event: 'email.status_update_unhandled', application_id: applicationId, reason: emailError instanceof Error ? emailError.message : 'unknown' }));
     }
