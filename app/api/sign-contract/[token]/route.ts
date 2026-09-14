@@ -23,27 +23,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!bodyResult.ok) return NextResponse.json({ error: bodyResult.error }, { status: 400 });
   const body = bodyResult.data as Record<string, unknown>;
   const signedName = body.signed_name;
-  if (typeof signedName !== 'string' || !signedName.trim() || signedName.trim().length > 200) {
-    return NextResponse.json({ error: 'A valid signed_name is required.' }, { status: 400 });
-  }
+  if (typeof signedName !== 'string' || !signedName.trim() || signedName.trim().length > 200) return NextResponse.json({ error: 'A valid signed_name is required.' }, { status: 400 });
 
   const corrections: { employeeName?: string; employeeAddress?: string; startDate?: string } = {};
   if (body.employee_name !== undefined) {
-    if (typeof body.employee_name !== 'string' || !body.employee_name.trim() || body.employee_name.length > 200) {
-      return NextResponse.json({ error: 'employee_name must be a non-empty string.' }, { status: 400 });
-    }
+    if (typeof body.employee_name !== 'string' || !body.employee_name.trim() || body.employee_name.length > 200) return NextResponse.json({ error: 'employee_name must be a non-empty string.' }, { status: 400 });
     corrections.employeeName = body.employee_name.trim();
   }
   if (body.employee_address !== undefined) {
-    if (typeof body.employee_address !== 'string' || body.employee_address.length > 500) {
-      return NextResponse.json({ error: 'employee_address must be a string.' }, { status: 400 });
-    }
+    if (typeof body.employee_address !== 'string' || body.employee_address.length > 500) return NextResponse.json({ error: 'employee_address must be a string.' }, { status: 400 });
     corrections.employeeAddress = body.employee_address.trim();
   }
   if (body.start_date !== undefined) {
-    if (typeof body.start_date !== 'string' || (body.start_date && Number.isNaN(new Date(body.start_date).getTime()))) {
-      return NextResponse.json({ error: 'start_date must be a valid date.' }, { status: 400 });
-    }
+    if (typeof body.start_date !== 'string' || (body.start_date && Number.isNaN(new Date(body.start_date).getTime()))) return NextResponse.json({ error: 'start_date must be a valid date.' }, { status: 400 });
     corrections.startDate = body.start_date;
   }
 
@@ -53,70 +45,37 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const signature = await getContractSignatureByToken(token);
     if (!signature) return NextResponse.json({ error: 'Signature request not found.' }, { status: 404 });
     if (signature.status === 'signed') return NextResponse.json({ error: 'This contract has already been signed.' }, { status: 409 });
-    if (signature.expires_at && new Date(signature.expires_at).getTime() < Date.now()) {
-      return NextResponse.json({ error: 'This signing link has expired. Ask Bimed to issue a new one.' }, { status: 410 });
-    }
+    if (signature.expires_at && new Date(signature.expires_at).getTime() < Date.now()) return NextResponse.json({ error: 'This signing link has expired. Ask Bimed to issue a new one.' }, { status: 410 });
 
     const client = db();
     const updated = await markContractSignatureSigned(signature.id, signedName.trim(), corrections);
     if (!updated) return NextResponse.json({ error: 'This contract has already been signed.' }, { status: 409 });
 
-    const { data: application } = await client
-      .from('recruitment_applications')
-      .select('id, full_name, email, role_applied')
-      .eq('id', updated.application_id)
-      .maybeSingle();
+    const { data: application } = await client.from('recruitment_applications').select('id, full_name, email, role_applied').eq('id', updated.application_id).maybeSingle();
 
-    await recordRecruitmentAudit(client, {
-      applicationId: updated.application_id,
-      eventType: 'contract_signed',
-      actor: signedName.trim(),
-      metadata: {
-        signature_id: updated.id,
-        role_slug: updated.role_slug,
-        corrected_fields: Object.keys(corrections),
-      },
-    });
+    await recordRecruitmentAudit(client, { applicationId: updated.application_id, eventType: 'contract_signed', actor: signedName.trim(), metadata: { signature_id: updated.id, role_slug: updated.role_slug, corrected_fields: Object.keys(corrections) } });
 
     let staffProvisioning: { staff: any; activationSent: boolean } | null = null;
     try {
       const provisioned = await createStaffFromApplication(client, updated.application_id);
       if (provisioned.activationToken && provisioned.staff) {
-        const activation = await sendStaffPortalActivationEmail(client, provisioned.staff, provisioned.activationToken);
+        const activation = await sendStaffPortalActivationEmail(client, provisioned.staff, provisioned.activationToken, application?.email || null);
         staffProvisioning = { staff: provisioned.staff, activationSent: activation.status === 'sent' };
       } else if (provisioned.staff) {
         staffProvisioning = { staff: provisioned.staff, activationSent: false };
       }
-      await recordRecruitmentAudit(client, {
-        applicationId: updated.application_id,
-        staffId: provisioned.staff?.id,
-        actor: 'system',
-        eventType: 'staff_portal_provisioned_after_contract',
-        metadata: { bimed_id: provisioned.staff?.bimed_id, activation_sent: staffProvisioning?.activationSent || false },
-      });
+      await recordRecruitmentAudit(client, { applicationId: updated.application_id, staffId: provisioned.staff?.id, actor: 'system', eventType: 'staff_portal_provisioned_after_contract', metadata: { bimed_id: provisioned.staff?.bimed_id, activation_sent: staffProvisioning?.activationSent || false } });
     } catch (staffError) {
       console.error(JSON.stringify({ level: 'error', event: 'staff_portal.provision_failed', application_id: updated.application_id, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
     }
 
     if (application) {
-      await sendContractSignedNotificationEmails(
-        {
-          application,
-          signedName: updated.signed_name || signedName.trim(),
-          signedAtLabel: new Date(updated.signed_at || Date.now()).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }),
-          signatureId: updated.id,
-        },
-        client
-      );
+      await sendContractSignedNotificationEmails({ application, signedName: updated.signed_name || signedName.trim(), signedAtLabel: new Date(updated.signed_at || Date.now()).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }), signatureId: updated.id }, client);
     }
 
     return NextResponse.json({ signature: updated, staffPortal: staffProvisioning ? { bimed_id: staffProvisioning.staff.bimed_id, address: staffProvisioning.staff.portal_address, activationSent: staffProvisioning.activationSent } : null });
   } catch (error) {
-    console.error(JSON.stringify({
-      level: 'error',
-      event: 'contract_signature.sign_failed',
-      reason: error instanceof Error ? error.message : 'unknown',
-    }));
+    console.error(JSON.stringify({ level: 'error', event: 'contract_signature.sign_failed', reason: error instanceof Error ? error.message : 'unknown' }));
     return NextResponse.json({ error: 'Unable to sign the contract right now.' }, { status: 500 });
   }
 }
