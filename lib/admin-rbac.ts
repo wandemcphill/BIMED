@@ -60,6 +60,8 @@ export function hasAdminPermission(role: string, permission: AdminPermission) {
 /**
  * Route-level policy for the server API surface.
  * Unknown admin API routes fail closed to admin.core rather than inheriting broad access.
+ * Sensitive sub-routes are checked before broader prefixes so `/staff/*/permit` cannot
+ * accidentally inherit the generic workforce policy.
  */
 export function permissionForAdminPath(pathname: string): AdminPermission {
   const path = pathname.replace(/^\/api\/admin\/?/, '/');
@@ -69,11 +71,13 @@ export function permissionForAdminPath(pathname: string): AdminPermission {
   if (path.startsWith('/invites')) return ADMIN_PERMISSIONS.RECRUITMENT;
   if (path.startsWith('/messages')) return ADMIN_PERMISSIONS.COMMUNICATIONS;
   if (path.startsWith('/document-overrides')) return ADMIN_PERMISSIONS.DOCUMENTS;
+  if (path === '/permit' || path.startsWith('/permit/')) return ADMIN_PERMISSIONS.INTERNATIONAL;
+  if (path.includes('/permit') && path.startsWith('/staff/')) return ADMIN_PERMISSIONS.INTERNATIONAL;
+  if (path.includes('/billing') && path.startsWith('/staff/')) return ADMIN_PERMISSIONS.PAYROLL;
   if (path.startsWith('/staff')) return ADMIN_PERMISSIONS.WORKFORCE;
   if (path.startsWith('/attendance')) return ADMIN_PERMISSIONS.OPERATIONS;
   if (path.startsWith('/rota')) return ADMIN_PERMISSIONS.OPERATIONS;
   if (path.startsWith('/payslips')) return ADMIN_PERMISSIONS.PAYROLL;
-  if (path.startsWith('/permit')) return ADMIN_PERMISSIONS.INTERNATIONAL;
 
   return ADMIN_PERMISSIONS.CORE;
 }
