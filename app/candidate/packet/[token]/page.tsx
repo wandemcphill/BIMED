@@ -60,7 +60,9 @@ export default async function CandidatePacketPage({ params }: PageProps) {
     );
   }
 
-  const source = await fs.readFile(path.join(process.cwd(), packet.sourcePath), 'utf8');
+  // Packet source paths are selected only from the server-controlled PacketDefinition.
+  // The filesystem lookup is intentional for the read-only packet documents.
+  const source = await fs.readFile(/* turbopackIgnore: true */ path.join(process.cwd(), packet.sourcePath), 'utf8');
   const personalised = source
     .replaceAll('[NAME]', application.full_name || '')
     .replaceAll('[EMPLOYEE FULL NAME]', application.full_name || '')
