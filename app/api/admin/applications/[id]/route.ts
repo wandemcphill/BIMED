@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
+import { db } from '@/lib/db';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendApplicationStatusUpdateEmails } from '@/lib/email';
 import { MAX_JSON_BYTES, readJsonBody, validateAdminApplicationPatch } from '@/lib/request-validation';
 import { createSignedAudioUrl, INTERVIEW_AUDIO_BUCKET } from '@/lib/interview-audio';
 import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
+import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -60,6 +61,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { data: before } = await client.from('recruitment_applications').select('status').eq('id', applicationId).maybeSingle();
   const previousStatus = before?.status || null;
 
+  let preparedStaff: { staff: any; activationToken: string | null } | null = null;
+
+  // Hired is the hard boundary between recruitment and permanent workforce. Prepare the
+  // staff identity first so an applicant cannot be left as Hired without a real Staff Portal account.
+  if (body.status === 'Hired' && previousStatus !== 'Hired') {
+    try {
+      preparedStaff = await createStaffFromApplication(client, applicationId, { refreshActivation: true });
+    } catch (staffError) {
+      console.error(JSON.stringify({ level: 'error', event: 'staff.identity_creation_failed_on_hire', application_id: applicationId, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
+      return NextResponse.json({ error: staffError instanceof Error ? staffError.message : 'Unable to create the BIMED staff account. The candidate was not moved to Hired.' }, { status: 422 });
+    }
+  }
+
   const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
   if (body.status) updatePayload.status = body.status;
   if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
@@ -77,14 +91,42 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     metadata: { status: body.status || data.status, previous_status: previousStatus, notes_updated: body.notes !== undefined },
   });
 
-  let staffIdentity: { bimed_id: string; activationUrl: string | null } | null = null;
-  if (body.status && ['Selected', 'Offer Issued', 'Onboarding'].includes(body.status)) {
+  let staffIdentity: { bimed_id: string; bimed_email: string; activationUrl: string | null; welcomeEmailSent: boolean } | null = null;
+
+  if (preparedStaff) {
+    const origin = new URL(request.url).origin;
+    let welcomeEmailSent = false;
+    if (preparedStaff.activationToken) {
+      const welcome = await sendStaffPortalActivationEmail(client, preparedStaff.staff, preparedStaff.activationToken, data.email);
+      welcomeEmailSent = welcome.status === 'sent';
+    }
+    staffIdentity = {
+      bimed_id: preparedStaff.staff.bimed_id,
+      bimed_email: preparedStaff.staff.email,
+      activationUrl: preparedStaff.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(preparedStaff.activationToken)}&email=${encodeURIComponent(preparedStaff.staff.email)}` : null,
+      welcomeEmailSent,
+    };
+    await createStaffAudit(client, {
+      staffId: preparedStaff.staff.id,
+      actor: session.email,
+      eventType: 'candidate_promoted_to_hired',
+      metadata: {
+        application_id: applicationId,
+        recruitment_status: 'Hired',
+        bimed_id: preparedStaff.staff.bimed_id,
+        bimed_email: preparedStaff.staff.email,
+        welcome_email_sent: welcomeEmailSent,
+      },
+    });
+  } else if (body.status && ['Selected', 'Offer Issued', 'Onboarding'].includes(body.status)) {
     try {
       const result = await createStaffFromApplication(client, applicationId);
       const origin = new URL(request.url).origin;
       staffIdentity = {
         bimed_id: result.staff.bimed_id,
+        bimed_email: result.staff.email,
         activationUrl: result.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}` : null,
+        welcomeEmailSent: false,
       };
       await createStaffAudit(client, { staffId: result.staff.id, actor: session.email, eventType: 'recruitment_status_linked_to_staff', metadata: { application_id: applicationId, recruitment_status: body.status } });
     } catch (staffError) {
@@ -100,7 +142,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         previousStatus,
         status: body.status,
         actor: session.email,
-        notifyCandidate: body.notify_candidate !== false,
+        // Hired uses the personalized new-hire welcome email above rather than the generic status email.
+        notifyCandidate: body.status === 'Hired' ? false : body.notify_candidate !== false,
       }, client);
       statusEmail = emails.candidate;
     } catch (emailError) {
@@ -114,7 +157,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 // Permanently deletes a candidate's application and everything tied to it (interviews, contract
 // signatures, second-interview record, and any recorded voice notes). Audit log entries survive
 // with application_id set to null (see 20260906_audit_log_cascade.sql), so there's still a record
-// that a deletion happened, without blocking it.
+// of a deletion without blocking it.
 export async function DELETE(request: NextRequest, context: RouteContext) {
   const session = await getAdminSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
