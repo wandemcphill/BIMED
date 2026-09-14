@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function StaffLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -13,7 +13,7 @@ export default function StaffLoginPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try {
-      const response = await fetch('/api/staff/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) });
+      const response = await fetch('/api/staff/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifier, password }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to sign in.');
       router.replace('/staff');
@@ -26,10 +26,11 @@ export default function StaffLoginPage() {
       <div style={{fontSize:13,fontWeight:800,letterSpacing:1.4,textTransform:'uppercase',color:'#0f766e'}}>BIMED Healthcare</div>
       <h1 style={{fontSize:30,margin:'10px 0 8px',color:'#102a43'}}>Staff Portal</h1>
       <p style={{color:'#627d98',marginBottom:24}}>Sign in with your permanent BIMED account.</p>
-      <label style={{display:'block',fontWeight:700,marginBottom:6}}>Email</label>
-      <input value={email} onChange={e=>setEmail(e.target.value)} type='email' autoComplete='email' required style={{width:'100%',padding:'12px 14px',border:'1px solid #d9e2ec',borderRadius:10,marginBottom:16}} />
+      <label style={{display:'block',fontWeight:700,marginBottom:6}}>BIMED ID or BIMED email</label>
+      <input value={identifier} onChange={e=>setIdentifier(e.target.value)} type='text' autoComplete='username' required placeholder='BIM-2026-AB12CD or firstname.lastname@bimedhealthcare.com' style={{width:'100%',padding:'12px 14px',border:'1px solid #d9e2ec',borderRadius:10,marginBottom:16,boxSizing:'border-box'}} />
       <label style={{display:'block',fontWeight:700,marginBottom:6}}>Password</label>
-      <input value={password} onChange={e=>setPassword(e.target.value)} type='password' autoComplete='current-password' required style={{width:'100%',padding:'12px 14px',border:'1px solid #d9e2ec',borderRadius:10,marginBottom:16}} />
+      <input value={password} onChange={e=>setPassword(e.target.value)} type='password' autoComplete='current-password' required style={{width:'100%',padding:'12px 14px',border:'1px solid #d9e2ec',borderRadius:10,marginBottom:16,boxSizing:'border-box'}} />
+      <div style={{background:'#f4f7fb',borderRadius:10,padding:12,fontSize:12,color:'#627d98',marginBottom:16}}>New hires: use your activation link first to create your password. After activation, you can sign in with either your BIMED ID or your BIMED email.</div>
       {error && <div style={{background:'#fff5f5',border:'1px solid #fed7d7',color:'#c53030',padding:12,borderRadius:10,marginBottom:16}}>{error}</div>}
       <button disabled={busy} style={{width:'100%',padding:'13px 16px',border:0,borderRadius:10,background:'#0f766e',color:'#fff',fontWeight:800,cursor:'pointer'}}>{busy?'Signing in…':'Sign in'}</button>
     </form>
