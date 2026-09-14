@@ -4,7 +4,6 @@ import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
 import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
-import { sendStaffActivationEmail } from '@/lib/email';
 
 const INTERNAL_DEPARTMENTS = ['Administration', 'Finance', 'HR', 'Recruitment', 'Operations', 'Management', 'Other'] as const;
 const EMPLOYMENT_TYPES = ['Permanent', 'Fixed-term', 'Part-time', 'Contract'] as const;
@@ -79,7 +78,7 @@ export async function POST(request: NextRequest) {
       if (!fullName || !email || !jobTitle || !department || !employmentType) {
         return NextResponse.json({ error: 'Full name, email, job title, department and employment type are required.' }, { status: 400 });
       }
-      if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(email)) {
+      if (!/^\s*[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+\s*$/.test(email)) {
         return NextResponse.json({ error: 'Enter a valid staff email address.' }, { status: 400 });
       }
       if (!INTERNAL_DEPARTMENTS.includes(department as (typeof INTERNAL_DEPARTMENTS)[number])) {
@@ -141,14 +140,7 @@ export async function POST(request: NextRequest) {
         metadata: { department, job_title: jobTitle, employment_type: employmentType },
       });
 
-      const emailResult = await sendStaffActivationEmail({
-        staffName: staff.full_name,
-        jobTitle: staff.job_title,
-        bimedId: staff.bimed_id,
-        activationUrl,
-      }, client);
-
-      return NextResponse.json({ staff, activationUrl, email: emailResult }, { status: 201 });
+      return NextResponse.json({ staff, activationUrl }, { status: 201 });
     }
 
     if (body.action === 'promote') {
