@@ -159,6 +159,14 @@ export async function sendAdminDocumentSignedEmail(input: { application: Applica
   return Promise.all(recruitmentInternalRecipients(isInternationalRoutingCandidate(input.application)).map((recipient) => sendTransactionalEmail({ to: recipient, content: adminDocumentSignedEmail({ candidateName: input.application.full_name, role: input.application.role_applied, applicationId: input.application.id, documentLabel: input.documentLabel, signedName: input.signedName, signedAtLabel: input.signedAtLabel, adminRecordUrl: adminRecordUrl(input.application.id) }), emailType: 'admin_document_signed', dedupeKey: `admin_document_signed:${input.signatureId}:${recipient}`, applicationId: input.application.id, client })));
 }
 
+export async function sendContractSignedNotificationEmails(input: { application: ApplicationEmailRecord; signedName: string; signedAtLabel: string; signatureId: string }, client?: SupabaseClient | null): Promise<SendResult[]> {
+  return sendAdminContractSignedEmail(input, client);
+}
+
+export async function sendDocumentSignedNotificationEmails(input: { application: ApplicationEmailRecord; documentLabel: string; signedName: string; signedAtLabel: string; signatureId: string }, client?: SupabaseClient | null): Promise<SendResult[]> {
+  return sendAdminDocumentSignedEmail(input, client);
+}
+
 export async function sendAdminPasswordResetEmail(input: { displayName: string; recipient: string; resetUrl: string; expiryMinutes: number }, client?: SupabaseClient | null): Promise<SendResult> {
   return sendTransactionalEmail({ to: input.recipient, content: adminPasswordResetEmail({ displayName: input.displayName, resetUrl: input.resetUrl, expiryMinutes: input.expiryMinutes }), emailType: 'admin_password_reset', client, replyTo: recruitmentContacts.admin });
 }
