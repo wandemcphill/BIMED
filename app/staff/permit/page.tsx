@@ -9,6 +9,9 @@ export default function StaffPermitPage() {
   const router = useRouter();
   const [permit, setPermit] = useState<Permit | null>(null);
   const [packet, setPacket] = useState<any>(null);
+  const [invoice, setInvoice] = useState<any>(null);
+  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -17,7 +20,7 @@ export default function StaffPermitPage() {
     const data = await response.json();
     if (response.status === 401) { router.replace('/staff/login'); return; }
     if (!response.ok) { setError(data.error || 'Unable to load the permit workspace.'); return; }
-    setPermit(data.permit); setPacket(data.packet);
+    setPermit(data.permit); setPacket(data.packet); setInvoice(data.invoice); setInvoiceUrl(data.invoiceUrl);
   }
   useEffect(() => { void load(); }, []);
 
@@ -32,8 +35,23 @@ export default function StaffPermitPage() {
     finally { setBusy(false); }
   }
 
+  async function acknowledgeAccommodation() {
+    if (!acknowledged) { setError('Please confirm that you understand and are comfortable with the accommodation payment, refund and accommodation terms.'); return; }
+    setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/staff/permit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'acknowledge_accommodation', acknowledged: true }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to record your acknowledgement.');
+      setPermit(data.permit);
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to record your acknowledgement.'); }
+    finally { setBusy(false); }
+  }
+
   if (error && !permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}><h1>Employment permit & sponsorship</h1><p style={{ color: '#9b2c2c' }}>{error}</p><button onClick={() => router.push('/staff')} style={button}>Back to Staff Portal</button></main>;
   if (!permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}>Loading employment permit workspace…</main>;
+
+  const termsAcknowledged = Boolean(permit.accommodation_terms_acknowledged_at);
 
   return <main style={{ minHeight: '100vh', background: '#f4f7fb', color: '#102a43', fontFamily: 'system-ui', padding: 28 }}>
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -45,16 +63,16 @@ export default function StaffPermitPage() {
       <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>Your permit journey</h2><Info label='Current status' value={permit.status.replaceAll('_', ' ')} /><Info label='Permit type' value={permit.permit_type || 'BIMED to confirm'} /><Info label='Permit application ID' value={permit.permit_application_id || 'Not submitted yet'} /><Info label='Visa status' value={permit.visa_status || 'Not started'} />
       {permit.status === 'not_started' ? <button disabled={busy} onClick={() => void requestJourney()} style={button}>{busy ? 'Submitting…' : 'Apply to BIMED for employment permit / sponsorship'}</button> : <div style={{ marginTop: 14, color: '#627d98' }}>Your request has been received. BIMED will review the complete profile and prepare the employer-side documents.</div>}</section>
 
-      <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>BIMED accommodation offer</h2><p>BIMED records an accommodation offer for your initial three-month probationary period as part of the employment onboarding and immigration evidence package.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 12 }}><Info label='Accommodation period' value={`${permit.accommodation_period_months || 3} months`} /><Info label='Accommodation amount' value={`€${Number(permit.accommodation_amount_eur || 4000).toFixed(2)}`} /><Info label='Refund plan' value={`€${Number(permit.accommodation_refund_amount_eur || 4000).toFixed(2)} in ${permit.accommodation_refund_installments || 4} weekly instalments after probation, subject to the agreed terms`} /></div><div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: '#f8fafc', color: '#627d98', lineHeight: 1.6 }}><strong style={{ color: '#334e68' }}>Important immigration note:</strong> accommodation evidence may support an application, but it does not guarantee an employment permit or visa and does not automatically replace any financial evidence required by Irish immigration authorities.</div><div style={{ marginTop: 12, color: '#627d98' }}>If the permit/visa journey is refused, the portal records the agreed full refund arrangement. Keep all payment and accommodation documentation.</div></section>
+      <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>Accommodation payment arrangement</h2><p>BIMED is offering accommodation for your initial three-month probationary period for <strong>€4,000</strong>. The arrangement is fully documented and is separate from the employment permit or visa decision.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 12 }}><Info label='Accommodation period' value={`${permit.accommodation_period_months || 3} months`} /><Info label='Amount payable' value={`€${Number(permit.accommodation_amount_eur || 4000).toFixed(2)}`} /><Info label='Refund arrangement' value={`€${Number(permit.accommodation_refund_amount_eur || 4000).toFixed(2)} after qualifying refusal or, after successful probation, in ${permit.accommodation_refund_installments || 4} weekly instalments`} /></div><div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: '#f8fafc', color: '#627d98', lineHeight: 1.6 }}><strong style={{ color: '#334e68' }}>Please read before confirming:</strong> the accommodation arrangement is voluntary. It does not guarantee an employment permit or visa and does not automatically replace any financial evidence required by Irish immigration authorities. The payment, refund timing and conditions are documented in the accommodation terms and subsequent invoice.</div>{!termsAcknowledged ? <div style={{ marginTop: 18, padding: 18, border: '1px solid #d9e2ec', borderRadius: 12 }}><label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: '#334e68', lineHeight: 1.6 }}><input type='checkbox' checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} style={{ marginTop: 5 }} /><span>I have read the accommodation payment and refund arrangement, I understand the €4,000 payment for three months, the refund provisions, and the related terms, and I am comfortable proceeding with this arrangement. I understand that acknowledgement does not guarantee a permit or visa outcome.</span></label><button disabled={busy || !acknowledged} onClick={() => void acknowledgeAccommodation()} style={{ ...button, opacity: busy || !acknowledged ? 0.55 : 1 }}>{busy ? 'Recording…' : 'Acknowledge and request invoice'}</button></div> : <div style={{ marginTop: 18, padding: 16, borderRadius: 12, background: '#ecfdf5', color: '#166534' }}><strong>Accommodation terms acknowledged</strong><div style={{ marginTop: 5, fontSize: 13 }}>Acknowledged on {permit.accommodation_terms_acknowledged_at}. BIMED has notified overseas recruitment and the manager. The invoice is now in the billing workflow.</div>{invoice && invoiceUrl && ['issued','paid'].includes(invoice.status) ? <a href={invoiceUrl} target='_blank' rel='noreferrer' style={{ ...secondary, display: 'inline-block', marginTop: 12 }}>Open accommodation invoice</a> : <div style={{ marginTop: 10, color: '#627d98' }}>The invoice is being prepared. You will receive the issued invoice once BIMED has confirmed the payment account details.</div>}</div>}</section>
 
       <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>Information BIMED will use</h2><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}><div><h3>Employee</h3><Info label='Full name' value={packet?.employee?.full_name} /><Info label='Nationality' value={packet?.employee?.nationality} /><Info label='Date of birth' value={packet?.employee?.date_of_birth} /><Info label='Phone' value={packet?.employee?.phone} /><Info label='Address' value={packet?.employee?.residential_address} /></div><div><h3>Employment</h3><Info label='Employer' value={packet?.employment?.employer} /><Info label='Position' value={packet?.employment?.position} /><Info label='Start date' value={packet?.employment?.start_date} /><Info label='Salary' value={packet?.employment?.annual_salary_eur ? `€${packet.employment.annual_salary_eur.toLocaleString()}` : 'To be confirmed'} /></div></div></section>
 
-      <section style={{ ...card, marginTop: 18, marginBottom: 30 }}><h2 style={{ marginTop: 0 }}>What happens next</h2><ol style={{ lineHeight: 1.8, color: '#334e68' }}><li>Submit your request to BIMED from this page.</li><li>BIMED checks your complete profile, employment terms and supporting evidence.</li><li>BIMED prepares the employer-side permit/sponsorship documentation and confirms the applicable permit type.</li><li>Where required, BIMED completes any Labour Market Needs Test and related recruitment evidence before submission.</li><li>After a permit decision, the visa stage is handled through the appropriate Irish immigration process where applicable.</li><li>Shift access stays blocked until the required permission to work is confirmed.</li></ol></section>
+      <section style={{ ...card, marginTop: 18, marginBottom: 30 }}><h2 style={{ marginTop: 0 }}>What happens next</h2><ol style={{ lineHeight: 1.8, color: '#334e68' }}><li>Decide whether you are comfortable with the accommodation arrangement and acknowledge it from this page.</li><li>BIMED automatically notifies overseas recruitment and the manager that you have requested the accommodation invoice.</li><li>BIMED enters the payment account details and issues the professional invoice.</li><li>After payment is confirmed, BIMED records the payment and can issue a professional payment receipt.</li><li>BIMED continues the employer-side permit/sponsorship process using your complete profile and supporting evidence.</li><li>Shift access stays blocked until the required permission to work is confirmed.</li></ol></section>
     </div>
   </main>;
 }
 
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e5eaf0', borderRadius: 16, padding: 20, boxShadow: '0 8px 28px rgba(15,23,42,.04)' };
 const button: React.CSSProperties = { marginTop: 14, padding: '11px 15px', border: 0, borderRadius: 9, background: '#0f766e', color: '#fff', fontWeight: 900 };
-const secondary: React.CSSProperties = { padding: '9px 12px', border: '1px solid #d9e2ec', borderRadius: 9, background: '#fff', fontWeight: 800 };
+const secondary: React.CSSProperties = { padding: '9px 12px', border: '1px solid #d9e2ec', borderRadius: 9, background: '#fff', fontWeight: 800, textDecoration: 'none', color: '#334e68' };
 function Info({ label, value }: { label: string; value: unknown }) { return <div style={{ padding: '8px 0', borderBottom: '1px solid #edf2f7' }}><div style={{ fontSize: 12, color: '#627d98' }}>{label}</div><div style={{ fontWeight: 700 }}>{String(value || '—')}</div></div>; }
