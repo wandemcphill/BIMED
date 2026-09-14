@@ -9,6 +9,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -22,9 +25,12 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps 2>&1 | tee /tmp/npm-install.log
+        run: |
+          set -o pipefail
+          npm ci --legacy-peer-deps 2>&1 | tee /tmp/npm-install.log
 
       - name: Typecheck
+        if: always()
         run: |
           set -o pipefail
           npm run typecheck 2>&1 | tee /tmp/typecheck.log
@@ -40,6 +46,33 @@ jobs:
         run: |
           set -o pipefail
           npm run build 2>&1 | tee /tmp/build.log
+
+      - name: Capture failure diagnostics
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "CI FAILURE RUN: ${{ github.run_id }}"
+            echo "COMMIT: ${{ github.sha }}"
+            echo
+            echo "===== npm install ====="
+            cat /tmp/npm-install.log 2>/dev/null || true
+            echo
+            echo "===== typecheck ====="
+            cat /tmp/typecheck.log 2>/dev/null || true
+            echo
+            echo "===== test ====="
+            cat /tmp/test.log 2>/dev/null || true
+            echo
+            echo "===== build ====="
+            cat /tmp/build.log 2>/dev/null || true
+          } > ci-failure.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci-failure.log
+          git commit -m "ci: capture failure diagnostics [skip ci]" || true
+          git push origin "HEAD:${{ github.head_ref }}"
 
       - name: Upload CI diagnostics
         if: always()
