@@ -30,8 +30,7 @@ const FIXED: Record<string, Airport> = {
   MX: { code: 'MEX', name: 'Mexico City International Airport', city: 'Mexico City', country_code: 'MX', country_name: 'Mexico' },
   TR: { code: 'IST', name: 'Istanbul Airport', city: 'Istanbul', country_code: 'TR', country_name: 'Türkiye' },
   EG: { code: 'CAI', name: 'Cairo International Airport', city: 'Cairo', country_code: 'EG', country_name: 'Egypt' },
-  MA: { code: 'CMN', name: 'Mohammed V International Airport', city: 'Casablanca', country_code: 'MA', country_name: 'Morocco' },
-  NG: { code: 'LOS', name: 'Murtala Muhammed International Airport', city: 'Lagos', country_code: 'NG', country_name: 'Nigeria' }
+  MA: { code: 'CMN', name: 'Mohammed V International Airport', city: 'Casablanca', country_code: 'MA', country_name: 'Morocco' }
 };
 
 const ALIASES: Record<string, string> = {
@@ -40,7 +39,8 @@ const ALIASES: Record<string, string> = {
 
 function csv(line: string) {
   const cells: string[] = []; let current = ''; let quote = false;
-  for (let i = 0; i < line.length; i += 1) { const ch = line[i]; if (ch === '"') { if (quote && line[i + 1] === '"') { current += '"'; i += 1; } else quote = !quote; continue; } if (ch === ',' && !quote) { cells.push(current); current = ''; continue; } current += ch; } cells.push(current); return cells;
+  for (let i = 0; i < line.length; i += 1) { const ch = line[i]; if (ch === '"') { if (quote && line[i + 1] === '"') { current += '"'; i += 1; } else quote = !quote; continue; } if (ch === ',' && !quote) { cells.push(current); current = ''; continue; } current += ch; }
+  cells.push(current); return cells;
 }
 
 let cache: { at: number; airports: Airport[] } | null = null;
