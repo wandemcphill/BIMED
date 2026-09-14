@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
 import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
+import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
 
 const INTERNAL_DEPARTMENTS = ['Administration', 'Finance', 'HR', 'Recruitment', 'Operations', 'Management', 'Other'] as const;
 const EMPLOYMENT_TYPES = ['Permanent', 'Fixed-term', 'Part-time', 'Contract'] as const;
@@ -149,7 +150,12 @@ export async function POST(request: NextRequest) {
       const result = await createStaffFromApplication(client, body.applicationId);
       await createStaffAudit(client, { staffId: result.staff.id, actor: session.email, eventType: 'staff_identity_created', metadata: { application_id: body.applicationId } });
       const activationUrl = result.activationToken ? createActivationUrl(request, result.activationToken, result.staff.email) : null;
-      return NextResponse.json({ staff: result.staff, activationUrl });
+      let welcomeEmailSent = false;
+      if (result.activationToken) {
+        const welcomeEmail = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken);
+        welcomeEmailSent = welcomeEmail.status === 'sent';
+      }
+      return NextResponse.json({ staff: result.staff, activationUrl, welcomeEmailSent });
     }
 
     if (body.action === 'status') {

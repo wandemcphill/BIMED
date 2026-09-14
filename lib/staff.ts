@@ -68,6 +68,8 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
   const effectiveStartDate = signedContract.start_date || application.start_date || defaultStartDate();
   const effectiveName = signedContract.employee_name || application.full_name;
   const effectiveAddress = signedContract.employee_address || application.address;
+  const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
+
   const { data: staff, error } = await client
     .from('recruitment_staff')
     .insert({
@@ -83,7 +85,7 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
       employment_type: application.employment_type,
       employment_start_date: effectiveStartDate,
       country: 'Ireland',
-      status: application.living_in_ireland === 'No' ? 'pre_arrival' : 'active',
+      status: effectiveStatus,
       ...mapResidentialAddress(effectiveAddress),
       activation_token_hash: hashActivationToken(activationToken),
       activation_expires_at: activationExpiresAt(),
@@ -92,7 +94,21 @@ export async function createStaffFromApplication(client: SupabaseClient, applica
     .single();
   if (error || !staff) throw error || new Error('Unable to create staff profile.');
 
-  await client.from('recruitment_applications').update({ bimed_id: staff.bimed_id, address: effectiveAddress, start_date: effectiveStartDate, updated_at: new Date().toISOString() }).eq('id', applicationId);
+  await client.from('recruitment_applications').update({
+    bimed_id: staff.bimed_id,
+    address: effectiveAddress,
+    start_date: effectiveStartDate,
+    updated_at: new Date().toISOString(),
+  }).eq('id', applicationId);
+
+  await createStaffNotification(client, {
+    staffId: staff.id,
+    category: 'welcome',
+    title: 'Welcome to the BIMED Staff Portal',
+    body: `Your permanent BIMED staff account is ready for your ${staff.job_title || staff.role || 'BIMED'} position. Use Messages to contact BIMED Admin / HR, My Rota for shifts and work requests, Attendance for attendance records, Payslips for payroll records, My Profile for your details and profile photograph, and Notifications for workplace updates.${staff.application_id ? ' Your Onboarding workspace remains available for your recruitment-linked requirements.' : ''}`,
+    actionUrl: '/staff',
+  });
+
   return { staff, activationToken };
 }
 
