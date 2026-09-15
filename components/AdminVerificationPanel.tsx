@@ -35,11 +35,15 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  async function load() {
+  async function load(attempt = 0): Promise<void> {
     setLoading(true);
     setError('');
     const response = await fetch(`/api/admin/applications/${applicationId}/onboarding-checklist`, { cache: 'no-store' });
     const data = await response.json().catch(() => ({}));
+    if (response.status === 401 && attempt < 12) {
+      window.setTimeout(() => void load(attempt + 1), 1000);
+      return;
+    }
     if (!response.ok) {
       setError(data.error || 'Unable to load verification controls.');
       setLoading(false);
