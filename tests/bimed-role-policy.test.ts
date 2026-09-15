@@ -41,6 +41,15 @@ describe('BIMED role policy', () => {
     expect(recruitmentRoleSlug('not-a-bimed-role')).toBeNull();
   });
 
+  it('keeps the canonical role salaries unchanged', () => {
+    expect(BIMED_ROLE_SALARIES).toEqual({
+      'support-worker': '€36,000 per annum',
+      'healthcare-assistant': '€36,000 per annum',
+      'senior-support-worker': '€41,000 per annum',
+      physiotherapist: '€55,000 per annum',
+    });
+  });
+
   it('removes unresolved placeholders from every canonical contract after applying BIMED defaults', () => {
     for (const role of CANONICAL_RECRUITMENT_ROLES) {
       const slug = recruitmentRoleSlug(role)!;
@@ -122,7 +131,7 @@ describe('BIMED role policy', () => {
     expect(roleSummary?.paragraphs.join('\n')).not.toContain('[Insert line manager name/title]');
   });
 
-  it('states the intended Critical Skills permit pathway for Physiotherapist', () => {
+  it('states the intended Critical Skills permit pathway and canonical terms for Physiotherapist', () => {
     const template = getContractTemplate('physiotherapist');
     if (!template) throw new Error('Physiotherapist template missing');
 
@@ -134,11 +143,22 @@ describe('BIMED role policy', () => {
       ...resolved.schedules.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
       resolved.closingNote,
     ].join('\n');
+    const schedule1 = resolved.schedules.find((section) => section.heading === 'Schedule 1 - Additional Terms for Employment Permit Holders (Overseas Employees)')?.paragraphs.join('\n') || '';
+    const schedule2 = resolved.schedules.find((section) => section.heading === 'Schedule 2 - Job Description');
 
     expect(field('Contracted hours')).toBe('35 hours per week');
     expect(field('Pay')).toBe(BIMED_ROLE_SALARIES.physiotherapist);
+    expect(field('Pay')).toBe('€55,000 per annum');
     expect(field('Employment permit category')).toContain('Critical Skills Employment Permit (CSEP)');
     expect(allContractText).toContain('Intended employment permit pathway: Critical Skills Employment Permit (CSEP)');
+    expect(allContractText).toContain('€55,000 per annum');
+    expect(allContractText).not.toContain('EUR 45,514 to EUR 63,831');
+    expect(schedule1).toContain('intended permit pathway is Critical Skills Employment Permit (CSEP)');
+    expect(schedule1).not.toContain('General Employment Permit');
     expect(resolved.sections.find((section) => section.heading === '16. Right to Work')?.paragraphs.join('\n')).toContain('CORU');
+    expect(schedule2?.paragraphs.join('\n')).toContain('Job title: Physiotherapist');
+    expect(schedule2?.paragraphs.join('\n')).toContain(`Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`);
+    expect(schedule2?.bullets ?? []).toContain("Assessing service users' physical function, mobility and rehabilitation needs");
+    expect(schedule2?.bullets ?? []).toContain('Ensuring all clinical practice remains within the CORU Standards of Proficiency for Physiotherapists');
   });
 });
