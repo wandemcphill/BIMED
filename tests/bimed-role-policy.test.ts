@@ -7,6 +7,7 @@ import {
   BIMED_DEFAULT_PAY_FREQUENCY,
   BIMED_DEFAULT_PROBATION,
   BIMED_DEFAULT_START_DATE,
+  BIMED_GEP_STANDARD_MAR_2026,
   BIMED_ROLE_SALARIES,
   applyBimedContractDefaults,
   applyBimedJobDescriptionDefaults,
@@ -41,9 +42,15 @@ describe('BIMED role policy', () => {
     expect(recruitmentRoleSlug('not-a-bimed-role')).toBeNull();
   });
 
-  it('keeps the canonical role salaries unchanged', () => {
+  it('keeps canonical salaries at or above the applicable current permit floor', () => {
+    expect(BIMED_GEP_STANDARD_MAR_2026).toBe('€36,605 per annum');
+    expect(BIMED_ROLE_SALARIES['support-worker']).toBe('€36,605 per annum');
+    expect(BIMED_ROLE_SALARIES['senior-support-worker']).toBe('€41,000 per annum');
+    expect(Number(BIMED_ROLE_SALARIES['support-worker']?.replace(/[^0-9]/g, ''))).toBeGreaterThanOrEqual(36605);
+    expect(Number(BIMED_ROLE_SALARIES['senior-support-worker']?.replace(/[^0-9]/g, ''))).toBeGreaterThanOrEqual(36605);
+
     expect(BIMED_ROLE_SALARIES).toEqual({
-      'support-worker': '€36,000 per annum',
+      'support-worker': '€36,605 per annum',
       'healthcare-assistant': '€36,000 per annum',
       'senior-support-worker': '€41,000 per annum',
       physiotherapist: '€55,000 per annum',
@@ -59,9 +66,7 @@ describe('BIMED role policy', () => {
     for (const role of CANONICAL_RECRUITMENT_ROLES) {
       const template = getContractTemplate(recruitmentRoleSlug(role)!);
       if (!template) throw new Error(`${role} template missing`);
-      const resolved = applyBimedContractDefaults(template, {
-        startDate: undefined,
-      } as never);
+      const resolved = applyBimedContractDefaults(template);
       const field = (label: string) => resolved.editableFields.find((item) => item.label === label)?.value;
       const commencement = resolved.sections.find((section) => section.heading === '2. Commencement of Employment and Probation')?.paragraphs.join('\n') || '';
 
@@ -128,6 +133,7 @@ describe('BIMED role policy', () => {
     const resolved = applyBimedContractDefaults(template, {
       employeeName: 'Gabriel Oliveira de Lima',
       employeeAddress: 'Example residential address, Dublin',
+      startDate: '2029-03-04',
     });
     const allContractText = [
       ...resolved.editableFields.map((item) => item.value),
@@ -139,9 +145,9 @@ describe('BIMED role policy', () => {
     expect(allContractText).toContain('Gabriel Oliveira de Lima');
     expect(allContractText).toContain('Example residential address, Dublin');
     expect(allContractText).toContain('11 January 2027');
+    expect(allContractText).not.toContain('4 March 2029');
+    expect(allContractText).toContain('€36,605 per annum');
     expect(allContractText).toContain(BIMED_DEFAULT_CONTRACT_DURATION);
-    expect(allContractText).not.toContain('11 January 2028');
-    expect(allContractText).not.toContain('11 January 2029');
     expect(allContractText).not.toMatch(/\[[^\]]+\]/);
   });
 
