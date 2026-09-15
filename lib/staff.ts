@@ -22,7 +22,7 @@ function mapResidentialAddress(address: string | null | undefined) {
 export async function createStaffFromApplication(
   client: SupabaseClient,
   applicationId: string,
-  options?: { refreshActivation?: boolean },
+  options?: { refreshActivation?: boolean; allowUncontractedHire?: boolean },
 ) {
   const { data: application, error: applicationError } = await client
     .from('recruitment_applications')
@@ -44,8 +44,12 @@ export async function createStaffFromApplication(
     .limit(1)
     .maybeSingle();
   if (signatureError) throw signatureError;
-  if (!signedContract) throw new Error('The employment contract must be signed before the candidate can be promoted to staff.');
-  if (signedContract.role_slug !== expectedRoleSlug) throw new Error('The signed contract role does not match the candidate\'s applied role.');
+  if (signedContract && signedContract.role_slug !== expectedRoleSlug) {
+    throw new Error('The signed contract role does not match the candidate\'s applied role.');
+  }
+  if (!signedContract && !options?.allowUncontractedHire) {
+    throw new Error('The employment contract must be signed before the candidate can be promoted to staff.');
+  }
 
   const { data: existing } = await client
     .from('recruitment_staff')
@@ -76,16 +80,18 @@ export async function createStaffFromApplication(
     return { staff: existing, activationToken: null as string | null };
   }
 
-  const readiness = await getOnboardingReadiness(client, application);
-  if (!readiness.ready) {
-    const missing = readiness.missing.map((item) => item.title).join(', ');
-    throw new Error(`Onboarding is not complete. Complete the following before staff creation: ${missing}`);
+  if (!options?.allowUncontractedHire) {
+    const readiness = await getOnboardingReadiness(client, application);
+    if (!readiness.ready) {
+      const missing = readiness.missing.map((item) => item.title).join(', ');
+      throw new Error(`Onboarding is not complete. Complete the following before staff creation: ${missing}`);
+    }
   }
 
   const activationToken = createActivationToken();
-  const effectiveStartDate = signedContract.start_date || application.start_date || defaultStartDate();
-  const effectiveName = signedContract.employee_name || application.full_name;
-  const effectiveAddress = signedContract.employee_address || application.address;
+  const effectiveStartDate = defaultStartDate();
+  const effectiveName = signedContract?.employee_name || application.full_name;
+  const effectiveAddress = signedContract?.employee_address || application.address;
   const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
   const portalEmail = await generateBimedPortalEmail(client, effectiveName);
 
@@ -145,7 +151,7 @@ export async function createStaffFromApplication(
     staffId: staff.id,
     category: 'welcome',
     title: 'Welcome to the BIMED Staff Portal',
-    body: `Your permanent BIMED staff account is ready for your ${staff.job_title || staff.role || 'BIMED'} position. Your BIMED email is ${staff.email}. Sign in with your BIMED ID or BIMED email after activation. Use Messages to contact BIMED Admin / HR, My Rota for shifts and work requests, Attendance for attendance records, Payslips for payroll records, My Profile for your details and profile photograph, and Notifications for workplace updates.${staff.application_id ? ' Your Onboarding workspace remains available for your recruitment-linked requirements.' : ''}${effectiveStatus === 'pre_arrival' ? ' Your employment-permit and accommodation workspace is also available. You are not eligible to take shifts until the required permission to work is confirmed.' : ''}`,
+    body: `Your BIMED staff account is ready for your ${staff.job_title || staff.role || 'BIMED'} position. Your BIMED email is ${staff.email}. Sign in with your BIMED ID or BIMED email after activation. Use Messages to contact BIMED Admin / HR, My Rota for shifts and work requests, Attendance for attendance records, Payslips for payroll records, My Profile for your details and profile photograph, and Notifications for workplace updates.${staff.application_id ? ' Your recruitment-linked onboarding workspace remains available for follow-up requirements.' : ''}${effectiveStatus === 'pre_arrival' ? ' Your employment-permit and accommodation workspace is also available. You are not eligible to take shifts until the required permission to work is confirmed.' : ''}`,
     actionUrl: effectiveStatus === 'pre_arrival' ? '/staff/permit' : '/staff',
   });
 
