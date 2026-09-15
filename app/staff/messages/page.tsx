@@ -77,31 +77,96 @@ export default function BimedMessagesPage() {
   const activeConversation = conversations.find((item) => item.id === active);
 
   return (
-    <main style={{ minHeight: '100vh', background: '#f4f7fb', color: '#102a43', fontFamily: 'system-ui' }}>
-      <header style={{ background: '#fff', borderBottom: '1px solid #e5eaf0', padding: '18px 5vw', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <div><div style={{ color: '#0f766e', fontSize: 12, fontWeight: 900, letterSpacing: 1.4 }}>BIMED HEALTHCARE</div><h1 style={{ margin: '4px 0 0', fontSize: 26 }}>BIMED Messages</h1><div style={{ marginTop: 5, color: '#627d98', fontSize: 13 }}>{staffType === 'recruitment_intake' ? 'New intake · onboarding and workforce communications' : 'Internal BIMED staff · workplace communications'}</div></div>
-        {mailbox && <div style={{ textAlign: 'right', fontSize: 13 }}><div style={{ fontWeight: 900 }}>{mailbox.address}</div><div style={{ color: '#627d98' }}>BIMED internal address</div></div>}
+    <main className="messages-page">
+      <style>{`
+        .messages-page { min-height:100vh; background:#f4f7fb; color:#102a43; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+        .messages-header { background:#fff; border-bottom:1px solid #e5eaf0; padding:18px clamp(16px,5vw,64px); display:flex; justify-content:space-between; align-items:center; gap:16px; }
+        .messages-header h1 { margin:4px 0 0; font-size:26px; }
+        .messages-header-copy { min-width:0; }
+        .messages-mailbox { text-align:right; font-size:13px; min-width:0; }
+        .messages-mailbox strong { display:block; overflow-wrap:anywhere; }
+        .messages-layout { width:min(1200px,100%); margin:0 auto; padding:20px; display:grid; grid-template-columns:320px minmax(0,1fr); gap:16px; box-sizing:border-box; }
+        .messages-rail,.messages-thread { background:#fff; border:1px solid #e5eaf0; border-radius:16px; min-width:0; box-sizing:border-box; }
+        .messages-rail { padding:14px; }
+        .messages-thread { min-height:calc(100vh - 120px); display:flex; flex-direction:column; overflow:hidden; }
+        .messages-thread-body { flex:1; min-height:360px; overflow-y:auto; padding:18px; display:grid; align-content:start; gap:10px; overscroll-behavior:contain; }
+        .messages-bubble { max-width:min(78%, 680px); overflow-wrap:anywhere; word-break:break-word; }
+        .messages-compose { border-bottom:1px solid #edf2f7; padding-bottom:14px; margin-bottom:14px; }
+        .messages-compose select,.messages-compose textarea,.messages-reply textarea { width:100%; box-sizing:border-box; }
+        .messages-conversation-button { width:100%; min-width:0; text-align:left; border:0; padding:12px; margin-bottom:6px; border-radius:10px; cursor:pointer; }
+        .messages-conversation-preview { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .messages-empty { margin:auto; padding:32px; color:#627d98; text-align:center; max-width:420px; }
+        .messages-back { display:none; }
+        .messages-reply { border-top:1px solid #edf2f7; padding:14px; display:flex; gap:8px; align-items:flex-end; background:#fff; }
+        .messages-reply textarea { flex:1; min-width:0; resize:vertical; }
+        @media (max-width: 760px) {
+          .messages-header { padding:14px 16px; align-items:flex-start; }
+          .messages-header h1 { font-size:21px; }
+          .messages-header-subtitle { font-size:12px !important; }
+          .messages-mailbox { display:none; }
+          .messages-layout { padding:10px; display:block; }
+          .messages-rail,.messages-thread { border-radius:14px; }
+          .messages-thread { min-height:calc(100dvh - 94px); height:calc(100dvh - 94px); }
+          .messages-thread.messages-thread-hidden { display:none; }
+          .messages-rail.messages-rail-hidden { display:none; }
+          .messages-rail { min-height:calc(100dvh - 94px); }
+          .messages-compose { padding-bottom:12px; margin-bottom:12px; }
+          .messages-notices { max-height:155px; overflow:auto; }
+          .messages-thread-header { position:sticky; top:0; z-index:2; background:#fff; }
+          .messages-back { display:inline-flex; align-items:center; gap:6px; border:1px solid #d9e2ec; background:#fff; color:#243b53; border-radius:9px; padding:7px 9px; font-weight:800; }
+          .messages-thread-title { display:flex; align-items:center; gap:10px; min-width:0; }
+          .messages-thread-title span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+          .messages-thread-body { min-height:0; padding:12px; gap:8px; }
+          .messages-bubble { max-width:88%; font-size:14px; }
+          .messages-reply { padding:10px; }
+          .messages-reply textarea { min-height:44px; max-height:120px; }
+          .messages-reply button { min-height:44px; padding:10px 14px !important; }
+        }
+      `}</style>
+
+      <header className="messages-header">
+        <div className="messages-header-copy">
+          <div style={{ color: '#0f766e', fontSize: 12, fontWeight: 900, letterSpacing: 1.4 }}>BIMED HEALTHCARE</div>
+          <h1>BIMED Messages</h1>
+          <div className="messages-header-subtitle" style={{ marginTop: 5, color: '#627d98', fontSize: 13 }}>{staffType === 'recruitment_intake' ? 'New intake · onboarding and workforce communications' : 'Internal BIMED staff · workplace communications'}</div>
+        </div>
+        {mailbox && <div className="messages-mailbox"><strong>{mailbox.address}</strong><div style={{ color: '#627d98' }}>BIMED internal address</div></div>}
       </header>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 20, display: 'grid', gridTemplateColumns: '340px minmax(0,1fr)', gap: 16 }}>
-        <aside style={{ background: '#fff', border: '1px solid #e5eaf0', borderRadius: 16, padding: 14 }}>
-          <form onSubmit={startConversation} style={{ borderBottom: '1px solid #edf2f7', paddingBottom: 14, marginBottom: 14 }}>
+
+      <div className="messages-layout">
+        <aside className={`messages-rail ${active ? 'messages-rail-hidden' : ''}`}>
+          <form onSubmit={startConversation} className="messages-compose">
             <div style={{ fontWeight: 900, marginBottom: 8 }}>Message BIMED Admin / HR</div>
-            <select value={to} onChange={(e) => setTo(e.target.value)} style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 10, boxSizing: 'border-box', marginBottom: 8 }}>
-              {adminRecipients.map((admin) => <option key={admin.email} value={admin.email}>{admin.name} · {admin.email} · {admin.title}</option>)}
-              {!adminRecipients.length && <option value=''>No BIMED admin is currently available</option>}
+            <select value={to} onChange={(e) => setTo(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 10, marginBottom: 8 }}>
+              {adminRecipients.map((admin) => <option key={admin.email} value={admin.email}>{admin.name} · {admin.email}</option>)}
+              {!adminRecipients.length && <option value="">No BIMED admin is currently available</option>}
             </select>
-            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Write a workplace message…" rows={3} style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 10, boxSizing: 'border-box', resize: 'vertical' }} />
+            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Write a workplace message…" rows={3} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 10, resize: 'vertical' }} />
             <button disabled={busy || !draft.trim() || !to} style={{ width: '100%', marginTop: 8, padding: 10, border: 0, borderRadius: 10, background: '#0f766e', color: '#fff', fontWeight: 900 }}>{busy ? 'Sending…' : 'Send message'}</button>
           </form>
-          {notices && <div style={{ background: '#f8fafc', border: '1px solid #e5eaf0', borderRadius: 12, padding: 12, marginBottom: 14, fontSize: 12, lineHeight: 1.55 }}><strong>Important</strong><p style={{ margin: '6px 0' }}>{notices.probation}</p><p style={{ margin: 0 }}>{notices.monitoring}</p></div>}
+
+          {notices && <div className="messages-notices" style={{ background: '#f8fafc', border: '1px solid #e5eaf0', borderRadius: 12, padding: 12, marginBottom: 14, fontSize: 12, lineHeight: 1.55 }}><strong>Important</strong><p style={{ margin: '6px 0' }}>{notices.probation}</p><p style={{ margin: 0 }}>{notices.monitoring}</p></div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><div style={{ fontWeight: 900 }}>Inbox</div><div style={{ color: '#0f766e', fontWeight: 900, fontSize: 12 }}>{conversations.filter((item) => item.unread).length ? `${conversations.filter((item) => item.unread).length} unread` : 'All caught up'}</div></div>
-          {conversations.length === 0 ? <div style={{ color: '#627d98', fontSize: 13 }}>No messages yet.</div> : conversations.map((item) => <button key={item.id} onClick={() => { setDraft(''); void openConversation(item.id); }} style={{ width: '100%', textAlign: 'left', border: 0, background: active === item.id ? '#e6fffb' : '#fff', borderRadius: 10, padding: 12, marginBottom: 6, cursor: 'pointer' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><strong>{item.isAdminThread ? 'BIMED Admin / HR' : (item.other?.preferred_name || item.other?.full_name || item.other?.display || 'BIMED staff')}</strong>{item.unread && <span style={{ color: '#0f766e', fontWeight: 900 }}>●</span>}</div><div style={{ fontSize: 12, color: '#627d98', marginTop: 3 }}>{item.isAdminThread ? 'Official BIMED workplace inbox' : (item.other?.address || '')}</div><div style={{ fontSize: 12, color: '#829ab1', marginTop: 4 }}>{item.latest?.body || ''}</div></button>)}
+          {conversations.length === 0 ? <div style={{ color: '#627d98', fontSize: 13 }}>No messages yet.</div> : conversations.map((item) => <button key={item.id} onClick={() => { setDraft(''); void openConversation(item.id); }} className="messages-conversation-button" style={{ background: active === item.id ? '#e6fffb' : '#fff' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><strong>{item.isAdminThread ? 'BIMED Admin / HR' : (item.other?.preferred_name || item.other?.full_name || item.other?.display || 'BIMED staff')}</strong>{item.unread && <span style={{ color: '#0f766e', fontWeight: 900 }}>●</span>}</div><div style={{ fontSize: 12, color: '#627d98', marginTop: 3 }}>{item.isAdminThread ? 'Official BIMED workplace inbox' : (item.other?.address || '')}</div><div className="messages-conversation-preview" style={{ fontSize: 12, color: '#829ab1', marginTop: 4 }}>{item.latest?.body || ''}</div></button>)}
         </aside>
-        <section style={{ background: '#fff', border: '1px solid #e5eaf0', borderRadius: 16, minHeight: 640, display: 'flex', flexDirection: 'column' }}>
-          {!active ? <div style={{ margin: 'auto', color: '#627d98', textAlign: 'center' }}>Choose a BIMED admin above or open an existing conversation.</div> : <><div style={{ padding: 16, borderBottom: '1px solid #edf2f7', display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 900 }}><span>{activeConversation?.isAdminThread ? 'BIMED Admin / HR' : (activeConversation?.other?.preferred_name || activeConversation?.other?.full_name || 'Conversation')}</span>{olderCursor && <button onClick={() => void loadOlder()} disabled={loadingOlder} style={{ padding: '6px 9px', border: '1px solid #d9e2ec', background: '#fff', borderRadius: 8, fontWeight: 700 }}>{loadingOlder ? 'Loading…' : 'Load older'}</button>}</div><div style={{ flex: 1, padding: 18, display: 'grid', alignContent: 'start', gap: 10, overflowY: 'auto' }}>{messages.map((message) => <div key={message.id} style={{ justifySelf: message.sender_staff_id ? 'start' : 'end', maxWidth: '78%', background: message.sender_staff_id ? '#f4f7fb' : '#0f766e', color: message.sender_staff_id ? '#243b53' : '#fff', borderRadius: 14, padding: '10px 13px' }}><div style={{ fontSize: 11, fontWeight: 800, opacity: .75, marginBottom: 3 }}>{message.sender_staff_id ? 'You / Staff' : 'BIMED Admin'}</div><div style={{ whiteSpace: 'pre-wrap' }}>{message.body}</div><div style={{ fontSize: 10, opacity: .72, marginTop: 5 }}>{new Date(message.created_at).toLocaleString('en-IE')}</div></div>)}</div><form onSubmit={sendReply} style={{ borderTop: '1px solid #edf2f7', padding: 14, display: 'flex', gap: 8 }}><textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Reply…" rows={2} style={{ flex: 1, padding: 10, border: '1px solid #cbd5e1', borderRadius: 10, resize: 'vertical' }} /><button disabled={busy || !draft.trim()} style={{ padding: '10px 16px', border: 0, borderRadius: 10, background: '#0f766e', color: '#fff', fontWeight: 900 }}>Send</button></form></>}
+
+        <section className={`messages-thread ${!active ? 'messages-thread-hidden' : ''}`}>
+          {!active ? <div className="messages-empty">Choose a BIMED admin above or open an existing conversation.</div> : <>
+            <div className="messages-thread-header" style={{ padding: 12, borderBottom: '1px solid #edf2f7', display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 900 }}>
+              <div className="messages-thread-title">
+                <button type="button" className="messages-back" onClick={() => setActive('')}>← Inbox</button>
+                <span>{activeConversation?.isAdminThread ? 'BIMED Admin / HR' : (activeConversation?.other?.preferred_name || activeConversation?.other?.full_name || 'Conversation')}</span>
+              </div>
+              {olderCursor && <button onClick={() => void loadOlder()} disabled={loadingOlder} style={{ padding: '6px 9px', border: '1px solid #d9e2ec', background: '#fff', borderRadius: 8, fontWeight: 700, whiteSpace: 'nowrap' }}>{loadingOlder ? 'Loading…' : 'Load older'}</button>}
+            </div>
+            <div className="messages-thread-body">
+              {messages.map((message) => <div key={message.id} className="messages-bubble" style={{ justifySelf: message.sender_staff_id ? 'start' : 'end', background: message.sender_staff_id ? '#f4f7fb' : '#0f766e', color: message.sender_staff_id ? '#243b53' : '#fff', borderRadius: 14, padding: '10px 13px' }}><div style={{ fontSize: 11, fontWeight: 800, opacity: .75, marginBottom: 3 }}>{message.sender_staff_id ? 'You / Staff' : 'BIMED Admin'}</div><div style={{ whiteSpace: 'pre-wrap' }}>{message.body}</div><div style={{ fontSize: 10, opacity: .72, marginTop: 5 }}>{new Date(message.created_at).toLocaleString('en-IE')}</div></div>)}
+            </div>
+            <form onSubmit={sendReply} className="messages-reply"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Reply…" rows={2} /><button disabled={busy || !draft.trim()} style={{ padding: '10px 16px', border: 0, borderRadius: 10, background: '#0f766e', color: '#fff', fontWeight: 900 }}>Send</button></form>
+          </>}
         </section>
       </div>
-      {error && <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 20px', color: '#b42318' }}>{error}</div>}
+      {error && <div style={{ width: 'min(1200px,100%)', margin: '0 auto', padding: '0 20px 20px', boxSizing: 'border-box', color: '#b42318' }}>{error}</div>}
     </main>
   );
 }
