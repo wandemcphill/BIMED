@@ -6,7 +6,8 @@ export const BIMED_DEFAULT_PROBATION = '3 months';
 export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
 export const BIMED_DEFAULT_CONTRACT_DURATION = 'Fixed-term employment for two years, from 11 January 2027 to 10 January 2029';
 
-// Permit-relevant salary floors. These are BIMED contract minimums, not guarantees of permit eligibility.
+// Current 2026 standard General Employment Permit minimum annual remuneration published by DETE.
+// This is a current compliance floor, not a guarantee that a future permit application will qualify.
 export const BIMED_GEP_STANDARD_MAR_2026 = '€36,605 per annum';
 
 export const BIMED_ROLE_SALARIES: Partial<Record<CanonicalRecruitmentRoleSlug, string>> = {
