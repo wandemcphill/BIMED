@@ -1,5 +1,6 @@
 import Header from '@/components/Header';
 import AdminApplicationDetail from '@/components/AdminApplicationDetail';
+import AdminVerificationPanel from '@/components/AdminVerificationPanel';
 
 type PageProps = {
   params: Promise<{
@@ -14,6 +15,7 @@ export default async function ApplicationPage({ params }: PageProps) {
     <>
       <Header />
       <main className="wrap">
+        <AdminVerificationPanel applicationId={id} />
         <AdminApplicationDetail applicationId={id} />
       </main>
     </>
