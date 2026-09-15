@@ -2,7 +2,12 @@ import crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { activationExpiresAt, createActivationToken, hashActivationToken } from './staff-auth';
 import { recruitmentRoleSlug } from './bimed-role-policy';
-import { getOnboardingReadiness } from './onboarding-readiness';
+import {
+  ensureOnboardingChecklist,
+  getOnboardingReadiness,
+  POST_ACCESS_CHECK_KEYS,
+  PRE_ACCESS_CHECK_KEYS,
+} from './onboarding-readiness';
 import { generateBimedPortalEmail } from './staff-email';
 
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
@@ -84,7 +89,7 @@ export async function createStaffFromApplication(
     const readiness = await getOnboardingReadiness(client, application);
     if (!readiness.ready) {
       const missing = readiness.missing.map((item) => item.title).join(', ');
-      throw new Error(`Onboarding is not complete. Complete the following before staff creation: ${missing}`);
+      throw new Error(`Pre-access verification is not complete. Complete the following before staff creation: ${missing}`);
     }
   }
 
@@ -119,11 +124,40 @@ export async function createStaffFromApplication(
     .single();
   if (error || !staff) throw error || new Error('Unable to create staff profile.');
 
+  await ensureOnboardingChecklist(client, application);
+  const now = new Date().toISOString();
+
+  const { error: preAccessError } = await client
+    .from('recruitment_onboarding_checklist')
+    .update({
+      status: 'completed',
+      completed_at: now,
+      completed_by: 'BIMED recruitment verification',
+      notes: 'Pre-access evidence verified before staff portal access was issued.',
+      updated_at: now,
+    })
+    .eq('application_id', application.id)
+    .in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS));
+  if (preAccessError) throw preAccessError;
+
+  const { error: postAccessError } = await client
+    .from('recruitment_onboarding_checklist')
+    .update({
+      status: 'pending',
+      completed_at: null,
+      completed_by: null,
+      notes: null,
+      updated_at: now,
+    })
+    .eq('application_id', application.id)
+    .in('item_key', Array.from(POST_ACCESS_CHECK_KEYS));
+  if (postAccessError) throw postAccessError;
+
   await client.from('recruitment_applications').update({
     bimed_id: staff.bimed_id,
     address: effectiveAddress,
     start_date: effectiveStartDate,
-    updated_at: new Date().toISOString(),
+    updated_at: now,
   }).eq('id', applicationId);
 
   if (effectiveStatus === 'pre_arrival') {
@@ -142,7 +176,7 @@ export async function createStaffFromApplication(
       accommodation_payment_status: 'not_due',
       work_authorised: false,
       shift_eligibility: 'blocked',
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     }, { onConflict: 'staff_id' });
     if (permitError) console.error(JSON.stringify({ level: 'error', event: 'staff.permit_case_init_failed', staff_id: staff.id, reason: permitError.message }));
   }

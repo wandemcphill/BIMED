@@ -18,25 +18,25 @@ export const ONBOARDING_CHECKLIST_BASE: Omit<OnboardingChecklistItem, 'status' |
   {
     item_key: 'identity_verified',
     title: 'Identity verified',
-    description: 'Passport or other identity evidence has been reviewed and verified.',
+    description: 'Passport or other identity evidence has been reviewed and verified before staff portal access is issued.',
     required: true,
   },
   {
     item_key: 'qualification_evidence_verified',
     title: 'Qualification evidence verified',
-    description: 'Required qualification and training evidence has been reviewed for the applied role.',
+    description: 'Required qualification and training evidence has been reviewed for the applied role before staff portal access is issued.',
     required: true,
   },
   {
     item_key: 'references_verified',
     title: 'References verified',
-    description: 'Required professional or employment references have been checked and accepted.',
+    description: 'Required professional or employment references remain a BIMED-controlled post-access verification check.',
     required: true,
   },
   {
     item_key: 'right_to_work_verified',
     title: 'Right to work verified',
-    description: 'The candidate has been cleared to work in Ireland under the applicable pathway.',
+    description: 'BIMED confirms the candidate\'s applicable right-to-work position before lawful commencement of employment.',
     required: true,
   },
 ];
@@ -44,9 +44,16 @@ export const ONBOARDING_CHECKLIST_BASE: Omit<OnboardingChecklistItem, 'status' |
 export const INTERNATIONAL_ONBOARDING_CHECKLIST: Omit<OnboardingChecklistItem, 'status' | 'completed_at' | 'completed_by' | 'notes'> = {
   item_key: 'international_work_permission_verified',
   title: 'International work permission verified',
-  description: 'Required employment-permit or sponsorship evidence has been reviewed and accepted for this overseas candidate.',
+  description: 'Required employment-permit or sponsorship evidence is a BIMED-controlled post-access verification check for this overseas candidate.',
   required: true,
 };
+
+export const PRE_ACCESS_CHECK_KEYS = new Set(['identity_verified', 'qualification_evidence_verified']);
+export const POST_ACCESS_CHECK_KEYS = new Set([
+  'references_verified',
+  'right_to_work_verified',
+  'international_work_permission_verified',
+]);
 
 export function onboardingChecklistForApplication(application: {
   living_in_ireland?: string | null;
@@ -84,8 +91,8 @@ export async function getOnboardingReadiness(
   if (error) throw error;
 
   const items = (data || []) as OnboardingChecklistItem[];
-  const required = items.filter((item) => item.required);
-  const incomplete = required.filter((item) => item.status !== 'completed' && item.status !== 'waived');
+  const preAccessRequired = items.filter((item) => item.required && PRE_ACCESS_CHECK_KEYS.has(item.item_key));
+  const incomplete = preAccessRequired.filter((item) => item.status !== 'completed' && item.status !== 'waived');
   return {
     ready: incomplete.length === 0,
     items,
