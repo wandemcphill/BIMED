@@ -7,7 +7,7 @@ export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
 export const BIMED_DEFAULT_CONTRACT_DURATION = 'Permanent employment, with no fixed end date';
 
 export const BIMED_ROLE_SALARIES: Partial<Record<CanonicalRecruitmentRoleSlug, string>> = {
-  'support-worker': '€36,000 per annum',
+  'support-worker': '€36,605 per annum',
   'healthcare-assistant': '€36,000 per annum',
   'senior-support-worker': '€41,000 per annum',
   physiotherapist: '€55,000 per annum',
@@ -74,6 +74,18 @@ function permitCategoryForRole(roleSlug: CanonicalRecruitmentRoleSlug): string |
   return null;
 }
 
+function permitFloorNoteForRole(roleSlug: CanonicalRecruitmentRoleSlug): string {
+  switch (roleSlug) {
+    case 'physiotherapist':
+      return ' (current 2026 CSEP relevant-degree minimum annual remuneration is €40,904)';
+    case 'healthcare-assistant':
+      return ' (current 2026 HCA GEP minimum annual remuneration is €32,691)';
+    case 'support-worker':
+    case 'senior-support-worker':
+      return ' (current 2026 standard GEP minimum annual remuneration is €36,605 unless a different statutory occupation-specific threshold applies)';
+  }
+}
+
 export function applyBimedContractDefaults(
   template: ContractTemplate,
   overrides?: { employeeName?: string | null; employeeAddress?: string | null; startDate?: string | null }
@@ -96,6 +108,7 @@ export function applyBimedContractDefaults(
     ['Job title: [insert] Reports to: [insert]', `Job title: ${template.roleLabel} Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`],
     ['The first 6 months of your employment is a probationary period', `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`],
     ['extend your probationary period once, up to a combined maximum of 12 months', 'extend your probationary period once, up to a combined maximum of 6 months'],
+    [' (currently EUR 32,691 per annum for Healthcare Assistant / Home Support Worker roles)', permitFloorNoteForRole(roleSlug)],
   ];
 
   if (roleSalary) replacements.push(['[Insert pay rate for this role]', roleSalary]);
@@ -146,9 +159,7 @@ export function applyBimedContractDefaults(
 
   if (permitCategory) {
     const rightToWorkSection = sections.find((section) => section.heading === '16. Right to Work');
-    if (rightToWorkSection && !rightToWorkSection.paragraphs.some((paragraph) => paragraph.startsWith('16.')) && false) {
-      rightToWorkSection.paragraphs.push(`Intended employment permit pathway: ${permitCategory}.`);
-    } else if (rightToWorkSection && !rightToWorkSection.paragraphs.some((paragraph) => paragraph.includes('Intended employment permit pathway:'))) {
+    if (rightToWorkSection && !rightToWorkSection.paragraphs.some((paragraph) => paragraph.includes('Intended employment permit pathway:'))) {
       rightToWorkSection.paragraphs.push(`Intended employment permit pathway: ${permitCategory}. Final eligibility and grant are determined by DETE.`);
     }
   }
