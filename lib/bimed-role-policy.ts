@@ -7,7 +7,7 @@ export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
 export const BIMED_DEFAULT_CONTRACT_DURATION = 'Permanent employment, with no fixed end date';
 
 export const BIMED_ROLE_SALARIES: Partial<Record<CanonicalRecruitmentRoleSlug, string>> = {
-  'support-worker': '€36,605 per annum',
+  'support-worker': '€36,000 per annum',
   'healthcare-assistant': '€36,000 per annum',
   'senior-support-worker': '€41,000 per annum',
   physiotherapist: '€55,000 per annum',
@@ -112,6 +112,17 @@ export function applyBimedContractDefaults(
   ];
 
   if (roleSalary) replacements.push(['[Insert pay rate for this role]', roleSalary]);
+
+  if (roleSlug === 'physiotherapist') {
+    replacements.push([
+      'EUR 45,514 to EUR 63,831 gross per annum, in line with the HSE-aligned Physiotherapist (staff grade) pay scale, based on experience',
+      roleSalary ?? '€55,000 per annum',
+    ]);
+    replacements.push([
+      'The Company will apply for a General Employment Permit on your behalf, valid from your start date.',
+      'Where an employment permit is required for this Role, the Company\'s intended permit pathway is Critical Skills Employment Permit (CSEP), subject to DETE eligibility and final assessment. This statement does not guarantee permit eligibility or grant.',
+    ]);
+  }
 
   if (overrides?.employeeName) {
     replacements.push(['[Insert employee name]', overrides.employeeName], ['[Employee full name]', overrides.employeeName]);
