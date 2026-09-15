@@ -21,11 +21,16 @@ describe('BIMED staff portal parity', () => {
     expect(route).not.toContain(".upsert(");
   });
 
-  it('exposes the onboarding workspace without granting staff mutation rights', async () => {
+  it('exposes the three post-access checks without staff-side mutation controls', async () => {
     const page = await repoFile('app/staff/onboarding/page.tsx');
     expect(page).toContain("/api/staff/onboarding");
-    expect(page).toContain('This page is read-only.');
-    expect(page).toContain('Onboarding readiness requirements are complete.');
+    expect(page).toContain('Post-access verification');
+    expect(page).toContain('Portal access approved');
+    expect(page).toContain('references_verified');
+    expect(page).toContain('right_to_work_verified');
+    expect(page).toContain('international_work_permission_verified');
+    expect(page).not.toContain('This page is read-only.');
+    expect(page).not.toContain('Onboarding readiness requirements are complete.');
   });
 
   it('retains BIMED workforce coverage across rota, attendance, payslips and profile services', async () => {
@@ -40,9 +45,13 @@ describe('BIMED staff portal parity', () => {
     expect(profile).toContain(".eq('id', session.staff_id)");
   });
 
-  it('keeps the existing onboarding gate before staff creation', async () => {
+  it('keeps the pre-access verification gate before staff creation and resets post-access checks', async () => {
     const staff = await repoFile('lib/staff.ts');
     expect(staff).toContain('getOnboardingReadiness');
     expect(staff).toContain("if (!readiness.ready)");
+    expect(staff).toContain(".in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS))");
+    expect(staff).toContain(".in('item_key', Array.from(POST_ACCESS_CHECK_KEYS))");
+    expect(staff).toContain("status: 'completed'");
+    expect(staff).toContain("status: 'pending'");
   });
 });

@@ -95,11 +95,17 @@ export function applyBimedContractDefaults(
   overrides?: { employeeName?: string | null; employeeAddress?: string | null; startDate?: string | null }
 ): ContractTemplate {
   const startDate = BIMED_DEFAULT_START_DATE;
+  const employeeName = overrides?.employeeName?.trim() || 'Employee name to be confirmed before issue';
+  const employeeAddress = overrides?.employeeAddress?.trim() || 'Employee address to be confirmed before issue';
 
   const roleSlug = template.roleSlug as CanonicalRecruitmentRoleSlug;
   const roleSalary = BIMED_ROLE_SALARIES[roleSlug];
   const permitCategory = permitCategoryForRole(roleSlug);
   const replacements: Array<[string, string]> = [
+    ['[Insert employee name]', employeeName],
+    ['[Employee full name]', employeeName],
+    ['[Insert employee address]', employeeAddress],
+    ['[Employee address]', employeeAddress],
     ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[Insert start date]', startDate],
@@ -115,6 +121,13 @@ export function applyBimedContractDefaults(
 
   if (roleSalary) replacements.push(['[Insert pay rate for this role]', roleSalary]);
 
+  if (roleSlug === 'healthcare-assistant') {
+    replacements.push([
+      'EUR 32,691 gross per annum minimum, equivalent to EUR 16.12 gross per hour based on a 39-hour working week',
+      roleSalary ?? '€36,000 per annum',
+    ]);
+  }
+
   if (roleSlug === 'physiotherapist') {
     replacements.push([
       'EUR 45,514 to EUR 63,831 gross per annum, in line with the HSE-aligned Physiotherapist (staff grade) pay scale, based on experience',
@@ -124,13 +137,6 @@ export function applyBimedContractDefaults(
       'The Company will apply for a General Employment Permit on your behalf, valid from your start date.',
       'Where an employment permit is required for this Role, the Company\'s intended permit pathway is Critical Skills Employment Permit (CSEP), subject to DETE eligibility and final assessment. This statement does not guarantee permit eligibility or grant.',
     ]);
-  }
-
-  if (overrides?.employeeName) {
-    replacements.push(['[Insert employee name]', overrides.employeeName], ['[Employee full name]', overrides.employeeName]);
-  }
-  if (overrides?.employeeAddress) {
-    replacements.push(['[Insert employee address]', overrides.employeeAddress], ['[Employee address]', overrides.employeeAddress]);
   }
 
   const editableFields = template.editableFields.map((field) => ({
