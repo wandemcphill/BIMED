@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getContractTemplate } from '@/lib/contract-templates';
 import { getJobDescriptionTemplate } from '@/lib/document-templates';
 import {
+  BIMED_DEFAULT_CONTRACT_DURATION,
   BIMED_DEFAULT_LINE_MANAGER,
   BIMED_DEFAULT_PAY_FREQUENCY,
   BIMED_DEFAULT_PROBATION,
@@ -60,6 +61,8 @@ describe('BIMED role policy', () => {
       expect(resolved.editableFields.find((item) => item.label === 'Start date')?.value).toBe(BIMED_DEFAULT_START_DATE);
       expect(resolved.editableFields.find((item) => item.label === 'Pay frequency')?.value).toBe(BIMED_DEFAULT_PAY_FREQUENCY);
       expect(resolved.editableFields.find((item) => item.label === 'Pay')?.value).toBe(BIMED_ROLE_SALARIES[slug]);
+      expect(resolved.editableFields.find((item) => item.label === 'Contract duration')?.value).toBe(BIMED_DEFAULT_CONTRACT_DURATION);
+      expect(resolved.sections.find((section) => section.heading === '2. Commencement of Employment and Probation')?.paragraphs.join('\n')).toContain(`2.6 Contract duration: ${BIMED_DEFAULT_CONTRACT_DURATION}`);
     }
   });
 
@@ -75,6 +78,7 @@ describe('BIMED role policy', () => {
     expect(field('Line manager')).toBe(BIMED_DEFAULT_LINE_MANAGER);
     expect(field('Start date')).toBe(BIMED_DEFAULT_START_DATE);
     expect(field('Pay frequency')).toBe(BIMED_DEFAULT_PAY_FREQUENCY);
+    expect(field('Contract duration')).toBe(BIMED_DEFAULT_CONTRACT_DURATION);
     expect(probation).toContain(`first ${BIMED_DEFAULT_PROBATION}`);
     expect(probation).toContain('combined maximum of 6 months');
     expect(probation).not.toContain('first 6 months of your employment');
@@ -104,6 +108,7 @@ describe('BIMED role policy', () => {
     expect(allContractText).toContain('Gabriel Oliveira de Lima');
     expect(allContractText).toContain('Example residential address, Dublin');
     expect(allContractText).toContain('11 January 2027');
+    expect(allContractText).toContain(BIMED_DEFAULT_CONTRACT_DURATION);
     expect(allContractText).not.toMatch(/\[[^\]]+\]/);
   });
 
@@ -117,15 +122,23 @@ describe('BIMED role policy', () => {
     expect(roleSummary?.paragraphs.join('\n')).not.toContain('[Insert line manager name/title]');
   });
 
-  it('preserves Physiotherapist-specific hours, pay and registration requirements', () => {
+  it('states the intended Critical Skills permit pathway for Physiotherapist', () => {
     const template = getContractTemplate('physiotherapist');
     if (!template) throw new Error('Physiotherapist template missing');
 
     const resolved = applyBimedContractDefaults(template);
     const field = (label: string) => resolved.editableFields.find((item) => item.label === label)?.value;
+    const allContractText = [
+      ...resolved.editableFields.map((item) => item.value),
+      ...resolved.sections.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
+      ...resolved.schedules.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
+      resolved.closingNote,
+    ].join('\n');
 
     expect(field('Contracted hours')).toBe('35 hours per week');
     expect(field('Pay')).toBe(BIMED_ROLE_SALARIES.physiotherapist);
+    expect(field('Employment permit category')).toContain('Critical Skills Employment Permit (CSEP)');
+    expect(allContractText).toContain('Intended employment permit pathway: Critical Skills Employment Permit (CSEP)');
     expect(resolved.sections.find((section) => section.heading === '16. Right to Work')?.paragraphs.join('\n')).toContain('CORU');
   });
 });
