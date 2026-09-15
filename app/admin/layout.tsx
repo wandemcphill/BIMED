@@ -7,9 +7,7 @@ import { useEffect, useState } from 'react';
 const sections = [
   {
     title: 'Recruitment',
-    items: [
-      { href: '/admin', label: 'Dashboard' },
-    ],
+    items: [{ href: '/admin', label: 'Dashboard' }],
   },
   {
     title: 'Workforce',
@@ -23,9 +21,7 @@ const sections = [
   },
   {
     title: 'Overseas',
-    items: [
-      { href: '/admin/permit', label: 'Permit & Travel' },
-    ],
+    items: [{ href: '/admin/permit', label: 'Permit & Travel' }],
   },
   {
     title: 'Administration',
@@ -67,10 +63,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .bimed-admin-link.active { background:#0f766e; box-shadow:0 7px 20px rgba(15,118,110,.24); }
         .bimed-admin-footer { margin-top:auto; padding:14px 12px 4px; border-top:1px solid rgba(255,255,255,.12); color:rgba(255,255,255,.68); font-size:11px; line-height:1.5; }
         .bimed-admin-footer strong { display:block; color:#fff; font-size:12px; margin-bottom:2px; overflow-wrap:anywhere; }
-        .bimed-admin-content { min-width:0; margin-left:252px; min-height:100vh; }
+        .bimed-admin-content { min-width:0; margin-left:252px; min-height:100vh; overflow-x:auto; }
         .bimed-admin-mobile-bar { display:none; }
         .bimed-admin-overlay { display:none; }
-        .bimed-admin-content main { min-width:0; max-width:100vw; overflow-x:hidden; }
+        .bimed-admin-content main { min-width:0; max-width:100%; overflow-x:visible; }
 
         @media (max-width: 980px) {
           .bimed-admin-sidebar { width:274px; transform:translateX(-104%); transition:transform .2s ease; box-shadow:18px 0 44px rgba(15,23,42,.22); }
@@ -135,7 +131,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="bimed-admin-section">{section.title}</div>
             {section.items.map((item) => {
               const active = item.href === '/admin' ? pathname === '/admin' : pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return <Link key={item.href} href={item.href} className={`bimed-admin-link ${active ? 'active' : ''}`} onClick={close}>{item.label}</Link>;
+              return <Link key={item.href} href={item.href} className={`bimed-admin-link ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={close}>{item.label}</Link>;
             })}
           </div>
         ))}
