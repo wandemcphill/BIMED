@@ -61,19 +61,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { data: before } = await client.from('recruitment_applications').select('status').eq('id', applicationId).maybeSingle();
   const previousStatus = before?.status || null;
 
-  let preparedStaff: { staff: any; activationToken: string | null } | null = null;
-
-  // Hired is the hard boundary between recruitment and permanent workforce. Prepare the
-  // staff identity first so an applicant cannot be left as Hired without a real Staff Portal account.
-  if (body.status === 'Hired' && previousStatus !== 'Hired') {
-    try {
-      preparedStaff = await createStaffFromApplication(client, applicationId, { refreshActivation: true });
-    } catch (staffError) {
-      console.error(JSON.stringify({ level: 'error', event: 'staff.identity_creation_failed_on_hire', application_id: applicationId, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
-      return NextResponse.json({ error: staffError instanceof Error ? staffError.message : 'Unable to create the BIMED staff account. The candidate was not moved to Hired.' }, { status: 422 });
-    }
-  }
-
   const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
   if (body.status) updatePayload.status = body.status;
   if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
@@ -92,32 +79,47 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   });
 
   let staffIdentity: { bimed_id: string; bimed_email: string; activationUrl: string | null; welcomeEmailSent: boolean } | null = null;
+  let staffProvisioningWarning: string | null = null;
 
-  if (preparedStaff) {
-    const origin = new URL(request.url).origin;
-    let welcomeEmailSent = false;
-    if (preparedStaff.activationToken) {
-      const welcome = await sendStaffPortalActivationEmail(client, preparedStaff.staff, preparedStaff.activationToken, data.email);
-      welcomeEmailSent = welcome.status === 'sent';
+  if (body.status === 'Hired' && previousStatus !== 'Hired') {
+    try {
+      const result = await createStaffFromApplication(client, applicationId, { refreshActivation: true, allowUncontractedHire: true });
+      const origin = new URL(request.url).origin;
+      let welcomeEmailSent = false;
+      if (result.activationToken) {
+        const welcome = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken, data.email);
+        welcomeEmailSent = welcome.status === 'sent';
+      }
+      staffIdentity = {
+        bimed_id: result.staff.bimed_id,
+        bimed_email: result.staff.email,
+        activationUrl: result.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}` : null,
+        welcomeEmailSent,
+      };
+      await createStaffAudit(client, {
+        staffId: result.staff.id,
+        actor: session.email,
+        eventType: 'candidate_promoted_to_hired',
+        metadata: {
+          application_id: applicationId,
+          recruitment_status: 'Hired',
+          bimed_id: result.staff.bimed_id,
+          bimed_email: result.staff.email,
+          welcome_email_sent: welcomeEmailSent,
+          promotion_override: true,
+        },
+      });
+    } catch (staffError) {
+      staffProvisioningWarning = staffError instanceof Error ? staffError.message : 'Staff Portal provisioning could not be completed.';
+      console.error(JSON.stringify({ level: 'error', event: 'staff.identity_creation_failed_on_hire', application_id: applicationId, reason: staffProvisioningWarning }));
+      await recordRecruitmentAudit(client, {
+        applicationId,
+        inviteId: data.invite_id,
+        eventType: 'candidate_hired_staff_provisioning_failed',
+        actor: session.email,
+        metadata: { promotion_override: true, reason: staffProvisioningWarning },
+      });
     }
-    staffIdentity = {
-      bimed_id: preparedStaff.staff.bimed_id,
-      bimed_email: preparedStaff.staff.email,
-      activationUrl: preparedStaff.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(preparedStaff.activationToken)}&email=${encodeURIComponent(preparedStaff.staff.email)}` : null,
-      welcomeEmailSent,
-    };
-    await createStaffAudit(client, {
-      staffId: preparedStaff.staff.id,
-      actor: session.email,
-      eventType: 'candidate_promoted_to_hired',
-      metadata: {
-        application_id: applicationId,
-        recruitment_status: 'Hired',
-        bimed_id: preparedStaff.staff.bimed_id,
-        bimed_email: preparedStaff.staff.email,
-        welcome_email_sent: welcomeEmailSent,
-      },
-    });
   } else if (body.status && ['Selected', 'Offer Issued', 'Onboarding'].includes(body.status)) {
     try {
       const result = await createStaffFromApplication(client, applicationId);
@@ -142,7 +144,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         previousStatus,
         status: body.status,
         actor: session.email,
-        // Hired uses the personalized new-hire welcome email above rather than the generic status email.
         notifyCandidate: body.status === 'Hired' ? false : body.notify_candidate !== false,
       }, client);
       statusEmail = emails.candidate;
@@ -151,7 +152,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
-  return NextResponse.json({ application: data, statusEmail, staffIdentity });
+  return NextResponse.json({ application: data, statusEmail, staffIdentity, staffProvisioningWarning });
 }
 
 // Permanently deletes a candidate's application and everything tied to it (interviews, contract
