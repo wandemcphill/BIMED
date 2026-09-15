@@ -138,10 +138,25 @@ export function applyBimedContractDefaults(
     });
   }
 
+  const sections = template.sections.map((section) => applySectionReplacements(section, replacements));
+  const commencementSection = sections.find((section) => section.heading === '2. Commencement of Employment and Probation');
+  if (commencementSection && !commencementSection.paragraphs.some((paragraph) => paragraph.startsWith('2.6 Contract duration:'))) {
+    commencementSection.paragraphs.push(`2.6 Contract duration: ${BIMED_DEFAULT_CONTRACT_DURATION}. There is no fixed end date unless a candidate-specific written variation expressly states otherwise.`);
+  }
+
+  if (permitCategory) {
+    const rightToWorkSection = sections.find((section) => section.heading === '16. Right to Work');
+    if (rightToWorkSection && !rightToWorkSection.paragraphs.some((paragraph) => paragraph.startsWith('16.')) && false) {
+      rightToWorkSection.paragraphs.push(`Intended employment permit pathway: ${permitCategory}.`);
+    } else if (rightToWorkSection && !rightToWorkSection.paragraphs.some((paragraph) => paragraph.includes('Intended employment permit pathway:'))) {
+      rightToWorkSection.paragraphs.push(`Intended employment permit pathway: ${permitCategory}. Final eligibility and grant are determined by DETE.`);
+    }
+  }
+
   return {
     ...template,
     editableFields,
-    sections: template.sections.map((section) => applySectionReplacements(section, replacements)),
+    sections,
     schedules: template.schedules.map((section) => applySectionReplacements(section, replacements)),
     closingNote: replaceText(template.closingNote, replacements),
   };
