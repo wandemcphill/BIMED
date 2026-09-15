@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   ]);
   if (!permit) return NextResponse.json({ error: 'Overseas permit case not initialized.' }, { status: 404 });
   const { data: invoice } = await client.from('recruitment_accommodation_invoices').select('id,invoice_number,status').eq('permit_case_id', permit.id).maybeSingle();
-  if (!accommodationReady(invoice)) return NextResponse.json({ error: 'Your accommodation invoice must be issued by BIMED before flight planning can continue.' }, { status: 409 });
+  if (!invoice || !accommodationReady(invoice)) return NextResponse.json({ error: 'Your accommodation invoice must be issued by BIMED before flight planning can continue.' }, { status: 409 });
   try {
     const travelDate = getDate(body?.travel_date);
     const passengers = Array.isArray(body?.passengers) ? body.passengers.slice(0, 3).map((passenger: any) => ({ full_name: String(passenger?.full_name || '').trim(), date_of_birth: String(passenger?.date_of_birth || '').trim() })) : [];
