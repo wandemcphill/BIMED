@@ -10,8 +10,8 @@ const SAFE_PROFILE_FIELDS = 'id,bimed_id,application_id,full_name,preferred_name
 
 async function withPhotoUrl(client: ReturnType<typeof db>, staff: Record<string, unknown>) {
   if (!staff.profile_photo_path) return staff;
-  const { data } = await client.storage.from(STAFF_PHOTO_BUCKET).createSignedUrl(String(staff.profile_photo_path), 15 * 60);
-  return { ...staff, profile_photo_url: data?.signedUrl || null };
+  const version = staff.profile_photo_updated_at ? encodeURIComponent(String(staff.profile_photo_updated_at)) : 'current';
+  return { ...staff, profile_photo_url: `/api/staff/me/photo?v=${version}` };
 }
 
 export async function GET(request: NextRequest) {
