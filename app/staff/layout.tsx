@@ -8,6 +8,8 @@ const navItems = [
   { href: '/staff/messages', label: 'Messages' },
   { href: '/staff/rota', label: 'Rota' },
   { href: '/staff/attendance', label: 'Attendance' },
+  { href: '/staff/notifications', label: 'Notifications' },
+  { href: '/staff/permit', label: 'Employment permit' },
   { href: '/staff/travel', label: 'Travel to Ireland' },
 ];
 
@@ -27,6 +29,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           position:fixed; inset:0 auto 0 0; width:var(--bimed-sidebar-width); z-index:100;
           display:flex; flex-direction:column; gap:6px; padding:20px 14px;
           box-sizing:border-box; background:#163247; color:#fff; box-shadow:12px 0 30px rgba(15,23,42,.08);
+          overflow-y:auto;
         }
         .bimed-staff-brand { display:block; padding:4px 12px 18px; border-bottom:1px solid rgba(255,255,255,.12); margin-bottom:8px; }
         .bimed-staff-brand strong { display:block; font-size:18px; letter-spacing:-.02em; }
@@ -39,6 +42,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         .bimed-staff-nav-link.active { background:#0f766e; box-shadow:0 6px 18px rgba(15,118,110,.22); }
         .bimed-staff-content { min-width:0; margin-left:var(--bimed-sidebar-width); min-height:100vh; }
         .bimed-staff-mobile-bar { display:none; }
+        .bimed-staff-overlay { display:none; }
         main { max-width:100vw; box-sizing:border-box; overflow-x:hidden; }
         main img { max-width:100%; height:auto; }
 
@@ -46,8 +50,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           :root { --bimed-sidebar-width:0px; }
           .bimed-staff-sidebar { width:270px; transform:translateX(-104%); transition:transform .2s ease; box-shadow:16px 0 36px rgba(15,23,42,.2); }
           .bimed-staff-sidebar.open { transform:translateX(0); }
-          .bimed-staff-overlay { display:none; position:fixed; inset:0; z-index:90; background:rgba(15,23,42,.45); }
-          .bimed-staff-overlay.open { display:block; }
+          .bimed-staff-overlay.open { display:block; position:fixed; inset:0; z-index:90; background:rgba(15,23,42,.45); }
           .bimed-staff-content { margin-left:0; padding-top:58px; }
           .bimed-staff-mobile-bar {
             position:fixed; inset:0 0 auto 0; height:58px; z-index:80; display:flex; align-items:center; gap:10px;
