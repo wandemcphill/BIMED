@@ -68,6 +68,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .bimed-admin-overlay { display:none; }
         .bimed-admin-content main { min-width:0; max-width:100%; overflow-x:visible; }
 
+        /* Admin pages intentionally use white secondary action surfaces in a number of places.
+           The global button rule supplies white text by default, so make those light buttons
+           readable without changing primary/teal action buttons that already specify their text color. */
+        .bimed-admin-content button[style*="background: rgb(255, 255, 255)"],
+        .bimed-admin-content button[style*="background:#fff"],
+        .bimed-admin-content button[style*="background: #fff"],
+        .bimed-admin-content button[style*="background:white"] {
+          color:#334e68;
+        }
+
+        .bimed-admin-content button:focus-visible,
+        .bimed-admin-content a:focus-visible,
+        .bimed-admin-content input:focus-visible,
+        .bimed-admin-content select:focus-visible,
+        .bimed-admin-content textarea:focus-visible {
+          outline:3px solid rgba(15,118,110,.24);
+          outline-offset:2px;
+        }
+
         @media (max-width: 980px) {
           .bimed-admin-sidebar { width:274px; transform:translateX(-104%); transition:transform .2s ease; box-shadow:18px 0 44px rgba(15,23,42,.22); }
           .bimed-admin-sidebar.open { transform:translateX(0); }
