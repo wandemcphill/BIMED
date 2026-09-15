@@ -50,6 +50,30 @@ describe('BIMED role policy', () => {
     });
   });
 
+  it('enforces the canonical start date and two-year term for every role', () => {
+    expect(BIMED_DEFAULT_START_DATE).toBe('11 January 2027');
+    expect(BIMED_DEFAULT_CONTRACT_DURATION).toBe(
+      'Fixed-term employment for two years, from 11 January 2027 to 10 January 2029'
+    );
+
+    for (const role of CANONICAL_RECRUITMENT_ROLES) {
+      const template = getContractTemplate(recruitmentRoleSlug(role)!);
+      if (!template) throw new Error(`${role} template missing`);
+      const resolved = applyBimedContractDefaults(template, {
+        startDate: undefined,
+      } as never);
+      const field = (label: string) => resolved.editableFields.find((item) => item.label === label)?.value;
+      const commencement = resolved.sections.find((section) => section.heading === '2. Commencement of Employment and Probation')?.paragraphs.join('\n') || '';
+
+      expect(field('Start date')).toBe('11 January 2027');
+      expect(field('Contract duration')).toBe(BIMED_DEFAULT_CONTRACT_DURATION);
+      expect(commencement).toContain('2.6 Contract duration: Fixed-term employment for two years, from 11 January 2027 to 10 January 2029.');
+      expect(commencement).toContain('fixed term ends on 10 January 2029');
+      expect(commencement).not.toContain('no fixed end date');
+      expect(commencement).not.toContain('permanent');
+    }
+  });
+
   it('removes unresolved placeholders from every canonical contract after applying BIMED defaults', () => {
     for (const role of CANONICAL_RECRUITMENT_ROLES) {
       const slug = recruitmentRoleSlug(role)!;
@@ -71,7 +95,6 @@ describe('BIMED role policy', () => {
       expect(resolved.editableFields.find((item) => item.label === 'Pay frequency')?.value).toBe(BIMED_DEFAULT_PAY_FREQUENCY);
       expect(resolved.editableFields.find((item) => item.label === 'Pay')?.value).toBe(BIMED_ROLE_SALARIES[slug]);
       expect(resolved.editableFields.find((item) => item.label === 'Contract duration')?.value).toBe(BIMED_DEFAULT_CONTRACT_DURATION);
-      expect(resolved.sections.find((section) => section.heading === '2. Commencement of Employment and Probation')?.paragraphs.join('\n')).toContain(`2.6 Contract duration: ${BIMED_DEFAULT_CONTRACT_DURATION}`);
     }
   });
 
@@ -98,14 +121,13 @@ describe('BIMED role policy', () => {
     expect(schedule2).not.toContain('[insert]');
   });
 
-  it('resolves employee-specific placeholders when preparing a candidate contract', () => {
+  it('resolves employee-specific identity/address without changing the canonical contract start date', () => {
     const template = getContractTemplate('support-worker');
     if (!template) throw new Error('Support Worker template missing');
 
     const resolved = applyBimedContractDefaults(template, {
       employeeName: 'Gabriel Oliveira de Lima',
       employeeAddress: 'Example residential address, Dublin',
-      startDate: '2027-01-11',
     });
     const allContractText = [
       ...resolved.editableFields.map((item) => item.value),
@@ -118,6 +140,8 @@ describe('BIMED role policy', () => {
     expect(allContractText).toContain('Example residential address, Dublin');
     expect(allContractText).toContain('11 January 2027');
     expect(allContractText).toContain(BIMED_DEFAULT_CONTRACT_DURATION);
+    expect(allContractText).not.toContain('11 January 2028');
+    expect(allContractText).not.toContain('11 January 2029');
     expect(allContractText).not.toMatch(/\[[^\]]+\]/);
   });
 
