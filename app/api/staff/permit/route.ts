@@ -71,6 +71,10 @@ function completeProfilePacket(staff: any, application: any, permit: any) {
   };
 }
 
+function isAccommodationReady(invoice: any) {
+  return invoice?.status === 'issued' || invoice?.status === 'paid';
+}
+
 async function getPermitContext(staffId: string) {
   const client = db();
   const { data: staff } = await client.from('recruitment_staff').select('*').eq('id', staffId).maybeSingle();
@@ -86,7 +90,7 @@ async function getPermitContext(staffId: string) {
 export async function GET(request: NextRequest) {
   const session = await getStaffSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
-  const { client, staff, permit, application, invoice } = await getPermitContext(session.staff_id);
+  const { staff, permit, application, invoice } = await getPermitContext(session.staff_id);
   if (!staff) return NextResponse.json({ error: 'Staff record not found.' }, { status: 404 });
   if (!staff.application_id || staff.status !== 'pre_arrival') return NextResponse.json({ error: 'The overseas permit workspace is only available to overseas recruitment-linked staff.' }, { status: 403 });
   if (!permit) return NextResponse.json({ error: 'Permit case has not been initialized.' }, { status: 404 });
@@ -95,6 +99,7 @@ export async function GET(request: NextRequest) {
     packet: completeProfilePacket(staff, application, permit),
     invoice: invoice ? { id: invoice.id, invoice_number: invoice.invoice_number, public_token: invoice.public_token, status: invoice.status, issue_date: invoice.issue_date, due_date: invoice.due_date, amount_eur: invoice.amount_eur } : null,
     invoiceUrl: invoice ? `${appUrl()}/invoices/accommodation/${invoice.public_token}` : null,
+    accommodationReady: isAccommodationReady(invoice),
   });
 }
 
@@ -109,7 +114,7 @@ export async function POST(request: NextRequest) {
 
   if (action === 'acknowledge_accommodation') {
     if (permit.accommodation_terms_acknowledged_at) return NextResponse.json({ error: 'The accommodation arrangement has already been acknowledged.' }, { status: 409 });
-    if (body?.acknowledged !== true) return NextResponse.json({ error: 'Please confirm that you understand and are comfortable with the accommodation payment and refund terms before continuing.' }, { status: 400 });
+    if (body?.acknowledged !== true) return NextResponse.json({ error: 'Please confirm that you understand and accept the compulsory accommodation payment and refund terms before continuing.' }, { status: 400 });
 
     const now = new Date().toISOString();
     const { data: updatedPermit, error: permitError } = await client.from('recruitment_staff_permit_cases').update({
@@ -117,7 +122,7 @@ export async function POST(request: NextRequest) {
       accommodation_terms_version: ACCOMMODATION_TERMS_VERSION,
       accommodation_terms_acknowledged_name: staff.full_name,
       accommodation_invoice_requested_at: now,
-      accommodation_payment_status: currentInvoice?.status === 'issued' ? 'invoice_issued' : 'invoice_requested',
+      accommodation_payment_status: isAccommodationReady(currentInvoice) ? 'invoice_issued' : 'invoice_requested',
       updated_at: now,
     }).eq('id', permit.id).select('*').single();
     if (permitError || !updatedPermit) return NextResponse.json({ error: 'Unable to record the acknowledgement.' }, { status: 500 });
@@ -143,26 +148,27 @@ export async function POST(request: NextRequest) {
     }
 
     const subject = `Accommodation payment request: ${staff.full_name} (${staff.bimed_id})`;
-    const bodyHtml = `<div style="font-family:Arial,sans-serif;color:#172b4d"><h2>Accommodation payment request</h2><p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has acknowledged the BIMED accommodation payment arrangement.</p><p>Amount: <strong>€${ACCOMMODATION_AMOUNT_EUR.toFixed(2)}</strong><br>Period: <strong>${ACCOMMODATION_PERIOD_MONTHS} months</strong><br>Terms version: <strong>${ACCOMMODATION_TERMS_VERSION}</strong></p><p>The candidate confirmed that they understand and are comfortable with the payment, refund and accommodation terms presented in the Staff Portal. The invoice is currently <strong>${invoice.status}</strong>.</p><p><a href="${appUrl()}/admin/permit/billing/${staff.id}">Open the billing workspace</a></p></div>`;
+    const bodyHtml = `<div style="font-family:Arial,sans-serif;color:#172b4d"><h2>Accommodation payment request</h2><p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has acknowledged the compulsory BIMED accommodation payment arrangement.</p><p>Amount: <strong>€${ACCOMMODATION_AMOUNT_EUR.toFixed(2)}</strong><br>Period: <strong>${ACCOMMODATION_PERIOD_MONTHS} months</strong><br>Terms version: <strong>${ACCOMMODATION_TERMS_VERSION}</strong></p><p>The candidate acknowledged the compulsory payment, refund and accommodation terms presented in the Staff Portal. The invoice is currently <strong>${invoice.status}</strong>. The permit journey and flight-planning workflow unlock only after BIMED issues the invoice.</p><p><a href="${appUrl()}/admin/permit/billing/${staff.id}">Open the billing workspace</a></p></div>`;
     try {
       await sendAccommodationEmail({ to: ['overseas@bimedhealthcare.com', 'manager@bimedhealthcare.com'], subject, html: bodyHtml });
     } catch (emailError) {
       console.error(JSON.stringify({ level: 'error', event: 'accommodation_acknowledgement_email_failed', staff_id: staff.id, reason: emailError instanceof Error ? emailError.message : String(emailError) }));
     }
-    await createStaffNotification(client, { staffId: staff.id, category: 'billing', title: 'Accommodation acknowledgement recorded', body: 'BIMED has recorded your acknowledgement of the accommodation payment arrangement. The billing team has been notified and will issue the invoice once the payment account details are ready.', actionUrl: '/staff/permit' });
-    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'accommodation_terms_acknowledged', metadata: { terms_version: ACCOMMODATION_TERMS_VERSION, invoice_id: invoice.id, invoice_number: invoice.invoice_number } });
+    await createStaffNotification(client, { staffId: staff.id, category: 'billing', title: 'Accommodation acknowledgement recorded', body: 'BIMED has recorded the compulsory accommodation arrangement. The billing team has been notified. Your permit-assistance request and flight-planning workspace will unlock after the accommodation invoice is issued.', actionUrl: '/staff/permit' });
+    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'accommodation_terms_acknowledged', metadata: { terms_version: ACCOMMODATION_TERMS_VERSION, invoice_id: invoice.id, invoice_number: invoice.invoice_number, compulsory: true } });
     return NextResponse.json({ permit: updatedPermit, invoice: { invoice_number: invoice.invoice_number, status: invoice.status } }, { status: 201 });
   }
 
   if (action === 'request_sponsorship') {
+    if (!isAccommodationReady(currentInvoice)) return NextResponse.json({ error: 'Your accommodation invoice must be issued by BIMED before you can request BIMED to begin the employment-permit / sponsorship journey.' }, { status: 409 });
     const { data: current } = await client.from('recruitment_staff_permit_cases').select('*').eq('staff_id', staff.id).maybeSingle();
     if (!current) return NextResponse.json({ error: 'Permit case not initialized.' }, { status: 404 });
     if (['permit_granted','visa_granted','arrived','closed'].includes(current.status)) return NextResponse.json({ error: 'This permit journey has already progressed beyond the request stage.' }, { status: 409 });
     const now = new Date().toISOString();
     const { data: updated, error } = await client.from('recruitment_staff_permit_cases').update({ status: 'requested', requested_at: current.requested_at || now, updated_at: now }).eq('staff_id', staff.id).select('*').single();
     if (error || !updated) return NextResponse.json({ error: 'Unable to submit the sponsorship request.' }, { status: 500 });
-    await createStaffNotification(client, { staffId: staff.id, category: 'permit', title: 'Employment permit request submitted', body: 'Your request for BIMED to begin your employment permit / sponsorship journey has been received. BIMED will review your complete staff profile and prepare the employer-side documentation.', actionUrl: '/staff/permit' });
-    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'employment_permit_requested', metadata: { status: 'requested' } });
+    await createStaffNotification(client, { staffId: staff.id, category: 'permit', title: 'Employment permit assistance requested', body: 'Your accommodation invoice has been issued and your request for BIMED to begin the employment permit / sponsorship journey has been received. BIMED will review your complete staff profile and prepare the employer-side documentation.', actionUrl: '/staff/permit' });
+    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'employment_permit_requested', metadata: { status: 'requested', accommodation_invoice_id: currentInvoice.id, accommodation_invoice_status: currentInvoice.status } });
     return NextResponse.json({ permit: updated }, { status: 201 });
   }
 
