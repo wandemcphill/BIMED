@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const navItems = [
   { href: '/staff', label: 'Dashboard' },
@@ -9,14 +10,23 @@ const navItems = [
   { href: '/staff/rota', label: 'Rota' },
   { href: '/staff/attendance', label: 'Attendance' },
   { href: '/staff/notifications', label: 'Notifications' },
-  { href: '/staff/onboarding', label: 'Onboarding' },
-  { href: '/staff/permit', label: 'Employment permit' },
-  { href: '/staff/travel', label: 'Travel to Ireland' },
+  { href: '/staff/onboarding', label: 'Onboarding', recruitmentOnly: true },
+  { href: '/staff/permit', label: 'Employment permit', recruitmentOnly: true },
+  { href: '/staff/travel', label: 'Travel to Ireland', recruitmentOnly: true },
 ];
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname === '/staff/login' || pathname.startsWith('/staff/activate') || pathname.startsWith('/staff/forgot-password');
+  const [recruitmentLinked, setRecruitmentLinked] = useState(false);
+
+  useEffect(() => {
+    if (isAuthPage) return;
+    void fetch('/api/staff/me', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => setRecruitmentLinked(Boolean(payload?.staff?.application_id)))
+      .catch(() => undefined);
+  }, [isAuthPage, pathname]);
 
   if (isAuthPage) return <>{children}</>;
 
@@ -81,7 +91,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
       <aside id="bimed-staff-sidebar" className="bimed-staff-sidebar" aria-label="BIMED Staff Portal navigation">
         <div className="bimed-staff-brand"><strong>BIMED Portal</strong><span>Staff workspace</span></div>
-        {navItems.map((item) => {
+        {navItems.filter((item) => !item.recruitmentOnly || recruitmentLinked).map((item) => {
           const active = item.href === '/staff' ? pathname === '/staff' : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return <Link key={item.href} href={item.href} className={`bimed-staff-nav-link ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => { document.getElementById('bimed-staff-sidebar')?.classList.remove('open'); document.getElementById('bimed-staff-overlay')?.classList.remove('open'); }}>
             {item.label}
