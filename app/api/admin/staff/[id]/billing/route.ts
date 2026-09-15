@@ -5,6 +5,8 @@ import { createStaffAudit } from '@/lib/staff';
 import {
   ACCOMMODATION_AMOUNT_EUR,
   ACCOMMODATION_REFUND_INSTALLMENTS,
+  ACCOMMODATION_SIGNATORY_NAME,
+  ACCOMMODATION_SIGNATORY_TITLE,
   appUrl,
   makeReceiptNumber,
   receiptHtml,
@@ -14,6 +16,50 @@ import {
 
 function safePublicUrl(token: string) {
   return `${appUrl()}/invoices/accommodation/${token}`;
+}
+
+async function issueReceiptForPaidInvoice(client: ReturnType<typeof db>, invoice: any, staff: any, application: any, permit: any) {
+  const { data: existingReceipt } = await client.from('recruitment_accommodation_receipts').select('*').eq('invoice_id', invoice.id).maybeSingle();
+  if (existingReceipt) {
+    return { receipt: existingReceipt, publicUrl: `${safePublicUrl(invoice.public_token)}?receipt=1`, created: false };
+  }
+
+  const receiptIssuedAt = new Date().toISOString();
+  const { data: receipt, error } = await client.from('recruitment_accommodation_receipts').insert({
+    invoice_id: invoice.id,
+    receipt_number: makeReceiptNumber(new Date(receiptIssuedAt)),
+    amount_eur: invoice.amount_eur,
+    currency: invoice.currency,
+    paid_at: invoice.paid_at || receiptIssuedAt,
+    payment_reference: invoice.payment_reference,
+    payment_method: invoice.payment_method,
+    issued_by: `${ACCOMMODATION_SIGNATORY_NAME} · ${ACCOMMODATION_SIGNATORY_TITLE}`,
+    notes: `Automatically issued upon payment confirmation. Authorised by ${ACCOMMODATION_SIGNATORY_NAME}.`,
+  }).select('*').single();
+
+  if (error || !receipt) throw new Error('Payment was recorded, but the professional receipt could not be created automatically.');
+
+  await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'paid_receipted', updated_at: receiptIssuedAt }).eq('id', permit.id);
+
+  const publicUrl = `${safePublicUrl(invoice.public_token)}?receipt=1`;
+  try {
+    await sendAccommodationEmail({
+      to: [application?.email || staff.email],
+      subject: `BIMED payment receipt ${receipt.receipt_number}`,
+      html: receiptHtml({ receipt, invoice, staff, publicUrl }),
+    });
+  } catch (emailError) {
+    console.error(JSON.stringify({ level: 'error', event: 'accommodation_receipt_email_failed', receipt_id: receipt.id, reason: emailError instanceof Error ? emailError.message : String(emailError) }));
+  }
+
+  await createStaffAudit(client, {
+    staffId: staff.id,
+    actor: ACCOMMODATION_SIGNATORY_NAME,
+    eventType: 'accommodation_payment_receipt_issued',
+    metadata: { receipt_number: receipt.receipt_number, invoice_number: invoice.invoice_number, issued_by: ACCOMMODATION_SIGNATORY_NAME },
+  });
+
+  return { receipt, publicUrl, created: true };
 }
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -45,7 +91,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const application = staff.application_id ? (await client.from('recruitment_applications').select('email,full_name').eq('id', staff.application_id).maybeSingle()).data : null;
 
   if (action === 'save_account') {
-    const required = ['account_name','bank_name'];
+    const required = ['account_name', 'bank_name'];
     if (required.some((key) => !String(body?.[key] || '').trim())) return NextResponse.json({ error: 'Account name and bank name are required.' }, { status: 400 });
     await client.from('recruitment_payment_accounts').update({ is_active: false, updated_at: new Date().toISOString() }).eq('is_active', true);
     const { data: account, error } = await client.from('recruitment_payment_accounts').insert({
@@ -69,9 +115,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   if (action === 'issue_invoice') {
     if (!invoice) return NextResponse.json({ error: 'The candidate has not acknowledged the accommodation arrangement yet.' }, { status: 409 });
+    if (invoice.status !== 'draft') return NextResponse.json({ error: `This invoice is already ${invoice.status}.` }, { status: 409 });
     const { data: account } = await client.from('recruitment_payment_accounts').select('*').eq('is_active', true).maybeSingle();
     if (!account) return NextResponse.json({ error: 'Add and save the active payment account details before issuing the invoice.' }, { status: 409 });
-    const now = new Date().toISOString();
+    const now = new Date();
+    const issuedAt = now.toISOString();
+    const issueDate = issuedAt.slice(0, 10);
+    const dueDate = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
     const snapshot = {
       account_name: account.account_name,
       bank_name: account.bank_name,
@@ -85,12 +135,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     };
     const { data: updatedInvoice, error } = await client.from('recruitment_accommodation_invoices').update({
       status: 'issued',
-      issued_at: invoice.issued_at || now,
+      issue_date: issueDate,
+      due_date: dueDate,
+      issued_at: issuedAt,
       payment_account_snapshot: snapshot,
-      updated_at: now,
+      updated_at: issuedAt,
     }).eq('id', invoice.id).select('*').single();
     if (error || !updatedInvoice) return NextResponse.json({ error: 'Unable to issue the invoice.' }, { status: 500 });
-    await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'invoice_issued', updated_at: now }).eq('id', permit.id);
+    await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'invoice_issued', updated_at: issuedAt }).eq('id', permit.id);
     const publicUrl = safePublicUrl(updatedInvoice.public_token);
     try {
       await sendAccommodationEmail({
@@ -102,12 +154,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     } catch (emailError) {
       console.error(JSON.stringify({ level: 'error', event: 'accommodation_invoice_email_failed', invoice_id: invoice.id, reason: emailError instanceof Error ? emailError.message : String(emailError) }));
     }
-    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'accommodation_invoice_issued', metadata: { invoice_number: updatedInvoice.invoice_number, amount_eur: updatedInvoice.amount_eur } });
+    await createStaffAudit(client, {
+      staffId: staff.id,
+      actor: ACCOMMODATION_SIGNATORY_NAME,
+      eventType: 'accommodation_invoice_issued',
+      metadata: { invoice_number: updatedInvoice.invoice_number, amount_eur: updatedInvoice.amount_eur, issued_by: ACCOMMODATION_SIGNATORY_NAME, issued_at: issuedAt },
+    });
     return NextResponse.json({ invoice: updatedInvoice, publicUrl });
   }
 
   if (action === 'send_invoice') {
-    if (!invoice || !['issued','paid'].includes(invoice.status)) return NextResponse.json({ error: 'Only an issued invoice can be sent.' }, { status: 409 });
+    if (!invoice || !['issued', 'paid'].includes(invoice.status)) return NextResponse.json({ error: 'Only an issued invoice can be sent.' }, { status: 409 });
     const to = String(body?.email || '').trim();
     if (!to || !to.includes('@')) return NextResponse.json({ error: 'Provide a valid recipient email address.' }, { status: 400 });
     const publicUrl = safePublicUrl(invoice.public_token);
@@ -123,42 +180,22 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   if (action === 'mark_paid') {
     if (!invoice || invoice.status === 'cancelled') return NextResponse.json({ error: 'No payable invoice is available.' }, { status: 409 });
-    if (invoice.status === 'paid') return NextResponse.json({ error: 'This invoice is already recorded as paid.' }, { status: 409 });
-    const paidAt = String(body?.paid_at || new Date().toISOString());
+    if (invoice.status !== 'issued') return NextResponse.json({ error: 'Only an issued invoice can be recorded as paid.' }, { status: 409 });
+    const paidAt = new Date().toISOString();
     const paymentReference = String(body?.payment_reference || '').trim() || null;
     const paymentMethod = String(body?.payment_method || 'Bank transfer').trim() || 'Bank transfer';
-    const { data: paidInvoice, error } = await client.from('recruitment_accommodation_invoices').update({ status: 'paid', paid_at: paidAt, payment_reference: paymentReference, payment_method: paymentMethod, updated_at: new Date().toISOString() }).eq('id', invoice.id).select('*').single();
+    const { data: paidInvoice, error } = await client.from('recruitment_accommodation_invoices').update({ status: 'paid', paid_at: paidAt, payment_reference: paymentReference, payment_method: paymentMethod, updated_at: paidAt }).eq('id', invoice.id).select('*').single();
     if (error || !paidInvoice) return NextResponse.json({ error: 'Unable to record the payment.' }, { status: 500 });
-    await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'paid', accommodation_paid_at: paidAt, updated_at: new Date().toISOString() }).eq('id', permit.id);
-    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'accommodation_payment_recorded', metadata: { invoice_number: invoice.invoice_number, payment_reference: paymentReference, payment_method: paymentMethod } });
-    return NextResponse.json({ invoice: paidInvoice });
+    await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'paid', accommodation_paid_at: paidAt, updated_at: paidAt }).eq('id', permit.id);
+    const receiptResult = await issueReceiptForPaidInvoice(client, paidInvoice, staff, application, permit);
+    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'accommodation_payment_recorded', metadata: { invoice_number: invoice.invoice_number, payment_reference: paymentReference, payment_method: paymentMethod, receipt_number: receiptResult.receipt.receipt_number, receipt_issued_by: ACCOMMODATION_SIGNATORY_NAME } });
+    return NextResponse.json({ invoice: paidInvoice, receipt: receiptResult.receipt, receiptPublicUrl: receiptResult.publicUrl });
   }
 
   if (action === 'issue_receipt') {
     if (!invoice || invoice.status !== 'paid') return NextResponse.json({ error: 'Record payment before issuing a receipt.' }, { status: 409 });
-    const { data: existingReceipt } = await client.from('recruitment_accommodation_receipts').select('*').eq('invoice_id', invoice.id).maybeSingle();
-    if (existingReceipt) return NextResponse.json({ receipt: existingReceipt, publicUrl: `${safePublicUrl(invoice.public_token)}?receipt=1` });
-    const { data: receipt, error } = await client.from('recruitment_accommodation_receipts').insert({
-      invoice_id: invoice.id,
-      receipt_number: makeReceiptNumber(),
-      amount_eur: invoice.amount_eur,
-      currency: invoice.currency,
-      paid_at: invoice.paid_at || new Date().toISOString(),
-      payment_reference: invoice.payment_reference,
-      payment_method: invoice.payment_method,
-      issued_by: session.email,
-      notes: String(body?.notes || '').trim() || null,
-    }).select('*').single();
-    if (error || !receipt) return NextResponse.json({ error: 'Unable to issue the receipt.' }, { status: 500 });
-    await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'paid_receipted', updated_at: new Date().toISOString() }).eq('id', permit.id);
-    const publicUrl = `${safePublicUrl(invoice.public_token)}?receipt=1`;
-    try {
-      await sendAccommodationEmail({ to: [application?.email || staff.email], subject: `BIMED payment receipt ${receipt.receipt_number}`, html: receiptHtml({ receipt, invoice, staff, publicUrl }) });
-    } catch (emailError) {
-      console.error(JSON.stringify({ level: 'error', event: 'accommodation_receipt_email_failed', receipt_id: receipt.id, reason: emailError instanceof Error ? emailError.message : String(emailError) }));
-    }
-    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'accommodation_payment_receipt_issued', metadata: { receipt_number: receipt.receipt_number, invoice_number: invoice.invoice_number } });
-    return NextResponse.json({ receipt, publicUrl });
+    const receiptResult = await issueReceiptForPaidInvoice(client, invoice, staff, application, permit);
+    return NextResponse.json({ receipt: receiptResult.receipt, publicUrl: receiptResult.publicUrl });
   }
 
   return NextResponse.json({ error: 'Unsupported billing action.' }, { status: 400 });
