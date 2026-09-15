@@ -4,6 +4,7 @@ export const BIMED_DEFAULT_LINE_MANAGER = 'Dezou Maurice';
 export const BIMED_DEFAULT_START_DATE = '11 January 2027';
 export const BIMED_DEFAULT_PROBATION = '3 months';
 export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
+export const BIMED_DEFAULT_CONTRACT_DURATION = 'Permanent employment, with no fixed end date';
 
 export const BIMED_ROLE_SALARIES: Partial<Record<CanonicalRecruitmentRoleSlug, string>> = {
   'support-worker': '€36,000 per annum',
@@ -65,6 +66,26 @@ function applySectionReplacements(section: ContractSection, replacements: Array<
   };
 }
 
+function permitCategoryForRole(roleSlug: CanonicalRecruitmentRoleSlug): string | null {
+  if (roleSlug === 'physiotherapist') {
+    return 'Critical Skills Employment Permit (CSEP), subject to DETE eligibility and final assessment';
+  }
+
+  return null;
+}
+
+function permitFloorNoteForRole(roleSlug: CanonicalRecruitmentRoleSlug): string {
+  switch (roleSlug) {
+    case 'physiotherapist':
+      return ' (current 2026 CSEP relevant-degree minimum annual remuneration is €40,904)';
+    case 'healthcare-assistant':
+      return ' (current 2026 HCA GEP minimum annual remuneration is €32,691)';
+    case 'support-worker':
+    case 'senior-support-worker':
+      return ' (current 2026 standard GEP minimum annual remuneration is €36,605 unless a different statutory occupation-specific threshold applies)';
+  }
+}
+
 export function applyBimedContractDefaults(
   template: ContractTemplate,
   overrides?: { employeeName?: string | null; employeeAddress?: string | null; startDate?: string | null }
@@ -73,7 +94,9 @@ export function applyBimedContractDefaults(
     ? new Date(overrides.startDate).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })
     : BIMED_DEFAULT_START_DATE;
 
-  const roleSalary = BIMED_ROLE_SALARIES[template.roleSlug as CanonicalRecruitmentRoleSlug];
+  const roleSlug = template.roleSlug as CanonicalRecruitmentRoleSlug;
+  const roleSalary = BIMED_ROLE_SALARIES[roleSlug];
+  const permitCategory = permitCategoryForRole(roleSlug);
   const replacements: Array<[string, string]> = [
     ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
@@ -85,9 +108,21 @@ export function applyBimedContractDefaults(
     ['Job title: [insert] Reports to: [insert]', `Job title: ${template.roleLabel} Reports to: ${BIMED_DEFAULT_LINE_MANAGER}`],
     ['The first 6 months of your employment is a probationary period', `The first ${BIMED_DEFAULT_PROBATION} of your employment is a probationary period`],
     ['extend your probationary period once, up to a combined maximum of 12 months', 'extend your probationary period once, up to a combined maximum of 6 months'],
+    [' (currently EUR 32,691 per annum for Healthcare Assistant / Home Support Worker roles)', permitFloorNoteForRole(roleSlug)],
   ];
 
   if (roleSalary) replacements.push(['[Insert pay rate for this role]', roleSalary]);
+
+  if (roleSlug === 'physiotherapist') {
+    replacements.push([
+      'EUR 45,514 to EUR 63,831 gross per annum, in line with the HSE-aligned Physiotherapist (staff grade) pay scale, based on experience',
+      roleSalary ?? '€55,000 per annum',
+    ]);
+    replacements.push([
+      'The Company will apply for a General Employment Permit on your behalf, valid from your start date.',
+      'Where an employment permit is required for this Role, the Company\'s intended permit pathway is Critical Skills Employment Permit (CSEP), subject to DETE eligibility and final assessment. This statement does not guarantee permit eligibility or grant.',
+    ]);
+  }
 
   if (overrides?.employeeName) {
     replacements.push(['[Insert employee name]', overrides.employeeName], ['[Employee full name]', overrides.employeeName]);
@@ -96,23 +131,54 @@ export function applyBimedContractDefaults(
     replacements.push(['[Insert employee address]', overrides.employeeAddress], ['[Employee address]', overrides.employeeAddress]);
   }
 
+  const editableFields = template.editableFields.map((field) => ({
+    ...field,
+    value: replaceText(field.value, replacements),
+    note:
+      field.label === 'Line manager'
+        ? 'Bimed default reporting line: Dezou Maurice.'
+        : field.label === 'Start date'
+          ? `Default commencement date: ${BIMED_DEFAULT_START_DATE}. Candidate-specific dates override this default.`
+          : field.label === 'Pay'
+            ? roleSalary ? `Agreed BIMED salary: ${roleSalary}.` : field.note
+            : field.label === 'Pay frequency'
+              ? 'Bimed payroll frequency: monthly.'
+              : field.note,
+  }));
+
+  if (!editableFields.some((field) => field.label === 'Contract duration')) {
+    editableFields.push({
+      label: 'Contract duration',
+      value: BIMED_DEFAULT_CONTRACT_DURATION,
+      note: 'BIMED contracts are permanent unless a candidate-specific written variation expressly states otherwise. A permanent CSEP role satisfies the required minimum job-offer duration subject to DETE assessment.',
+    });
+  }
+
+  if (permitCategory && !editableFields.some((field) => field.label === 'Employment permit category')) {
+    editableFields.push({
+      label: 'Employment permit category',
+      value: permitCategory,
+      note: 'This describes the intended permit pathway only. Final permit eligibility and grant are determined by the Department of Enterprise, Tourism and Employment.',
+    });
+  }
+
+  const sections = template.sections.map((section) => applySectionReplacements(section, replacements));
+  const commencementSection = sections.find((section) => section.heading === '2. Commencement of Employment and Probation');
+  if (commencementSection && !commencementSection.paragraphs.some((paragraph) => paragraph.startsWith('2.6 Contract duration:'))) {
+    commencementSection.paragraphs.push(`2.6 Contract duration: ${BIMED_DEFAULT_CONTRACT_DURATION}. There is no fixed end date unless a candidate-specific written variation expressly states otherwise.`);
+  }
+
+  if (permitCategory) {
+    const rightToWorkSection = sections.find((section) => section.heading === '16. Right to Work');
+    if (rightToWorkSection && !rightToWorkSection.paragraphs.some((paragraph) => paragraph.includes('Intended employment permit pathway:'))) {
+      rightToWorkSection.paragraphs.push(`Intended employment permit pathway: ${permitCategory}. Final eligibility and grant are determined by DETE.`);
+    }
+  }
+
   return {
     ...template,
-    editableFields: template.editableFields.map((field) => ({
-      ...field,
-      value: replaceText(field.value, replacements),
-      note:
-        field.label === 'Line manager'
-          ? 'Bimed default reporting line: Dezou Maurice.'
-          : field.label === 'Start date'
-            ? `Default commencement date: ${BIMED_DEFAULT_START_DATE}. Candidate-specific dates override this default.`
-            : field.label === 'Pay'
-              ? roleSalary ? `Agreed BIMED salary: ${roleSalary}.` : field.note
-              : field.label === 'Pay frequency'
-                ? 'Bimed payroll frequency: monthly.'
-                : field.note,
-    })),
-    sections: template.sections.map((section) => applySectionReplacements(section, replacements)),
+    editableFields,
+    sections,
     schedules: template.schedules.map((section) => applySectionReplacements(section, replacements)),
     closingNote: replaceText(template.closingNote, replacements),
   };
