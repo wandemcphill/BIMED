@@ -2,18 +2,31 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const navItems = [
   { href: '/staff', label: 'Dashboard' },
   { href: '/staff/messages', label: 'Messages' },
   { href: '/staff/rota', label: 'Rota' },
   { href: '/staff/attendance', label: 'Attendance' },
-  { href: '/staff/travel', label: 'Travel to Ireland' },
+  { href: '/staff/notifications', label: 'Notifications' },
+  { href: '/staff/onboarding', label: 'Onboarding', recruitmentOnly: true },
+  { href: '/staff/permit', label: 'Employment permit', recruitmentOnly: true },
+  { href: '/staff/travel', label: 'Travel to Ireland', recruitmentOnly: true },
 ];
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname === '/staff/login' || pathname.startsWith('/staff/activate') || pathname.startsWith('/staff/forgot-password');
+  const [recruitmentLinked, setRecruitmentLinked] = useState(false);
+
+  useEffect(() => {
+    if (isAuthPage) return;
+    void fetch('/api/staff/me', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => setRecruitmentLinked(Boolean(payload?.staff?.application_id)))
+      .catch(() => undefined);
+  }, [isAuthPage, pathname]);
 
   if (isAuthPage) return <>{children}</>;
 
@@ -27,6 +40,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           position:fixed; inset:0 auto 0 0; width:var(--bimed-sidebar-width); z-index:100;
           display:flex; flex-direction:column; gap:6px; padding:20px 14px;
           box-sizing:border-box; background:#163247; color:#fff; box-shadow:12px 0 30px rgba(15,23,42,.08);
+          overflow-y:auto;
         }
         .bimed-staff-brand { display:block; padding:4px 12px 18px; border-bottom:1px solid rgba(255,255,255,.12); margin-bottom:8px; }
         .bimed-staff-brand strong { display:block; font-size:18px; letter-spacing:-.02em; }
@@ -39,6 +53,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         .bimed-staff-nav-link.active { background:#0f766e; box-shadow:0 6px 18px rgba(15,118,110,.22); }
         .bimed-staff-content { min-width:0; margin-left:var(--bimed-sidebar-width); min-height:100vh; }
         .bimed-staff-mobile-bar { display:none; }
+        .bimed-staff-overlay { display:none; }
         main { max-width:100vw; box-sizing:border-box; overflow-x:hidden; }
         main img { max-width:100%; height:auto; }
 
@@ -46,8 +61,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           :root { --bimed-sidebar-width:0px; }
           .bimed-staff-sidebar { width:270px; transform:translateX(-104%); transition:transform .2s ease; box-shadow:16px 0 36px rgba(15,23,42,.2); }
           .bimed-staff-sidebar.open { transform:translateX(0); }
-          .bimed-staff-overlay { display:none; position:fixed; inset:0; z-index:90; background:rgba(15,23,42,.45); }
-          .bimed-staff-overlay.open { display:block; }
+          .bimed-staff-overlay.open { display:block; position:fixed; inset:0; z-index:90; background:rgba(15,23,42,.45); }
           .bimed-staff-content { margin-left:0; padding-top:58px; }
           .bimed-staff-mobile-bar {
             position:fixed; inset:0 0 auto 0; height:58px; z-index:80; display:flex; align-items:center; gap:10px;
@@ -57,6 +71,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           .bimed-staff-mobile-bar strong { font-size:15px; }
           .bimed-staff-mobile-sub { margin-left:auto; color:rgba(255,255,255,.7); font-size:11px; }
 
+          main > header { padding:12px 16px !important; }
           main > div { max-width:100% !important; box-sizing:border-box; padding-left:16px !important; padding-right:16px !important; }
           main > div > section, main > div > form { min-width:0 !important; max-width:100% !important; box-sizing:border-box; }
           main [style*="grid-template-columns"] { grid-template-columns:minmax(0,1fr) !important; }
@@ -76,11 +91,12 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
       <aside id="bimed-staff-sidebar" className="bimed-staff-sidebar" aria-label="BIMED Staff Portal navigation">
         <div className="bimed-staff-brand"><strong>BIMED Portal</strong><span>Staff workspace</span></div>
-        {navItems.map((item) => (
-          <Link key={item.href} href={item.href} className={`bimed-staff-nav-link ${pathname === item.href ? 'active' : ''}`} onClick={() => { document.getElementById('bimed-staff-sidebar')?.classList.remove('open'); document.getElementById('bimed-staff-overlay')?.classList.remove('open'); }}>
+        {navItems.filter((item) => !item.recruitmentOnly || recruitmentLinked).map((item) => {
+          const active = item.href === '/staff' ? pathname === '/staff' : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return <Link key={item.href} href={item.href} className={`bimed-staff-nav-link ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => { document.getElementById('bimed-staff-sidebar')?.classList.remove('open'); document.getElementById('bimed-staff-overlay')?.classList.remove('open'); }}>
             {item.label}
-          </Link>
-        ))}
+          </Link>;
+        })}
       </aside>
       <div id="bimed-staff-overlay" className="bimed-staff-overlay" onClick={() => { document.getElementById('bimed-staff-sidebar')?.classList.remove('open'); document.getElementById('bimed-staff-overlay')?.classList.remove('open'); }} />
       <div className="bimed-staff-mobile-bar">
