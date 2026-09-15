@@ -4,6 +4,7 @@ export const BIMED_DEFAULT_LINE_MANAGER = 'Dezou Maurice';
 export const BIMED_DEFAULT_START_DATE = '11 January 2027';
 export const BIMED_DEFAULT_PROBATION = '3 months';
 export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
+export const BIMED_DEFAULT_CONTRACT_DURATION = 'Permanent employment, with no fixed end date';
 
 export const BIMED_ROLE_SALARIES: Partial<Record<CanonicalRecruitmentRoleSlug, string>> = {
   'support-worker': '€36,000 per annum',
@@ -65,6 +66,14 @@ function applySectionReplacements(section: ContractSection, replacements: Array<
   };
 }
 
+function permitCategoryForRole(roleSlug: CanonicalRecruitmentRoleSlug): string | null {
+  if (roleSlug === 'physiotherapist') {
+    return 'Critical Skills Employment Permit (CSEP), subject to DETE eligibility and final assessment';
+  }
+
+  return null;
+}
+
 export function applyBimedContractDefaults(
   template: ContractTemplate,
   overrides?: { employeeName?: string | null; employeeAddress?: string | null; startDate?: string | null }
@@ -73,7 +82,9 @@ export function applyBimedContractDefaults(
     ? new Date(overrides.startDate).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })
     : BIMED_DEFAULT_START_DATE;
 
-  const roleSalary = BIMED_ROLE_SALARIES[template.roleSlug as CanonicalRecruitmentRoleSlug];
+  const roleSlug = template.roleSlug as CanonicalRecruitmentRoleSlug;
+  const roleSalary = BIMED_ROLE_SALARIES[roleSlug];
+  const permitCategory = permitCategoryForRole(roleSlug);
   const replacements: Array<[string, string]> = [
     ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
@@ -96,22 +107,40 @@ export function applyBimedContractDefaults(
     replacements.push(['[Insert employee address]', overrides.employeeAddress], ['[Employee address]', overrides.employeeAddress]);
   }
 
+  const editableFields = template.editableFields.map((field) => ({
+    ...field,
+    value: replaceText(field.value, replacements),
+    note:
+      field.label === 'Line manager'
+        ? 'Bimed default reporting line: Dezou Maurice.'
+        : field.label === 'Start date'
+          ? `Default commencement date: ${BIMED_DEFAULT_START_DATE}. Candidate-specific dates override this default.`
+          : field.label === 'Pay'
+            ? roleSalary ? `Agreed BIMED salary: ${roleSalary}.` : field.note
+            : field.label === 'Pay frequency'
+              ? 'Bimed payroll frequency: monthly.'
+              : field.note,
+  }));
+
+  if (!editableFields.some((field) => field.label === 'Contract duration')) {
+    editableFields.push({
+      label: 'Contract duration',
+      value: BIMED_DEFAULT_CONTRACT_DURATION,
+      note: 'BIMED contracts are permanent unless a candidate-specific written variation expressly states otherwise. A permanent CSEP role satisfies the required minimum job-offer duration subject to DETE assessment.',
+    });
+  }
+
+  if (permitCategory && !editableFields.some((field) => field.label === 'Employment permit category')) {
+    editableFields.push({
+      label: 'Employment permit category',
+      value: permitCategory,
+      note: 'This describes the intended permit pathway only. Final permit eligibility and grant are determined by the Department of Enterprise, Tourism and Employment.',
+    });
+  }
+
   return {
     ...template,
-    editableFields: template.editableFields.map((field) => ({
-      ...field,
-      value: replaceText(field.value, replacements),
-      note:
-        field.label === 'Line manager'
-          ? 'Bimed default reporting line: Dezou Maurice.'
-          : field.label === 'Start date'
-            ? `Default commencement date: ${BIMED_DEFAULT_START_DATE}. Candidate-specific dates override this default.`
-            : field.label === 'Pay'
-              ? roleSalary ? `Agreed BIMED salary: ${roleSalary}.` : field.note
-              : field.label === 'Pay frequency'
-                ? 'Bimed payroll frequency: monthly.'
-                : field.note,
-    })),
+    editableFields,
     sections: template.sections.map((section) => applySectionReplacements(section, replacements)),
     schedules: template.schedules.map((section) => applySectionReplacements(section, replacements)),
     closingNote: replaceText(template.closingNote, replacements),
