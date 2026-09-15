@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getStaffSession } from '@/lib/staff-auth';
+import { createStaffNotification } from '@/lib/staff';
 import { ensureStaffMailbox, findStaffByPortalAddress, getOrCreateAdminConversation, getOrCreateDirectConversation, participantConversationIds } from '@/lib/staff-messaging';
 import { BIMED_ADMIN_EMAILS, BIMED_ADMIN_PROBATION_NOTICE, BIMED_MONITORING_NOTICE } from '@/lib/bimed-admin-directory';
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     const otherIds = (participants || []).map((p: any) => p.staff_id).filter((id: string) => id !== session.staff_id);
     const { data: other } = otherIds.length ? await client.from('recruitment_staff_mailboxes').select('staff_id,handle,namespace,enabled').in('staff_id', otherIds).eq('enabled', true).limit(1).maybeSingle() : { data: null };
     const { data: otherStaff } = other ? await client.from('recruitment_staff').select('full_name,preferred_name,bimed_id,role,application_id,department,email').eq('id', other.staff_id).maybeSingle() : { data: null };
-    const { data: latest } = await client.from('recruitment_staff_messages').select('id,body,sender_staff_id,sender_admin_email,created_at').eq('conversation_id', conversation.id).is('deleted_at', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const { data: latest } = await client.from('recruitment_staff_messages').select('id,body,sender_staff_id,sender_admin_email,created_at').eq('conversation_id', conversation.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
     const meParticipant = (participants || []).find((p: any) => p.staff_id === session.staff_id);
     const unread = Boolean(latest && latest.sender_staff_id !== session.staff_id && (!meParticipant?.last_read_at || new Date(latest.created_at).getTime() > new Date(meParticipant.last_read_at).getTime()));
     const isAdminThread = otherIds.length === 0;
@@ -51,18 +52,30 @@ export async function POST(request: NextRequest) {
   const { data: sender } = await client.from('recruitment_staff').select('id,full_name,preferred_name,role,status').eq('id', session.staff_id).maybeSingle();
   if (!sender || !['pre_arrival','active','on_leave'].includes(sender.status)) return NextResponse.json({ error: 'Messaging is unavailable for this account.' }, { status: 403 });
   let conversation;
+  let recipientStaffId: string | null = null;
   if (to === '__bimed_admin__') conversation = await getOrCreateAdminConversation(client, session.staff_id);
   else if (BIMED_ADMIN_EMAILS.some((admin) => admin.email === to)) {
     const { data: recipient } = await client.from('recruitment_staff').select('id,status').eq('email', to).maybeSingle();
     if (!recipient || !['pre_arrival','active','on_leave'].includes(recipient.status)) return NextResponse.json({ error: 'That BIMED admin is unavailable.' }, { status: 404 });
+    recipientStaffId = recipient.id;
     conversation = await getOrCreateDirectConversation(client, session.staff_id, recipient.id);
   } else {
     const recipient = await findStaffByPortalAddress(client, to);
     if (!recipient || recipient.id === session.staff_id) return NextResponse.json({ error: 'Unable to start a conversation with that BIMED address.' }, { status: 404 });
+    recipientStaffId = recipient.id;
     conversation = await getOrCreateDirectConversation(client, session.staff_id, recipient.id);
   }
   const { data: created, error } = await client.from('recruitment_staff_messages').insert({ conversation_id: conversation.id, sender_staff_id: session.staff_id, body: message }).select('id,conversation_id,sender_staff_id,sender_admin_email,body,created_at').single();
   if (error || !created) return NextResponse.json({ error: 'Unable to send message.' }, { status: 500 });
   await client.from('recruitment_staff_conversations').update({ last_message_at: created.created_at, updated_at: created.created_at }).eq('id', conversation.id);
+  if (recipientStaffId) {
+    await createStaffNotification(client, {
+      staffId: recipientStaffId,
+      category: 'message',
+      title: 'New BIMED message',
+      body: `${sender.preferred_name || sender.full_name} sent you a message in BIMED Messages.`,
+      actionUrl: `/staff/messages?conversation=${encodeURIComponent(conversation.id)}`,
+    });
+  }
   return NextResponse.json({ conversation, message: created }, { status: 201 });
 }
