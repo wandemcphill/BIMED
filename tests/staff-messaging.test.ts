@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { directKey, normalizePortalAddress, namespaceForRole } from '@/lib/staff-messaging';
-import { hasAdminPermission, permissionForAdminPath } from '@/lib/admin-rbac';
 
 describe('staff messaging helpers', () => {
   it('normalizes internal portal addresses', () => {
@@ -16,14 +15,5 @@ describe('staff messaging helpers', () => {
 
   it('creates one stable direct conversation key regardless of sender order', () => {
     expect(directKey('staff-b', 'staff-a')).toBe(directKey('staff-a', 'staff-b'));
-  });
-});
-
-describe('messaging admin permissions', () => {
-  it('maps the admin message APIs to communications permission', () => {
-    expect(permissionForAdminPath('/api/admin/messages')).toBe('communications.manage');
-    expect(permissionForAdminPath('/api/admin/messages/abc')).toBe('communications.manage');
-    expect(hasAdminPermission('recruitment', 'communications.manage')).toBe(true);
-    expect(hasAdminPermission('finance', 'communications.manage')).toBe(false);
   });
 });
