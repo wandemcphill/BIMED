@@ -4,10 +4,14 @@ export const BIMED_DEFAULT_LINE_MANAGER = 'Dezou Maurice';
 export const BIMED_DEFAULT_START_DATE = '11 January 2027';
 export const BIMED_DEFAULT_PROBATION = '3 months';
 export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
-export const BIMED_DEFAULT_CONTRACT_DURATION = 'Permanent employment, with no fixed end date';
+export const BIMED_DEFAULT_CONTRACT_DURATION = 'Fixed-term employment for two years, from 11 January 2027 to 10 January 2029';
+
+// Current 2026 standard General Employment Permit minimum annual remuneration published by DETE.
+// This is a current compliance floor, not a guarantee that a future permit application will qualify.
+export const BIMED_GEP_STANDARD_MAR_2026 = '€36,605 per annum';
 
 export const BIMED_ROLE_SALARIES: Partial<Record<CanonicalRecruitmentRoleSlug, string>> = {
-  'support-worker': '€36,000 per annum',
+  'support-worker': BIMED_GEP_STANDARD_MAR_2026,
   'healthcare-assistant': '€36,000 per annum',
   'senior-support-worker': '€41,000 per annum',
   physiotherapist: '€55,000 per annum',
@@ -90,9 +94,7 @@ export function applyBimedContractDefaults(
   template: ContractTemplate,
   overrides?: { employeeName?: string | null; employeeAddress?: string | null; startDate?: string | null }
 ): ContractTemplate {
-  const startDate = overrides?.startDate
-    ? new Date(overrides.startDate).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })
-    : BIMED_DEFAULT_START_DATE;
+  const startDate = BIMED_DEFAULT_START_DATE;
 
   const roleSlug = template.roleSlug as CanonicalRecruitmentRoleSlug;
   const roleSalary = BIMED_ROLE_SALARIES[roleSlug];
@@ -138,9 +140,9 @@ export function applyBimedContractDefaults(
       field.label === 'Line manager'
         ? 'Bimed default reporting line: Dezou Maurice.'
         : field.label === 'Start date'
-          ? `Default commencement date: ${BIMED_DEFAULT_START_DATE}. Candidate-specific dates override this default.`
+          ? `Canonical commencement date: ${BIMED_DEFAULT_START_DATE}.`
           : field.label === 'Pay'
-            ? roleSalary ? `Agreed BIMED salary: ${roleSalary}.` : field.note
+            ? roleSalary ? `Agreed BIMED salary minimum: ${roleSalary}.` : field.note
             : field.label === 'Pay frequency'
               ? 'Bimed payroll frequency: monthly.'
               : field.note,
@@ -150,7 +152,7 @@ export function applyBimedContractDefaults(
     editableFields.push({
       label: 'Contract duration',
       value: BIMED_DEFAULT_CONTRACT_DURATION,
-      note: 'BIMED contracts are permanent unless a candidate-specific written variation expressly states otherwise. A permanent CSEP role satisfies the required minimum job-offer duration subject to DETE assessment.',
+      note: 'BIMED contracts are fixed-term for two years from 11 January 2027 to 10 January 2029 unless a candidate-specific written variation expressly changes the term.',
     });
   }
 
@@ -165,7 +167,7 @@ export function applyBimedContractDefaults(
   const sections = template.sections.map((section) => applySectionReplacements(section, replacements));
   const commencementSection = sections.find((section) => section.heading === '2. Commencement of Employment and Probation');
   if (commencementSection && !commencementSection.paragraphs.some((paragraph) => paragraph.startsWith('2.6 Contract duration:'))) {
-    commencementSection.paragraphs.push(`2.6 Contract duration: ${BIMED_DEFAULT_CONTRACT_DURATION}. There is no fixed end date unless a candidate-specific written variation expressly states otherwise.`);
+    commencementSection.paragraphs.push(`2.6 Contract duration: ${BIMED_DEFAULT_CONTRACT_DURATION}. The fixed term ends on 10 January 2029 unless a candidate-specific written variation expressly changes the term.`);
   }
 
   if (permitCategory) {

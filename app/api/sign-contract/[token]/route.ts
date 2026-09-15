@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const signedName = body.signed_name;
   if (typeof signedName !== 'string' || !signedName.trim() || signedName.trim().length > 200) return NextResponse.json({ error: 'A valid signed_name is required.' }, { status: 400 });
 
-  const corrections: { employeeName?: string; employeeAddress?: string; startDate?: string } = {};
+  const corrections: { employeeName?: string; employeeAddress?: string } = {};
   if (body.employee_name !== undefined) {
     if (typeof body.employee_name !== 'string' || !body.employee_name.trim() || body.employee_name.length > 200) return NextResponse.json({ error: 'employee_name must be a non-empty string.' }, { status: 400 });
     corrections.employeeName = body.employee_name.trim();
@@ -33,10 +33,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (body.employee_address !== undefined) {
     if (typeof body.employee_address !== 'string' || body.employee_address.length > 500) return NextResponse.json({ error: 'employee_address must be a string.' }, { status: 400 });
     corrections.employeeAddress = body.employee_address.trim();
-  }
-  if (body.start_date !== undefined) {
-    if (typeof body.start_date !== 'string' || (body.start_date && Number.isNaN(new Date(body.start_date).getTime()))) return NextResponse.json({ error: 'start_date must be a valid date.' }, { status: 400 });
-    corrections.startDate = body.start_date;
   }
 
   const { token } = await context.params;
@@ -66,7 +62,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
       await recordRecruitmentAudit(client, { applicationId: updated.application_id, staffId: provisioned.staff?.id, actor: 'system', eventType: 'staff_portal_provisioned_after_contract', metadata: { bimed_id: provisioned.staff?.bimed_id, activation_sent: staffProvisioning?.activationSent || false } });
     } catch (staffError) {
-      console.error(JSON.stringify({ level: 'error', event: 'staff_portal.provision_failed', application_id: updated.application_id, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
+      console.error(JSON.stringify({ level: 'error', event: 'staff_portal_provision.failed', application_id: updated.application_id, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
     }
 
     if (application) {

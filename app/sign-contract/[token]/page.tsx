@@ -4,7 +4,7 @@ import SignContractForm from '@/components/SignContractForm';
 import { getContractSignatureByToken } from '@/lib/contract-signature';
 import { applyContractOverrides, getContractTemplate } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
-import { applyBimedContractDefaults } from '@/lib/bimed-role-policy';
+import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
 
 export const metadata: Metadata = {
   title: 'Bimed Healthcare | Sign Your Employment Contract',
@@ -81,10 +81,8 @@ export default async function SignContractPage({ params }: PageProps) {
     applyContractOverrides(baseTemplate, {
       employeeName: signature.employee_name,
       employeeAddress: signature.employee_address,
-      startDate: signature.start_date,
     })
   );
-  const effectiveStartDate = signature.start_date || '2027-01-11';
 
   const employeeSignatureSlot =
     signature.status === 'signed' ? (
@@ -98,7 +96,7 @@ export default async function SignContractPage({ params }: PageProps) {
         token={token}
         employeeName={signature.employee_name}
         employeeAddress={signature.employee_address || ''}
-        startDate={effectiveStartDate}
+        startDate="2027-01-11"
       />
     );
 

@@ -11,9 +11,7 @@ import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-function defaultStartDateIso() {
-  return '2027-01-11';
-}
+const BIMED_CANONICAL_START_DATE_ISO = '2027-01-11';
 
 export async function GET(request: NextRequest, context: RouteContext) {
   if (!await getAdminSession(request)) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
@@ -47,7 +45,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { data: application, error: applicationError } = await client
       .from('recruitment_applications')
-      .select('id, full_name, email, address, start_date, role_applied, status')
+      .select('id, full_name, email, address, role_applied, status')
       .eq('id', applicationId)
       .maybeSingle();
     if (applicationError) throw applicationError;
@@ -65,7 +63,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const startDate = application.start_date || defaultStartDateIso();
+    const startDate = BIMED_CANONICAL_START_DATE_ISO;
 
     const { record, signUrl } = await createContractSignatureRequest({
       applicationId: application.id,
