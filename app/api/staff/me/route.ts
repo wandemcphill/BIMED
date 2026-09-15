@@ -8,7 +8,7 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const SAFE_PROFILE_FIELDS = 'id,bimed_id,application_id,full_name,preferred_name,email,status,role,job_title,department,employment_type,employment_start_date,manager_name,primary_location,phone,address_line_1,address_line_2,city,county,eircode,country,pps_number,pps_status,profile_photo_path,profile_photo_updated_at,department_namespace,portal_handle,portal_address,activated_at,last_login_at';
 
-async function withPhotoUrl(client: ReturnType<typeof db>, staff: Record<string, unknown>) {
+async function withPhotoUrl(staff: Record<string, unknown>) {
   if (!staff.profile_photo_path) return staff;
   const version = staff.profile_photo_updated_at ? encodeURIComponent(String(staff.profile_photo_updated_at)) : 'current';
   return { ...staff, profile_photo_url: `/api/staff/me/photo?v=${version}` };
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const client = db();
   const { data: staff, error } = await client.from('recruitment_staff').select(SAFE_PROFILE_FIELDS).eq('id', session.staff_id).single();
   if (error || !staff) return NextResponse.json({ error: 'Staff record not found.' }, { status: 404 });
-  return NextResponse.json({ staff: await withPhotoUrl(client, staff) });
+  return NextResponse.json({ staff: await withPhotoUrl(staff) });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest) {
   const { data, error } = await client.from('recruitment_staff').update(update).eq('id', session.staff_id).select(SAFE_PROFILE_FIELDS).single();
   if (error || !data) return NextResponse.json({ error: 'Unable to update your profile.' }, { status: 500 });
   await createStaffAudit(client, { staffId: session.staff_id, actor: session.email, eventType: 'staff_self_service_profile_updated', metadata: { fields: Object.keys(update).filter(k => k !== 'updated_at') } });
-  return NextResponse.json({ staff: await withPhotoUrl(client, data) });
+  return NextResponse.json({ staff: await withPhotoUrl(data) });
 }
 
 export async function POST(request: NextRequest) {
@@ -64,5 +64,5 @@ export async function POST(request: NextRequest) {
   if (error || !data) return NextResponse.json({ error: 'Unable to save the photograph.' }, { status: 500 });
   if (current?.profile_photo_path) await client.storage.from(STAFF_PHOTO_BUCKET).remove([current.profile_photo_path]);
   await createStaffAudit(client, { staffId: session.staff_id, actor: session.email, eventType: 'staff_photo_updated' });
-  return NextResponse.json({ staff: await withPhotoUrl(client, data) });
+  return NextResponse.json({ staff: await withPhotoUrl(data) });
 }
