@@ -9,6 +9,7 @@ const navItems = [
   { href: '/staff/rota', label: 'Rota' },
   { href: '/staff/attendance', label: 'Attendance' },
   { href: '/staff/notifications', label: 'Notifications' },
+  { href: '/staff/onboarding', label: 'Onboarding' },
   { href: '/staff/permit', label: 'Employment permit' },
   { href: '/staff/travel', label: 'Travel to Ireland' },
 ];
@@ -60,6 +61,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           .bimed-staff-mobile-bar strong { font-size:15px; }
           .bimed-staff-mobile-sub { margin-left:auto; color:rgba(255,255,255,.7); font-size:11px; }
 
+          main > header { padding:12px 16px !important; }
           main > div { max-width:100% !important; box-sizing:border-box; padding-left:16px !important; padding-right:16px !important; }
           main > div > section, main > div > form { min-width:0 !important; max-width:100% !important; box-sizing:border-box; }
           main [style*="grid-template-columns"] { grid-template-columns:minmax(0,1fr) !important; }
@@ -79,11 +81,12 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
       <aside id="bimed-staff-sidebar" className="bimed-staff-sidebar" aria-label="BIMED Staff Portal navigation">
         <div className="bimed-staff-brand"><strong>BIMED Portal</strong><span>Staff workspace</span></div>
-        {navItems.map((item) => (
-          <Link key={item.href} href={item.href} className={`bimed-staff-nav-link ${pathname === item.href ? 'active' : ''}`} onClick={() => { document.getElementById('bimed-staff-sidebar')?.classList.remove('open'); document.getElementById('bimed-staff-overlay')?.classList.remove('open'); }}>
+        {navItems.map((item) => {
+          const active = item.href === '/staff' ? pathname === '/staff' : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return <Link key={item.href} href={item.href} className={`bimed-staff-nav-link ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => { document.getElementById('bimed-staff-sidebar')?.classList.remove('open'); document.getElementById('bimed-staff-overlay')?.classList.remove('open'); }}>
             {item.label}
-          </Link>
-        ))}
+          </Link>;
+        })}
       </aside>
       <div id="bimed-staff-overlay" className="bimed-staff-overlay" onClick={() => { document.getElementById('bimed-staff-sidebar')?.classList.remove('open'); document.getElementById('bimed-staff-overlay')?.classList.remove('open'); }} />
       <div className="bimed-staff-mobile-bar">
