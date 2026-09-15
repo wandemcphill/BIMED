@@ -1,14 +1,12 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 
 type Conversation = { id: string; other: any; latest: any; unread: boolean; isAdminThread?: boolean };
 type AdminRecipient = { id: string; name: string; title: string; email: string; portalAddress: string; bimedId: string };
 type Message = { id: string; sender_staff_id: string | null; sender_admin_email: string | null; body: string; created_at: string };
 
 export default function BimedMessagesPage() {
-  const searchParams = useSearchParams();
   const [mailbox, setMailbox] = useState<any>(null);
   const [staffType, setStaffType] = useState('');
   const [adminRecipients, setAdminRecipients] = useState<AdminRecipient[]>([]);
@@ -61,9 +59,9 @@ export default function BimedMessagesPage() {
   }, [active]);
 
   useEffect(() => {
-    const requested = searchParams.get('conversation');
+    const requested = new URLSearchParams(window.location.search).get('conversation');
     if (requested) setActive(requested);
-  }, [searchParams]);
+  }, []);
 
   async function startConversation(event: FormEvent) {
     event.preventDefault(); if (!draft.trim() || !to) return; setBusy(true); setError('');
