@@ -28,6 +28,14 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       .catch(() => undefined);
   }, [isAuthPage, pathname]);
 
+  async function signOut() {
+    try {
+      await fetch('/api/staff/auth/logout', { method: 'POST' });
+    } finally {
+      window.location.href = '/staff/login';
+    }
+  }
+
   if (isAuthPage) return <>{children}</>;
 
   return (
@@ -51,6 +59,12 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         }
         .bimed-staff-nav-link:hover { background:rgba(255,255,255,.08); }
         .bimed-staff-nav-link.active { background:#0f766e; box-shadow:0 6px 18px rgba(15,118,110,.22); }
+        .bimed-staff-sidebar-footer { margin-top:auto; padding-top:12px; border-top:1px solid rgba(255,255,255,.12); }
+        .bimed-staff-signout {
+          width:100%; min-height:46px; padding:0 12px; border:1px solid rgba(255,255,255,.16); border-radius:10px;
+          background:rgba(255,255,255,.06); color:#fff; font:inherit; font-weight:800; text-align:left; cursor:pointer;
+        }
+        .bimed-staff-signout:hover { background:rgba(255,255,255,.12); }
         .bimed-staff-content { min-width:0; margin-left:var(--bimed-sidebar-width); min-height:100vh; }
         .bimed-staff-mobile-bar { display:none; }
         .bimed-staff-overlay { display:none; }
@@ -97,6 +111,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             {item.label}
           </Link>;
         })}
+        <div className="bimed-staff-sidebar-footer">
+          <button type="button" className="bimed-staff-signout" onClick={() => void signOut()}>Sign out</button>
+        </div>
       </aside>
       <div id="bimed-staff-overlay" className="bimed-staff-overlay" onClick={() => { document.getElementById('bimed-staff-sidebar')?.classList.remove('open'); document.getElementById('bimed-staff-overlay')?.classList.remove('open'); }} />
       <div className="bimed-staff-mobile-bar">
