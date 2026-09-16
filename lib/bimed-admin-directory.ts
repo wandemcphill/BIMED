@@ -2,6 +2,7 @@ export const BIMED_ADMIN_EMAILS = [
   { name: 'Hannah', email: 'info@bimedhealthcare.com', mailboxHandle: 'hannah', title: 'BIMED Admin / HR' },
   { name: 'Olga', email: 'recruitment@bimedhealthcare.com', mailboxHandle: 'olga', title: 'Recruitment Administrator' },
   { name: 'Razwan', email: 'overseas@bimedhealthcare.com', mailboxHandle: 'razwan', title: 'International Recruitment Administrator' },
+  { name: 'Dezou Maurice', email: 'manager@bimedhealthcare.com', mailboxHandle: 'dezou.maurice', title: 'Manager' },
 ] as const;
 
 export const BIMED_ADMIN_PROBATION_NOTICE =
