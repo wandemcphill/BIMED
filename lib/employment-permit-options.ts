@@ -29,6 +29,8 @@ export interface AccommodationPermitSelection {
   accommodation_period_months: number;
   accommodation_refund_installments: number;
   accommodation_refund_trigger: AccommodationRefundTrigger;
+  /** Backward-compatible alias used by invoice/request messaging. */
+  refund_trigger: AccommodationRefundTrigger;
   accommodation_plan_label: string;
   accommodation_summary: string;
   subsequent_accommodation: string;
@@ -92,6 +94,7 @@ export function getAccommodationSelection(
     accommodation_period_months: isShortStay ? 1 : 3,
     accommodation_refund_installments: ACCOMMODATION_REFUND_INSTALLMENTS,
     accommodation_refund_trigger: refundTrigger,
+    refund_trigger: refundTrigger,
     accommodation_plan_label: accommodationPlanLabel(plan),
     accommodation_summary: isShortStay
       ? 'BIMED-arranged accommodation for the first month while you complete training, onboarding and shadow shifts with BIMED.'
@@ -132,12 +135,14 @@ export function legacyAccommodationSelection(roleValue: string | null | undefine
   const role = normalizeRecruitmentRole(roleValue);
   const roleSlug = recruitmentRoleSlug(roleValue);
   const permitType = derivePermitType(roleValue) || (permitTypeValue === 'critical_skills_employment_permit' ? permitTypeValue : 'general_employment_permit');
+  const refundTrigger = 'successful_three_month_probation' as const;
   return {
     accommodation_plan: 'three_months_4000' as const,
     accommodation_amount_eur: 4000,
     accommodation_period_months: 3,
     accommodation_refund_installments: ACCOMMODATION_REFUND_INSTALLMENTS,
-    accommodation_refund_trigger: 'successful_three_month_probation' as const,
+    accommodation_refund_trigger: refundTrigger,
+    refund_trigger: refundTrigger,
     accommodation_plan_label: accommodationPlanLabel('three_months_4000'),
     accommodation_summary: 'Legacy BIMED-arranged accommodation for the initial three-month probationary period.',
     subsequent_accommodation: 'Legacy record. Continue under the original accommodation terms and any later agreed relocation arrangement.',
