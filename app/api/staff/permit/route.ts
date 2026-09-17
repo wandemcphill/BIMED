@@ -199,7 +199,12 @@ export async function POST(request: NextRequest) {
       });
       if (result.error || !result.data) throw result.error || new Error('Unable to record the accommodation acknowledgement.');
     } catch (error) {
-      console.error(JSON.stringify({ level: 'error', event: 'accommodation_acknowledgement_atomic_failed', staff_id: staff.id, reason: error instanceof Error ? error.message : String(error) }));
+      const reason = error instanceof Error
+        ? error.message
+        : error && typeof error === 'object'
+          ? JSON.stringify(error)
+          : String(error);
+      console.error(JSON.stringify({ level: 'error', event: 'accommodation_acknowledgement_atomic_failed', staff_id: staff.id, reason }));
       return NextResponse.json({ error: 'Unable to record the accommodation acknowledgement. No partial acknowledgement was saved.' }, { status: 500 });
     }
 
