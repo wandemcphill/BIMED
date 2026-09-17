@@ -205,3 +205,5 @@ export function receiptHtml(input: { receipt: any; invoice: any; staff: any; pub
       <div class="footer">Document version: ${e(selection.terms_version || ACCOMMODATION_OPTIONS_TERMS_VERSION)} · Paid: ${e(dateTime(paidAt))} · Retain this receipt with the original invoice.</div>
     </div></main></body></html>`;
 }
+
+export { appUrl };
