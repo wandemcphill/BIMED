@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/admin-session';
 import { db } from '@/lib/db';
 import { createStaffAudit } from '@/lib/staff';
-import { ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl, makeReceiptNumber, receiptHtml, invoiceHtml, sendAccommodationEmail } from '@/lib/accommodation-billing';
+import { ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl, makeReceiptNumber, sendAccommodationEmail } from '@/lib/accommodation-billing';
+import { invoiceHtml, receiptHtml } from '@/lib/accommodation-documents';
 import { recordAccommodationPaymentAtomic } from '@/lib/staff-portal-workflow';
 function safePublicUrl(token: string) { return `${appUrl()}/invoices/accommodation/${token}`; }
 async function issueReceiptForPaidInvoice(client: ReturnType<typeof db>, invoice: any, staff: any, application: any, permit: any) {
