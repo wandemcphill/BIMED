@@ -245,5 +245,3 @@ export function getPermitChecklist(
 export function checklistSourceForRole(roleValue: string | null | undefined): string | null {
   return getPermitChecklist(roleValue)?.source_url || null;
 }
-
-export { CORU_PHYSIOTHERAPIST_REGISTRATION_URL };
