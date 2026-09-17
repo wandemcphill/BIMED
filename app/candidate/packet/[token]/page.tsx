@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import CandidatePacketInteractive from '@/components/CandidatePacketInteractive';
 import { getPacketAccess, getPacketDefinition, type PacketSlug } from '@/lib/document-packets';
 import { db } from '@/lib/db';
+import { BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 
 function renderMarkdown(source: string) {
   return source.split(/\r?\n/).map((raw, index) => {
@@ -36,6 +37,13 @@ export default async function CandidatePacketPage({ params }: PageProps) {
     .maybeSingle();
   if (!application) notFound();
 
+  // Candidate-submitted application.start_date is retained as source information, but formal
+  // recruitment documents must use the single BIMED commencement date.
+  const formalApplication = {
+    ...application,
+    start_date: BIMED_DEFAULT_START_DATE_ISO,
+  };
+
   if (packet.mode !== 'reading') {
     return (
       <main style={{ minHeight: '100vh', background: '#f3f7f9', color: '#243039', padding: '28px 16px' }}>
@@ -50,7 +58,7 @@ export default async function CandidatePacketPage({ params }: PageProps) {
             title={packet.title}
             description={packet.description}
             mode={packet.mode}
-            application={application}
+            application={formalApplication}
             initialResponse={(access.response_data || {}) as Record<string, unknown>}
             completedAt={access.completed_at}
           />
@@ -64,11 +72,11 @@ export default async function CandidatePacketPage({ params }: PageProps) {
   // The filesystem lookup is intentional for the read-only packet documents.
   const source = await fs.readFile(/* turbopackIgnore: true */ path.join(process.cwd(), packet.sourcePath), 'utf8');
   const personalised = source
-    .replaceAll('[NAME]', application.full_name || '')
-    .replaceAll('[EMPLOYEE FULL NAME]', application.full_name || '')
-    .replaceAll('[ROLE]', application.role_applied || '')
-    .replaceAll('[ROLE TITLE]', application.role_applied || '')
-    .replaceAll('[DATE]', application.start_date || 'To be confirmed');
+    .replaceAll('[NAME]', formalApplication.full_name || '')
+    .replaceAll('[EMPLOYEE FULL NAME]', formalApplication.full_name || '')
+    .replaceAll('[ROLE]', formalApplication.role_applied || '')
+    .replaceAll('[ROLE TITLE]', formalApplication.role_applied || '')
+    .replaceAll('[DATE]', BIMED_DEFAULT_START_DATE_ISO || 'To be confirmed');
 
   return (
     <main style={{ minHeight: '100vh', background: '#f3f7f9', color: '#243039', padding: '28px 16px' }}>
@@ -80,7 +88,7 @@ export default async function CandidatePacketPage({ params }: PageProps) {
         <section style={{ background: '#fff', border: '1px solid #d7e1e6', borderRadius: 14, padding: '28px' }}>
           <div style={{ display: 'inline-block', padding: '5px 9px', borderRadius: 999, background: '#e8f4f8', color: '#0a6f95', fontSize: 12, fontWeight: 800, marginBottom: 14 }}>PRIVATE LINK</div>
           <div style={{ color: '#66717a', fontSize: 13, marginBottom: 20 }}>
-            Prepared for <strong>{application.full_name}</strong>{application.role_applied ? ` · ${application.role_applied}` : ''}
+            Prepared for <strong>{formalApplication.full_name}</strong>{formalApplication.role_applied ? ` · ${formalApplication.role_applied}` : ''}
           </div>
           <article>{renderMarkdown(personalised)}</article>
           <hr style={{ border: 0, borderTop: '1px solid #d7e1e6', margin: '28px 0 18px' }} />
