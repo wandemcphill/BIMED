@@ -17,7 +17,7 @@ export default function SignContractForm({
   const router = useRouter();
   const [name, setName] = useState(employeeName);
   const [address, setAddress] = useState(employeeAddress);
-  const [date, setDate] = useState(startDate);
+  const [date] = useState(startDate);
   const [typedName, setTypedName] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -76,8 +76,9 @@ export default function SignContractForm({
         <input value={address} onChange={(event) => setAddress(event.target.value)} />
       </div>
       <div className="field" style={{ marginTop: 10 }}>
-        <label>Start date</label>
-        <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        <label>Contract start date</label>
+        <input type="date" value={date} readOnly aria-readonly="true" />
+        <small className="muted">BIMED's standard contractual commencement date. Candidate availability and relocation dates are recorded separately.</small>
       </div>
 
       <p className="muted" style={{ marginTop: 16 }}>
