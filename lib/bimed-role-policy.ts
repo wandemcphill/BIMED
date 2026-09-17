@@ -2,9 +2,11 @@ import type { ContractTemplate, ContractSection } from '@/lib/contract-templates
 
 export const BIMED_DEFAULT_LINE_MANAGER = 'Dezou Maurice';
 export const BIMED_DEFAULT_START_DATE = '11 January 2027';
+export const BIMED_DEFAULT_START_DATE_ISO = '2027-01-11';
+export const BIMED_DEFAULT_END_DATE_ISO = '2029-01-10';
 export const BIMED_DEFAULT_PROBATION = '3 months';
 export const BIMED_DEFAULT_PAY_FREQUENCY = 'monthly';
-export const BIMED_DEFAULT_CONTRACT_DURATION = 'Fixed-term employment for two years, from 11 January 2027 to 10 January 2029';
+export const BIMED_DEFAULT_CONTRACT_DURATION = `Fixed-term employment for two years, from ${BIMED_DEFAULT_START_DATE} to 10 January 2029`;
 
 // Current 2026 standard General Employment Permit minimum annual remuneration published by DETE.
 // This is a current compliance floor, not a guarantee that a future permit application will qualify.

@@ -6,12 +6,10 @@ import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendContractReadyToSignEmail } from '@/lib/email';
 import { getContractTemplate } from '@/lib/contract-templates';
 import { createContractSignatureRequest, listContractSignaturesForApplication } from '@/lib/contract-signature';
-import { BIMED_DEFAULT_START_DATE, recruitmentRoleSlug } from '@/lib/bimed-role-policy';
+import { BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO, recruitmentRoleSlug } from '@/lib/bimed-role-policy';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-const BIMED_CANONICAL_START_DATE_ISO = '2027-01-11';
 
 export async function GET(request: NextRequest, context: RouteContext) {
   if (!await getAdminSession(request)) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
@@ -63,7 +61,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const startDate = BIMED_CANONICAL_START_DATE_ISO;
+    const startDate = BIMED_DEFAULT_START_DATE_ISO;
 
     const { record, signUrl } = await createContractSignatureRequest({
       applicationId: application.id,

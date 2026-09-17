@@ -8,13 +8,9 @@ import { createPacketAccess, packetList } from '@/lib/document-packets';
 import { sendFullOnboardingPackEmail } from '@/lib/full-onboarding-pack';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 import { db } from '@/lib/db';
-import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
+import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-function defaultStartDateIso() {
-  return '2027-01-11';
-}
 
 export async function POST(request: NextRequest, context: RouteContext) {
   const session = await getAdminSession(request);
@@ -43,7 +39,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!expectedRoleSlug) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
     if (requestedRoleSlug !== expectedRoleSlug) return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
 
-    const startDate = application.start_date || defaultStartDateIso();
+    const startDate = BIMED_DEFAULT_START_DATE_ISO;
     const contractInfo = {
       applicationId: application.id,
       employeeName: application.full_name,

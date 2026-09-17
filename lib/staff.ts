@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { activationExpiresAt, createActivationToken, hashActivationToken } from './staff-auth';
-import { recruitmentRoleSlug } from './bimed-role-policy';
+import { BIMED_DEFAULT_END_DATE_ISO, BIMED_DEFAULT_START_DATE_ISO, recruitmentRoleSlug } from './bimed-role-policy';
 import {
   ensureOnboardingChecklist,
   getOnboardingReadiness,
@@ -15,7 +15,7 @@ export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 export type StaffStatus = 'pre_arrival' | 'active' | 'on_leave' | 'suspended' | 'former';
 
 function defaultStartDate() {
-  return '2027-01-11';
+  return BIMED_DEFAULT_START_DATE_ISO;
 }
 
 function mapResidentialAddress(address: string | null | undefined) {
@@ -95,6 +95,7 @@ export async function createStaffFromApplication(
 
   const activationToken = createActivationToken();
   const effectiveStartDate = defaultStartDate();
+  const effectiveEndDate = BIMED_DEFAULT_END_DATE_ISO;
   const effectiveName = signedContract?.employee_name || application.full_name;
   const effectiveAddress = signedContract?.employee_address || application.address;
   const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
@@ -114,6 +115,7 @@ export async function createStaffFromApplication(
       job_title: application.role_applied,
       employment_type: application.employment_type,
       employment_start_date: effectiveStartDate,
+      employment_end_date: effectiveEndDate,
       country: 'Ireland',
       status: effectiveStatus,
       ...mapResidentialAddress(effectiveAddress),
@@ -220,6 +222,7 @@ export async function createStaffAudit(
 ) {
   await client.from('recruitment_staff_audit_log').insert({
     staff_id: input.staffId || null,
+    action: input.eventType,
     actor: input.actor,
     event_type: input.eventType,
     metadata: input.metadata || {},
