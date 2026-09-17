@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
@@ -7,7 +6,7 @@ import { sendDocumentReadyToSignEmail } from '@/lib/email';
 import { getJobDescriptionTemplate } from '@/lib/document-templates';
 import { createDocumentSignatureRequest, listContractSignaturesForApplication, type SignableDocType } from '@/lib/contract-signature';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
-import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
+import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -15,10 +14,6 @@ function documentLabelFor(docType: SignableDocType, roleSlug: string): string {
   if (docType === 'handbook') return 'Employee Handbook';
   const template = getJobDescriptionTemplate(roleSlug);
   return template ? `${template.roleLabel} Job Description` : 'Job Description';
-}
-
-function defaultStartDateIso() {
-  return '2027-01-11';
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -85,7 +80,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     }
 
-    const startDate = application.start_date || defaultStartDateIso();
+    const startDate = BIMED_DEFAULT_START_DATE_ISO;
     const { record, signUrl } = await createDocumentSignatureRequest({
       applicationId: application.id,
       docType,
