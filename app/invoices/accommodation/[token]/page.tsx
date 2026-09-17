@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
-import { invoiceHtml, receiptHtml, appUrl } from '@/lib/accommodation-billing';
+import { invoiceHtml, receiptHtml, appUrl } from '@/lib/accommodation-documents';
 
 export const dynamic = 'force-dynamic';
 
