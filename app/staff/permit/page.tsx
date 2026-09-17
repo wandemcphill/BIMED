@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getPermitChecklist } from '@/lib/permit-checklist';
 
 type Permit = Record<string, any>;
 type AccommodationOption = {
@@ -25,6 +26,12 @@ type AccommodationOption = {
   immigration_registration_fee_guidance_eur: number;
   immigration_registration_fee_note: string;
 };
+
+const audienceLabel = {
+  candidate: 'YOU / AGENCY',
+  BIMED: 'BIMED',
+  shared: 'SHARED',
+} as const;
 
 export default function StaffPermitPage() {
   const router = useRouter();
@@ -61,12 +68,7 @@ export default function StaffPermitPage() {
   }
   useEffect(() => { void load(); }, []);
 
-  const availablePlans = useMemo(() => {
-    return options.filter((option) => option.accommodation_plan === 'three_months_4000' && option.permit_submission_route === (selectedRoute || 'bimed_legal_team'))[0]
-      ? ['three_months_4000', 'one_month_1250'] as const
-      : ['three_months_4000', 'one_month_1250'] as const;
-  }, [options, selectedRoute]);
-
+  const availablePlans = useMemo(() => ['three_months_4000', 'one_month_1250'] as const, []);
   const selectedOption = useMemo(() => options.find((option) => option.accommodation_plan === selectedPlan && option.permit_submission_route === selectedRoute) || null, [options, selectedPlan, selectedRoute]);
   const termsAcknowledged = Boolean(permit?.accommodation_terms_acknowledged_at);
   const selectionLocked = Boolean(permit?.permit_submission_route && termsAcknowledged);
@@ -116,8 +118,10 @@ export default function StaffPermitPage() {
 
   const currentPlan = selectedPlan || permit.accommodation_plan || 'three_months_4000';
   const routeReady = Boolean(permit.permit_submission_route || selectedRoute);
-  const displayOption = selectedOption || options.find((option) => option.accommodation_plan === currentPlan && option.permit_submission_route === (permit.permit_submission_route || selectedRoute));
+  const currentRoute = (permit.permit_submission_route || selectedRoute || null) as AccommodationOption['permit_submission_route'] | null;
+  const displayOption = selectedOption || options.find((option) => option.accommodation_plan === currentPlan && option.permit_submission_route === currentRoute) || null;
   const permitTypeLabel = displayOption?.permit_type_label || (permit.permit_type === 'critical_skills_employment_permit' ? 'Critical Skills Employment Permit (CSEP)' : permit.permit_type === 'general_employment_permit' ? 'General Employment Permit (GEP)' : 'BIMED to derive from your role');
+  const checklist = getPermitChecklist(role || permit.role || null, currentRoute);
 
   return <main style={{ minHeight: '100vh', background: '#f4f7fb', color: '#102a43', fontFamily: 'system-ui', padding: 'clamp(16px,4vw,28px)' }}>
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
@@ -156,7 +160,17 @@ export default function StaffPermitPage() {
 
       <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>Information BIMED will use</h2><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}><div><h3>Employee</h3><Info label='Full name' value={packet?.employee?.full_name} /><Info label='Nationality' value={packet?.employee?.nationality} /><Info label='Date of birth' value={packet?.employee?.date_of_birth} /><Info label='Phone' value={packet?.employee?.phone} /><Info label='Address' value={packet?.employee?.residential_address} /></div><div><h3>Employment</h3><Info label='Employer' value={packet?.employment?.employer} /><Info label='Position' value={packet?.employment?.position} /><Info label='Role applied' value={packet?.employment?.role_applied || role} /><Info label='Start date' value={packet?.employment?.start_date} /><Info label='Salary' value={packet?.employment?.annual_salary_eur ? `€${packet.employment.annual_salary_eur.toLocaleString()}` : 'To be confirmed'} /></div></div></section>
 
-      <section style={{ ...card, marginTop: 18, marginBottom: 30 }}><h2 style={{ marginTop: 0 }}>Permit checklist</h2><ol style={{ lineHeight: 1.8, color: '#334e68', paddingLeft: 22 }}><li>Signed contract or job offer with agreed employment details.</li><li>BIMED employer/company details and supporting information required by Employment Permits Online.</li><li>Job description, occupation and work location.</li><li>Salary, remuneration and hours.</li><li>Employer declaration and supporting information.</li><li>Qualification, registration and professional-recognition evidence where relevant to the role.</li><li>Physiotherapist cases use the CSEP pathway; HCA, Senior Support Worker and Support Worker cases use the GEP pathway, subject to actual statutory eligibility and current DETE requirements.</li><li>Permit approval is a pre-travel immigration/work-authorisation step. Irish immigration registration is a separate post-arrival process.</li></ol><p style={{ ...muted, marginBottom: 0 }}>The final checklist is case-specific and must follow the current DETE checklist and the candidate's actual facts. No document list on this portal is a promise that every item is universally required.</p></section>
+      {checklist ? <section style={{ ...card, marginTop: 18, marginBottom: 30 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+          <div><div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.1, color: '#0f766e' }}>ROLE-SPECIFIC PREPARATION</div><h2 style={{ margin: '4px 0 6px' }}>{checklist.checklist_title}</h2><p style={{ ...muted, margin: 0 }}>Built from the current DETE permit checklist for this pathway, with the BIMED submission route layered on top.</p></div>
+          <a href={checklist.source_url} target='_blank' rel='noreferrer' style={secondary}>Open official DETE checklist ↗</a>
+        </div>
+        <div style={{ marginTop: 14, padding: 14, borderRadius: 12, background: '#f8fafc', color: '#334e68', lineHeight: 1.6 }}><strong>Official source:</strong> {checklist.source_label}<br /><strong>Submission route:</strong> {checklist.submission_route_label}</div>
+        <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+          {checklist.items.map((item) => <div key={item.id} style={{ border: '1px solid #e5eaf0', borderRadius: 12, padding: 14, background: '#fff' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}><strong>{item.title}</strong><span style={{ flexShrink: 0, fontSize: 10, fontWeight: 900, letterSpacing: .5, padding: '4px 7px', borderRadius: 999, background: item.audience === 'BIMED' ? '#e0f2fe' : item.audience === 'candidate' ? '#fef3c7' : '#ecfdf5', color: '#334e68' }}>{audienceLabel[item.audience]}</span></div><p style={{ margin: '6px 0 0', color: '#627d98', lineHeight: 1.6 }}>{item.detail}{item.conditional ? ' Conditional: verify whether this applies to this candidate and application.' : ''}</p></div>)}
+        </div>
+        <div style={{ marginTop: 14, padding: 14, border: '1px solid #d9e2ec', borderRadius: 12, background: '#fbfdff' }}><strong>Case-specific notes</strong><ul style={{ margin: '8px 0 0', paddingLeft: 20, color: '#627d98', lineHeight: 1.65 }}>{checklist.notes.map((note) => <li key={note}>{note}</li>)}</ul></div>
+      </section> : <section style={{ ...card, marginTop: 18, marginBottom: 30 }}><h2 style={{ marginTop: 0 }}>Permit checklist</h2><p style={muted}>BIMED needs to review the recruitment role before a role-specific employment-permit checklist can be shown.</p></section>}
     </div>
   </main>;
 }
