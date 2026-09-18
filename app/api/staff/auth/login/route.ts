@@ -13,10 +13,23 @@ export async function POST(request: NextRequest) {
   if (!ipLimit.allowed || !identityLimit.allowed) { const retryAfter = Math.max(ipLimit.retryAfterSeconds || 60, identityLimit.retryAfterSeconds || 60); return NextResponse.json({ error: 'Too many sign-in attempts. Please try again later.' }, { status: 429, headers: { 'Retry-After': String(retryAfter) } }); }
 
   const client = db();
+  try {
+    const { error: cancellationError } = await client.rpc('bimed_enforce_due_sponsorship_cancellations');
+    if (cancellationError) console.error(JSON.stringify({ level: 'error', event: 'sponsorship_cancellation_login_enforcement_failed', reason: cancellationError.message }));
+  } catch (error) {
+    console.error(JSON.stringify({ level: 'error', event: 'sponsorship_cancellation_login_enforcement_failed', reason: error instanceof Error ? error.message : String(error) }));
+  }
   const query = client.from('recruitment_staff').select('id,bimed_id,email,status,password_hash,session_version,portal_restriction_reason,portal_restriction_message');
   const { data: staff, error } = await (isEmail ? query.eq('email', lookup) : query.eq('bimed_id', normalizedId)).maybeSingle();
   if (error) return NextResponse.json({ error: 'Unable to sign in right now.' }, { status: 500 });
   if (!staff || !staff.password_hash || !verifyStaffPassword(password, staff.password_hash)) return NextResponse.json({ error: 'The BIMED ID/email or password is incorrect.' }, { status: 401 });
+  if (staff.status === 'suspended' && staff.portal_restriction_reason === 'sponsorship_cancellation') {
+    return NextResponse.json({
+      error: staff.portal_restriction_message || 'Your Staff Portal access is restricted because the 24-hour accommodation-fee cancellation window expired. Your application has been withdrawn, your employment contract has been voided and the employment-permit / sponsorship journey has ended. Contact info@bimedhealthcare.com if you believe this action was applied in error.',
+      code: 'SPONSORSHIP_CANCELLATION_FINALIZED',
+      restrictedReason: 'sponsorship_cancellation',
+    }, { status: 403 });
+  }
   if (staff.status === 'suspended' && staff.portal_restriction_reason === 'accommodation_nonpayment') return NextResponse.json({ error: staff.portal_restriction_message || 'Your BIMED Staff Portal access is temporarily restricted because the required accommodation contribution has not been paid. Please contact BIMED if you need clarification.', code: 'PORTAL_RESTRICTED', restrictedReason: 'accommodation_nonpayment' }, { status: 403 });
   if (!['active', 'pre_arrival', 'on_leave'].includes(staff.status)) return NextResponse.json({ error: 'This Staff Portal account is currently unavailable. Please contact BIMED for assistance.' }, { status: 403 });
 
