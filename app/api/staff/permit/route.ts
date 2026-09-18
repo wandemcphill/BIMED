@@ -20,6 +20,10 @@ import {
   type PermitSubmissionRoute,
   type AccommodationPlan,
 } from '@/lib/employment-permit-options';
+import {
+  requestStaffSponsorshipCancellationAtomic,
+  revokeStaffSponsorshipCancellationAtomic,
+} from '@/lib/staff-portal-workflow';
 
 function completeProfilePacket(staff: any, application: any, permit: any) {
   return {
@@ -153,6 +157,173 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null) as any;
   const action = typeof body?.action === 'string' ? body.action : '';
 
+  if (action === 'request_sponsorship_cancellation') {
+    if (!currentInvoice || !['issued', 'payment_reported', 'cancellation_requested'].includes(currentInvoice.status)) {
+      return NextResponse.json({ error: 'There is no active accommodation invoice available to reject.' }, { status: 409 });
+    }
+    const reason = typeof body?.reason === 'string' && body.reason.trim()
+      ? body.reason.trim().slice(0, 500)
+      : 'Candidate rejected the accommodation fee and requested cancellation of the accommodation invoice.';
+
+    try {
+      const result = await requestStaffSponsorshipCancellationAtomic(client, {
+        staffId: staff.id,
+        actor: session.email,
+        reason,
+      });
+
+      const deadline = result.deadline_at;
+      const candidateEmail = application?.email || staff.email;
+      const subject = `Sponsorship cancellation submitted: ${staff.full_name} (${staff.bimed_id})`;
+      const html = `<div style="font-family:Arial,sans-serif;color:#172b4d">
+        <h2>Accommodation fee rejection / sponsorship cancellation</h2>
+        <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has rejected the accommodation fee and submitted a cancellation of the BIMED accommodation invoice <strong>${result.invoice_number}</strong>.</p>
+        <p>The candidate has a <strong>24-hour reversal window</strong> ending at <strong>${deadline}</strong>. During that window, the candidate may sign in to the Staff Portal and revoke the cancellation to continue the application.</p>
+        <p>If the cancellation is not revoked before the deadline, BIMED's workflow will automatically restrict Staff Portal access, withdraw the recruitment application, void the employment contract and end the employment-permit / sponsorship journey.</p>
+        <p>Reason recorded: ${reason}</p>
+        <p><a href="${appUrl()}/admin/billing">Open the accommodation invoice queue</a></p>
+      </div>`;
+
+      try {
+        await sendAccommodationEmail({
+          to: [candidateEmail, 'info@bimedhealthcare.com'],
+          subject,
+          html,
+        });
+      } catch (emailError) {
+        console.error(JSON.stringify({
+          level: 'error',
+          event: 'sponsorship_cancellation_email_failed',
+          staff_id: staff.id,
+          invoice_id: result.invoice_id,
+          reason: emailError instanceof Error ? emailError.message : String(emailError),
+        }));
+      }
+
+      await createStaffNotification(client, {
+        staffId: staff.id,
+        category: 'permit',
+        title: 'Cancellation submitted: 24-hour reversal window started',
+        body: `You rejected the accommodation fee. You can revoke this cancellation in the Staff Portal before ${deadline} to continue your application. If you do not revoke it within 24 hours, BIMED will restrict portal access, withdraw your application, void the employment contract and end the employment-permit / sponsorship journey.`,
+        actionUrl: '/staff/permit',
+      });
+
+      const { data: updatedPermit } = await client
+        .from('recruitment_staff_permit_cases')
+        .select('*')
+        .eq('id', permit.id)
+        .single();
+
+      return NextResponse.json({
+        ok: true,
+        permit: updatedPermit || { ...permit, cancellation_requested_at: new Date().toISOString(), cancellation_deadline_at: deadline },
+        cancellationDeadline: deadline,
+        status: 'cancellation_requested',
+      }, { status: 201 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const mapped: Record<string, { message: string; status: number }> = {
+        SPONSORSHIP_CANCELLATION_FINALIZED: {
+          message: 'The sponsorship cancellation has already been finalised. Portal access and the recruitment record cannot be restored through the Staff Portal.',
+          status: 409,
+        },
+        SPONSORSHIP_CANCELLATION_DEADLINE_PASSED: {
+          message: 'The 24-hour cancellation window has already expired. BIMED is processing the withdrawal and portal restriction.',
+          status: 409,
+        },
+        ACCOMMODATION_INVOICE_NOT_CANCELABLE: {
+          message: 'The accommodation invoice is no longer available for cancellation.',
+          status: 409,
+        },
+      };
+      const handled = mapped[message];
+      return NextResponse.json(
+        { error: handled?.message || 'Unable to record the sponsorship cancellation.' },
+        { status: handled?.status || 500 },
+      );
+    }
+  }
+
+  if (action === 'revoke_sponsorship_cancellation') {
+    try {
+      const result = await revokeStaffSponsorshipCancellationAtomic(client, {
+        staffId: staff.id,
+        actor: session.email,
+      });
+
+      await createStaffNotification(client, {
+        staffId: staff.id,
+        category: 'permit',
+        title: 'Cancellation revoked',
+        body: 'Your cancellation has been revoked within the 24-hour reversal window. Your application and accommodation invoice have been restored and you may continue with your BIMED onboarding and sponsorship journey.',
+        actionUrl: '/staff/permit',
+      });
+
+      try {
+        await sendAccommodationEmail({
+          to: [application?.email || staff.email, 'info@bimedhealthcare.com'],
+          subject: `Sponsorship cancellation revoked: ${staff.full_name} (${staff.bimed_id})`,
+          html: `<div style="font-family:Arial,sans-serif;color:#172b4d">
+            <h2>Sponsorship cancellation revoked</h2>
+            <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) revoked the accommodation-fee cancellation for invoice <strong>${result.invoice_number}</strong> within the 24-hour reversal window.</p>
+            <p>The accommodation invoice has been restored to <strong>${result.restored_invoice_status}</strong> and the candidate may continue the BIMED application.</p>
+          </div>`,
+        });
+      } catch (emailError) {
+        console.error(JSON.stringify({
+          level: 'error',
+          event: 'sponsorship_cancellation_revoke_email_failed',
+          staff_id: staff.id,
+          invoice_id: result.invoice_id,
+          reason: emailError instanceof Error ? emailError.message : String(emailError),
+        }));
+      }
+
+      const { data: updatedPermit } = await client
+        .from('recruitment_staff_permit_cases')
+        .select('*')
+        .eq('id', permit.id)
+        .single();
+
+      return NextResponse.json({
+        ok: true,
+        permit: updatedPermit || { ...permit, cancellation_revoked_at: new Date().toISOString(), cancellation_deadline_at: null },
+        status: 'restored',
+      }, { status: 200 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const mapped: Record<string, { message: string; status: number }> = {
+        SPONSORSHIP_CANCELLATION_DEADLINE_PASSED: {
+          message: 'The 24-hour reversal window has expired. The cancellation can no longer be revoked from the Staff Portal.',
+          status: 409,
+        },
+        SPONSORSHIP_CANCELLATION_FINALIZED: {
+          message: 'The cancellation has already been finalised and this account can no longer be restored through the Staff Portal.',
+          status: 409,
+        },
+        NO_SPONSORSHIP_CANCELLATION: {
+          message: 'There is no active sponsorship cancellation to revoke.',
+          status: 409,
+        },
+      };
+      const handled = mapped[message];
+      return NextResponse.json(
+        { error: handled?.message || 'Unable to revoke the sponsorship cancellation.' },
+        { status: handled?.status || 500 },
+      );
+    }
+  }
+
+  if (permit.cancellation_requested_at
+      && !permit.cancellation_revoked_at
+      && !permit.cancellation_finalized_at) {
+    return NextResponse.json({
+      error: `Your sponsorship cancellation is pending. You must revoke it before ${permit.cancellation_deadline_at} to continue your application.`,
+      code: 'SPONSORSHIP_CANCELLATION_PENDING',
+      deadline: permit.cancellation_deadline_at,
+    }, { status: 409 });
+  }
+
   if (action === 'acknowledge_accommodation') {
     if (body?.acknowledged !== true) return NextResponse.json({ error: 'Please confirm that you understand and accept the selected accommodation, payment, refund and permit-route terms before continuing.' }, { status: 400 });
     if (currentInvoice && !permit.accommodation_terms_acknowledged_at) return NextResponse.json({ error: 'An accommodation invoice already exists for this case. BIMED should review the case before another acknowledgement is recorded.' }, { status: 409 });
@@ -283,6 +454,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'request_sponsorship') {
+    if (permit.cancellation_finalized_at) return NextResponse.json({ error: 'The sponsorship journey has been closed following the accommodation-fee cancellation.' }, { status: 409 });
+    if (permit.cancellation_requested_at && !permit.cancellation_revoked_at) return NextResponse.json({ error: `Your cancellation is pending until ${permit.cancellation_deadline_at}. Revoke it before the deadline to continue.` }, { status: 409 });
     if (!isAccommodationReady(currentInvoice)) return NextResponse.json({ error: 'Your accommodation invoice must be issued by BIMED before you can request BIMED to begin the employment-permit / sponsorship journey.' }, { status: 409 });
     const { data: current } = await client.from('recruitment_staff_permit_cases').select('*').eq('staff_id', staff.id).maybeSingle();
     if (!current) return NextResponse.json({ error: 'Permit case not initialized.' }, { status: 404 });
