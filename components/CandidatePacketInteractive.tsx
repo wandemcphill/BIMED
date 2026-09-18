@@ -26,34 +26,81 @@ type Props = {
   completedAt?: string | null;
 };
 
-const checklistMap: Partial<Record<PacketSlug, Array<{ key: string; label: string }>>> = {
+type ChecklistAudience = 'candidate' | 'bimed';
+type ChecklistStage = 'now' | 'upcoming';
+
+type ChecklistItem = {
+  key: string;
+  label: string;
+  audience: ChecklistAudience;
+  stage: ChecklistStage;
+  helper?: string;
+};
+
+const checklistMap: Partial<Record<PacketSlug, ChecklistItem[]>> = {
   'supporting-documents': [
-    { key: 'passport', label: 'Passport or approved identity evidence ready.' },
-    { key: 'address', label: 'Current address evidence ready, where requested.' },
-    { key: 'cv', label: 'Current CV ready.' },
-    { key: 'employment', label: 'Previous employment and reference details ready.' },
-    { key: 'qualifications', label: 'Qualification certificates ready.' },
-    { key: 'registration', label: 'Professional registration/licence evidence ready, where applicable.' },
-    { key: 'training', label: 'Relevant training certificates ready.' },
-    { key: 'permission', label: 'Work-permission / employment-permit evidence ready, where applicable.' },
-    { key: 'other', label: 'Any additional documents specifically requested by BIMED are ready.' },
+    { key: 'passport', label: 'Passport or approved identity evidence ready.', audience: 'candidate', stage: 'now' },
+    { key: 'address', label: 'Current address evidence ready, where requested.', audience: 'candidate', stage: 'now' },
+    { key: 'cv', label: 'Current CV ready.', audience: 'candidate', stage: 'now' },
+    { key: 'employment', label: 'Previous employment and reference details ready.', audience: 'candidate', stage: 'now' },
+    { key: 'qualifications', label: 'Qualification certificates ready.', audience: 'candidate', stage: 'now' },
+    { key: 'registration', label: 'Professional registration/licence evidence ready, where applicable.', audience: 'candidate', stage: 'now' },
+    { key: 'training', label: 'Relevant training certificates ready.', audience: 'candidate', stage: 'now' },
+    {
+      key: 'permission',
+      label: 'Employment permit / work-permission evidence',
+      audience: 'bimed',
+      stage: 'upcoming',
+      helper: 'BIMED controls this status. Leave it pending until the relevant permit or work permission has actually been granted and verified.',
+    },
+    { key: 'other', label: 'Any additional documents specifically requested by BIMED are ready.', audience: 'candidate', stage: 'now' },
   ],
   'international-relocation': [
-    { key: 'offer', label: 'BIMED employment documentation accepted or signed.' },
-    { key: 'identity', label: 'Identity information confirmed.' },
-    { key: 'route', label: 'International recruitment route confirmed.' },
-    { key: 'passport', label: 'Passport valid for intended travel.' },
-    { key: 'permission', label: 'Relevant immigration / permission documentation received or confirmed.' },
-    { key: 'travel', label: 'Travel date shared with BIMED.' },
-    { key: 'accommodation', label: 'Accommodation plan confirmed.' },
-    { key: 'arrival', label: 'Airport and arrival plan confirmed.' },
-    { key: 'induction', label: 'First reporting / induction appointment confirmed.' },
-    { key: 'contacts', label: 'Emergency and BIMED contact details saved.' },
-    { key: 'documents', label: 'Critical documents retained securely in digital and physical form.' },
-    { key: 'first-week', label: 'First-week induction and service orientation completed.' },
-    { key: 'training', label: 'Required mandatory training completed or scheduled.' },
-    { key: 'portal', label: 'Rota and attendance access confirmed.' },
-    { key: 'month-one', label: 'First-month check-in completed and outstanding actions understood.' },
+    { key: 'offer', label: 'BIMED employment offer and contract accepted or signed.', audience: 'candidate', stage: 'now' },
+    { key: 'identity', label: 'Identity information confirmed.', audience: 'candidate', stage: 'now' },
+    { key: 'route', label: 'International recruitment route confirmed.', audience: 'candidate', stage: 'now' },
+    { key: 'passport', label: 'Passport valid for intended travel.', audience: 'candidate', stage: 'now' },
+    {
+      key: 'permission',
+      label: 'Employment permit / immigration permission',
+      audience: 'bimed',
+      stage: 'upcoming',
+      helper: 'BIMED will update this when the applicable permit / immigration step is submitted, granted and verified.',
+    },
+    {
+      key: 'travel',
+      label: 'Proposed travel date shared with BIMED, if known.',
+      audience: 'candidate',
+      stage: 'now',
+      helper: 'A proposed date is optional. BIMED will confirm the final travel date after the permit, visa and travel arrangements are ready.',
+    },
+    {
+      key: 'accommodation',
+      label: 'Accommodation allocation confirmed.',
+      audience: 'bimed',
+      stage: 'upcoming',
+      helper: 'BIMED will provide the allocated accommodation details when confirmed.',
+    },
+    {
+      key: 'arrival',
+      label: 'Airport and arrival plan confirmed.',
+      audience: 'bimed',
+      stage: 'upcoming',
+      helper: 'BIMED will confirm airport pickup and arrival arrangements after travel is booked.',
+    },
+    {
+      key: 'induction',
+      label: 'First reporting / induction appointment confirmed.',
+      audience: 'bimed',
+      stage: 'upcoming',
+      helper: 'BIMED will provide the confirmed reporting location and induction date.',
+    },
+    { key: 'contacts', label: 'Emergency and BIMED contact details saved.', audience: 'candidate', stage: 'now' },
+    { key: 'documents', label: 'Critical documents retained securely in digital and physical form.', audience: 'candidate', stage: 'now' },
+    { key: 'first-week', label: 'First-week induction and service orientation completed.', audience: 'bimed', stage: 'upcoming' },
+    { key: 'training', label: 'Required mandatory training completed or scheduled.', audience: 'bimed', stage: 'upcoming' },
+    { key: 'portal', label: 'Rota and attendance access confirmed.', audience: 'bimed', stage: 'upcoming' },
+    { key: 'month-one', label: 'First-month check-in completed and outstanding actions understood.', audience: 'bimed', stage: 'upcoming' },
   ],
 };
 
@@ -127,13 +174,30 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
   }
 
   if (mode === 'checklist') {
-    const allDone = checklist.length > 0 && checklist.every((item) => checked.has(item.key));
+    const candidateNow = checklist.filter((item) => item.audience === 'candidate' && item.stage === 'now');
+    const allCandidateNowDone = candidateNow.length > 0 && candidateNow.every((item) => checked.has(item.key));
     return <PacketShell title={title} description={description} completed={complete} saved={saved} error={error} message={message}>
-      <div style={{ display: 'grid', gap: 9 }}>
-        {checklist.map((item) => <label key={item.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, border: '1px solid #dce4e8', borderRadius: 10, background: '#fff' }}><input type="checkbox" checked={checked.has(item.key)} onChange={() => toggleCheck(item.key)} style={{ marginTop: 3, width: 18, height: 18 }} /><span style={{ lineHeight: 1.45 }}>{item.label}</span></label>)}
+      <div style={{ display: 'grid', gap: 12 }}>
+        {checklist.map((item) => item.audience === 'bimed' || item.stage === 'upcoming'
+          ? <div key={item.key} style={{ padding: 13, border: '1px solid #dce4e8', borderRadius: 10, background: '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                <div><strong style={{ display: 'block', lineHeight: 1.45 }}>{item.label}</strong><span style={{ display: 'block', marginTop: 5, fontSize: 12, color: '#627d98', lineHeight: 1.5 }}>{item.helper || 'BIMED will update this item when it becomes applicable.'}</span></div>
+                <span style={{ flexShrink: 0, padding: '5px 8px', borderRadius: 999, background: '#fff8e1', color: '#975a16', fontSize: 11, fontWeight: 900 }}>BIMED / UPCOMING</span>
+              </div>
+            </div>
+          : <label key={item.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, border: '1px solid #dce4e8', borderRadius: 10, background: '#fff' }}>
+              <input type="checkbox" checked={checked.has(item.key)} onChange={() => toggleCheck(item.key)} style={{ marginTop: 3, width: 18, height: 18 }} />
+              <span style={{ lineHeight: 1.45 }}>{item.label}</span>
+            </label>
+        )}
       </div>
-      <div style={{ marginTop: 16, padding: 12, background: '#f8fbfc', borderRadius: 10, color: '#59676f', fontSize: 13 }}>Ticking an item confirms that you have it ready or have completed that step. It does not mean BIMED has verified the document or status.</div>
-      <div style={{ marginTop: 16, display: 'flex', gap: 10 }}><Button disabled={busy} onClick={() => void save(false)}>Save progress</Button><Button disabled={busy || !allDone || complete} onClick={() => void save(true)}>{complete ? 'Already submitted' : busy ? 'Submitting…' : 'Submit checklist'}</Button></div>
+      <div style={{ marginTop: 16, padding: 12, background: '#f8fbfc', borderRadius: 10, color: '#59676f', fontSize: 13 }}>
+        Candidate checkboxes confirm that you have the item ready or have completed the candidate-side action. BIMED-controlled and future steps are shown for visibility only and must not be marked complete by you.
+      </div>
+      <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
+        <Button disabled={busy} onClick={() => void save(false)}>Save progress</Button>
+        <Button disabled={busy || !allCandidateNowDone || complete} onClick={() => void save(true)}>{complete ? 'Already submitted' : busy ? 'Submitting…' : 'Submit current checklist'}</Button>
+      </div>
     </PacketShell>;
   }
 
@@ -149,8 +213,14 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
         <SelectField label="Will you require an employment permit for this role?" value={response.requiresPermit} options={['Yes', 'No', 'Unsure']} onChange={(v) => setValue('requiresPermit', v)} />
         <SelectField label="Have you previously held an Irish employment permit or immigration permission?" value={response.previousIrishPermission} options={['Yes', 'No']} onChange={(v) => setValue('previousIrishPermission', v)} />
         <SelectField label="Have you ever been refused an Irish immigration permission or visa?" value={response.previousRefusal} options={['Yes', 'No']} onChange={(v) => setValue('previousRefusal', v)} />
-        <div><label>{fieldLabel('Earliest realistic relocation date')}<input type="date" value={response.relocationDate || ''} onChange={(e) => setValue('relocationDate', e.target.value)} style={inputStyle()} /></label></div>
+        <div>
+          <label>{fieldLabel('Preferred / earliest realistic relocation date (optional)')}
+            <input type="date" value={response.relocationDate || ''} onChange={(e) => setValue('relocationDate', e.target.value)} style={inputStyle()} />
+          </label>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#627d98', lineHeight: 1.5 }}>This is a proposed date only. Your contractual employment start date and your final travel/relocation date are separate. BIMED will confirm the final relocation plan after the employment-permit, visa and travel arrangements are ready. You may leave this blank and BIMED will record it as To Be Confirmed.</div>
+        </div>
         <div><label>{fieldLabel('Anything that could affect your proposed start date?')}<textarea value={response.startDateConditions || ''} onChange={(e) => setValue('startDateConditions', e.target.value)} rows={4} style={{ ...inputStyle(), resize: 'vertical' }} /></label></div>
+        <div style={{ background: '#e8f4f8', border: '1px solid #cfe2eb', borderRadius: 12, padding: 15, lineHeight: 1.55 }}><strong>Permit submission route</strong><p style={{ margin: '7px 0 0' }}>BIMED will record whether its legal team or the candidate / recruitment agency will submit the employment-permit application. This is controlled in the Employment Permit & Sponsorship workspace and is not selected in this recruitment information form.</p></div>
         <div style={{ background: '#f8fbfc', border: '1px solid #d7e1e6', borderRadius: 12, padding: 15 }}><strong>Candidate declaration</strong><p style={{ lineHeight: 1.6, marginBottom: 10 }}>I confirm that the information I have supplied in this pack is true and complete to the best of my knowledge. I understand that BIMED may verify it and that immigration and employment-permit decisions are made by the relevant authorities.</p><label style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}><input type="checkbox" checked={response.declaration === true} onChange={(e) => setValue('declaration', e.target.checked)} style={{ marginTop: 3, width: 18, height: 18 }} /><span>I confirm the declaration above.</span></label></div>
       </div>
       <div style={{ marginTop: 18, display: 'flex', gap: 10 }}><Button disabled={busy} onClick={() => void save(false)}>Save progress</Button><Button disabled={busy || response.declaration !== true || !response.passportNumber || !response.passportExpiry || complete} onClick={() => void save(true)}>{complete ? 'Submitted' : busy ? 'Submitting…' : 'Submit sponsorship information'}</Button></div>
@@ -158,23 +228,46 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
   }
 
   if (slug === 'welcome-to-ireland') {
+    const confirmed = response.arrangementAcknowledged === true;
     return <PacketShell title={title} description={description} completed={complete} saved={saved} error={error} message={message}>
       <div style={{ display: 'grid', gap: 14 }}>
         <ReadOnlyGrid application={application} />
-        <div><label>{fieldLabel('Expected arrival date')}<input type="date" value={response.arrivalDate || ''} onChange={(e) => setValue('arrivalDate', e.target.value)} style={inputStyle()} /></label></div>
-        <div><label>{fieldLabel('Airport / point of arrival')}<input value={response.arrivalPoint || ''} onChange={(e) => setValue('arrivalPoint', e.target.value)} style={inputStyle()} /></label></div>
-        <div><label>{fieldLabel('BIMED arrival contact')}<input value={response.arrivalContact || ''} onChange={(e) => setValue('arrivalContact', e.target.value)} style={inputStyle()} /></label></div>
-        <div><label>{fieldLabel('Accommodation details')}<textarea value={response.accommodation || ''} onChange={(e) => setValue('accommodation', e.target.value)} rows={3} style={{ ...inputStyle(), resize: 'vertical' }} /></label></div>
-        <div><label>{fieldLabel('First reporting / induction location')}<input value={response.reportingLocation || ''} onChange={(e) => setValue('reportingLocation', e.target.value)} style={inputStyle()} /></label></div>
-        <div><label>{fieldLabel('First shift / induction date')}<input type="date" value={response.firstInductionDate || ''} onChange={(e) => setValue('firstInductionDate', e.target.value)} style={inputStyle()} /></label></div>
-        <div><label>{fieldLabel('Important arrival notes')}<textarea value={response.notes || ''} onChange={(e) => setValue('notes', e.target.value)} rows={4} style={{ ...inputStyle(), resize: 'vertical' }} /></label></div>
+        <div>
+          <label>{fieldLabel('Preferred / proposed arrival date (optional)')}<input type="date" value={response.arrivalDate || ''} onChange={(e) => setValue('arrivalDate', e.target.value)} style={inputStyle()} /></label>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#627d98', lineHeight: 1.5 }}>Optional. This is not a confirmed travel date. BIMED will confirm the final arrival date after permit, visa and flight arrangements are completed.</div>
+        </div>
+        <div>
+          <label>{fieldLabel('Preferred airport / point of arrival (optional)')}<input value={response.arrivalPoint || ''} onChange={(e) => setValue('arrivalPoint', e.target.value)} style={inputStyle()} placeholder="Optional preference, e.g. Dublin Airport" /></label>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#627d98' }}>BIMED will confirm the actual airport and arrival arrangement.</div>
+        </div>
+        <InfoField label="BIMED arrival contact" value="To Be Confirmed by BIMED before travel" />
+        <InfoField label="Accommodation details" value="To Be Confirmed by BIMED after allocation" />
+        <InfoField label="First reporting / induction location" value="To Be Confirmed by BIMED" />
+        <InfoField label="First shift / induction date" value="To Be Confirmed by BIMED" />
+        <div>
+          <label>{fieldLabel('Important arrival notes')}<textarea value={response.notes || ''} onChange={(e) => setValue('notes', e.target.value)} rows={4} style={{ ...inputStyle(), resize: 'vertical' }} placeholder="Tell BIMED about anything known that could affect travel or arrival." /></label>
+        </div>
+        <div style={{ background: '#f8fbfc', border: '1px solid #d7e1e6', borderRadius: 12, padding: 15, lineHeight: 1.6 }}>
+          <strong>What happens next</strong>
+          <p style={{ margin: '7px 0 0' }}>You are not expected to invent or guess airport pickup, accommodation, reporting location or induction details. BIMED will populate those fields when they are confirmed.</p>
+          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12 }}><input type="checkbox" checked={confirmed} onChange={(e) => setValue('arrangementAcknowledged', e.target.checked)} style={{ marginTop: 3, width: 18, height: 18 }} /><span>I understand that the arrival details shown above may remain To Be Confirmed until BIMED finalises my permit, visa, travel and accommodation arrangements.</span></label>
+        </div>
       </div>
-      <div style={{ marginTop: 16, padding: 12, background: '#f8fbfc', borderRadius: 10, color: '#59676f', fontSize: 13 }}>Use this form to share your planned arrival details with BIMED. It is not a substitute for your confirmed immigration, travel or employment arrangements.</div>
-      <div style={{ marginTop: 16, display: 'flex', gap: 10 }}><Button disabled={busy} onClick={() => void save(false)}>Save progress</Button><Button disabled={busy || !response.arrivalDate || complete} onClick={() => void save(true)}>{complete ? 'Submitted' : busy ? 'Submitting…' : 'Submit arrival plan'}</Button></div>
+      <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
+        <Button disabled={busy} onClick={() => void save(false)}>Save progress</Button>
+        <Button disabled={busy || !confirmed || complete} onClick={() => void save(true)}>{complete ? 'Submitted' : busy ? 'Submitting…' : 'Confirm and submit arrival information'}</Button>
+      </div>
     </PacketShell>;
   }
 
   return null;
+}
+
+function InfoField({ label, value }: { label: string; value: string }) {
+  return <div style={{ padding: 12, background: '#f8fafc', border: '1px solid #e0e8ec', borderRadius: 10 }}>
+    <div style={{ fontSize: 12, color: '#66717a' }}>{label}</div>
+    <strong style={{ display: 'block', marginTop: 3 }}>{value}</strong>
+  </div>;
 }
 
 function ReadOnlyGrid({ application }: { application: Application }) {
