@@ -149,6 +149,50 @@ export async function POST(request: NextRequest, { params }: Params) {
       reason,
     });
 
+    await createStaffNotification(client, {
+      staffId: staff.id,
+      category: 'permit',
+      title: 'Cancellation submitted: 24-hour reversal window started',
+      body: `You rejected the accommodation fee. You can revoke this cancellation in the Staff Portal before ${result.deadline_at} to continue your application. If you do not revoke it within 24 hours, BIMED will restrict portal access, withdraw your application, void the employment contract and end the employment-permit / sponsorship journey.`,
+      actionUrl: '/staff/permit',
+    });
+
+    const subject = `Sponsorship cancellation submitted: ${staff.full_name} (${staff.bimed_id})`;
+    const html = `<div style="font-family:Arial,sans-serif;color:#172b4d">
+      <h2>Accommodation fee rejection / sponsorship cancellation</h2>
+      <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has rejected the accommodation fee and submitted cancellation of invoice <strong>${result.invoice_number}</strong>.</p>
+      <p>The candidate has a <strong>24-hour reversal window</strong> ending at <strong>${result.deadline_at}</strong>. During this window the candidate may revoke the cancellation from the Staff Portal and continue the application.</p>
+      <p>If the cancellation is not revoked before the deadline, BIMED will automatically restrict Staff Portal access, withdraw the recruitment application, void the employment contract and end the employment-permit / sponsorship journey.</p>
+      <p><strong>Reason:</strong> ${reason}</p>
+      <p><a href="${appUrl()}/admin/billing">Open the accommodation invoice queue</a></p>
+    </div>`;
+    try {
+      await sendAccommodationEmail({
+        to: ['info@bimedhealthcare.com', 'overseas@bimedhealthcare.com', 'manager@bimedhealthcare.com'],
+        subject,
+        html,
+      });
+    } catch (emailError) {
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'sponsorship_cancellation_info_email_failed',
+        staff_id: staff.id,
+        invoice_id: result.invoice_id,
+        reason: emailError instanceof Error ? emailError.message : String(emailError),
+      }));
+    }
+
+    await createStaffAudit(client, {
+      staffId: staff.id,
+      actor: session.email,
+      eventType: 'sponsorship_cancellation_submitted',
+      metadata: {
+        invoice_id: result.invoice_id,
+        invoice_number: result.invoice_number,
+        deadline_at: result.deadline_at,
+      },
+    });
+
     const { data: updatedPermit } = await client
       .from('recruitment_staff_permit_cases')
       .select('*')
