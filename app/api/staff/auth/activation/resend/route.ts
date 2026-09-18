@@ -49,20 +49,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unable to request a new activation link.', code: 'activation_error' }, { status: 500 });
   }
 
-  // If an administrator has already replaced the token, allow the stale link
-  // to recover the unactivated account using the BIMED email shown on the page.
-  if (!staff && email) {
-    const fallback = await client
-      .from('recruitment_staff')
-      .select('id,bimed_id,email,status,full_name,preferred_name,job_title,role,application_id,activation_token_hash,activation_expires_at,activated_at')
-      .eq('email', email)
-      .maybeSingle();
-    if (fallback.error) {
-      return NextResponse.json({ error: 'Unable to request a new activation link.', code: 'activation_error' }, { status: 500 });
-    }
-    staff = fallback.data;
-  }
-
   // Keep the external response generic when the account cannot be recovered.
   if (!staff || !ACTIVATABLE_STATUSES.includes(staff.status) || staff.activated_at) {
     return NextResponse.json({
