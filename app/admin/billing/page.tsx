@@ -68,9 +68,11 @@ export default function BillingQueuePage() {
       if (!response.ok) throw new Error(data.error || 'Action failed.');
       setMessage(actionName === 'issue_invoice'
         ? 'Invoice issued and sent to the candidate.'
-        : actionName === 'mark_paid'
-          ? 'Payment verified and receipt issued.'
-          : 'Invoice cancelled.');
+        : actionName === 'send_invoice'
+          ? 'Invoice email sent to the candidate.'
+          : actionName === 'mark_paid'
+            ? 'Payment verified and receipt issued.'
+            : 'Invoice cancelled.');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Action failed.');
@@ -90,7 +92,10 @@ export default function BillingQueuePage() {
   return (
     <main style={{ minHeight: '100vh', background: '#f4f7fb', color: '#102a43', padding: 'clamp(16px,4vw,28px)', fontFamily: 'system-ui' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-        <a href="/admin/permit" style={secondary}>← Overseas permits</a>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a href="/admin/permit" style={secondary}>← Overseas permits</a>
+          <a href="/admin/billing" style={{ ...secondary, background: '#e6fffa', borderColor: '#0f766e', color: '#0f766e' }}>Accommodation Billing</a>
+        </div>
         <div style={{ marginTop: 14 }}>
           <div style={eyebrow}>OVERSEAS BILLING</div>
           <h1 style={{ margin: '4px 0' }}>Accommodation invoice queue</h1>
@@ -126,7 +131,7 @@ export default function BillingQueuePage() {
               <tbody>
                 {filtered.map((row) => (
                   <tr key={row.id} style={{ borderTop: '1px solid #edf2f7' }}>
-                    <td style={td}><strong>{row.staff.full_name}</strong><div style={small}>{row.staff.bimed_id} · {row.bill_to_email}</div></td>
+                    <td style={td}><strong>{row.staff.full_name}</strong><div style={small}>{row.staff.bimed_id}</div><div style={{ ...small, overflowWrap: 'anywhere' }}>{row.bill_to_email}</div></td>
                     <td style={td}><strong>{row.invoice_number}</strong><div style={small}><a href={`/invoices/accommodation/${row.public_token}`} target="_blank" rel="noreferrer">Open invoice ↗</a></div></td>
                     <td style={td}><strong>{money(Number(row.amount_eur), row.currency)}</strong><div style={small}>GBP equivalent: £{accommodationGbpEquivalent(Number(row.amount_eur)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div></td>
                     <td style={td}><span style={pill}>{statusLabel[row.status] || row.status}</span>{row.cancellation_reason ? <div style={{ ...small, marginTop: 6 }}>Reason: {row.cancellation_reason}</div> : null}</td>
@@ -135,6 +140,7 @@ export default function BillingQueuePage() {
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {row.status === 'draft' && <button disabled={busy === row.id + 'issue_invoice'} onClick={() => void action('issue_invoice', row.id)} style={button}>{busy === row.id + 'issue_invoice' ? 'Issuing…' : 'Issue & send'}</button>}
                         {['payment_reported', 'cancellation_requested'].includes(row.status) && <a href={`/admin/permit/billing/${row.staff.id}`} style={secondary}>Open billing</a>}
+                        {['issued', 'payment_reported', 'cancellation_requested'].includes(row.status) && <button disabled={busy === row.id + 'send_invoice'} onClick={() => void action('send_invoice', row.id)} style={secondary}>{busy === row.id + 'send_invoice' ? 'Sending…' : 'Send / resend invoice'}</button>}
                         {row.status === 'issued' && <a href={`/admin/permit/billing/${row.staff.id}`} style={secondary}>Open billing</a>}
                         {row.status === 'cancellation_requested' && <button disabled={busy === row.id + 'cancel_invoice'} onClick={() => void action('cancel_invoice', row.id)} style={dangerButton}>{busy === row.id + 'cancel_invoice' ? 'Cancelling…' : 'Cancel invoice'}</button>}
                         {row.status === 'payment_reported' && <button disabled={busy === row.id + 'mark_paid'} onClick={() => void action('mark_paid', row.id)} style={button}>{busy === row.id + 'mark_paid' ? 'Verifying…' : 'Mark paid'}</button>}
