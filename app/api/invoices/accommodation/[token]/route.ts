@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getStaffSession } from '@/lib/staff-auth';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
+import { requestStaffSponsorshipCancellationAtomic } from '@/lib/staff-portal-workflow';
 import { appUrl, sendAccommodationEmail } from '@/lib/accommodation-billing';
 
 type Params = { params: Promise<{ token: string }> };
@@ -126,57 +128,53 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   if (!['issued', 'payment_reported', 'cancellation_requested'].includes(invoice.status)) {
-    return safeRateHeaders(NextResponse.json({ error: 'This invoice cannot be cancelled in its current state.', code: 'cancellation_not_allowed' }, { status: 409 }));
+    return safeRateHeaders(NextResponse.json({ error: 'This invoice cannot be rejected in its current state.', code: 'cancellation_not_allowed' }, { status: 409 }));
   }
 
-  const reason = String(body?.reason || '').trim() || 'Candidate requested invoice cancellation.';
+  const session = await getStaffSession(request);
+  if (!session || session.staff_id !== staff.id) {
+    return safeRateHeaders(NextResponse.json({
+      error: 'Please sign in to the BIMED Staff Portal before rejecting the accommodation fee.',
+      code: 'staff_session_required',
+    }, { status: 401 }));
+  }
 
-  const { data: updated, error } = await client
-    .from('recruitment_accommodation_invoices')
-    .update({
-      status: 'cancellation_requested',
-      cancellation_requested_at: invoice.cancellation_requested_at || now,
-      cancellation_requested_by: 'candidate',
-      cancellation_reason: reason,
-      updated_at: now,
-    })
-    .eq('id', invoice.id)
-    .in('status', ['issued', 'payment_reported', 'cancellation_requested'])
-    .select('*')
-    .single();
-
-  if (error || !updated) return safeRateHeaders(NextResponse.json({ error: 'Unable to record the cancellation request.' }, { status: 500 }));
-
-  const subject = `Accommodation invoice cancellation requested: ${updated.invoice_number}`;
-  const html = `<div style="font-family:Arial,sans-serif;color:#172b4d">
-    <h2>Accommodation invoice cancellation requested</h2>
-    <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has requested cancellation of invoice <strong>${updated.invoice_number}</strong>.</p>
-    <p><strong>Reason:</strong> ${reason}</p>
-    <p><a href="${appUrl()}/admin/billing">Open the accommodation invoice queue</a></p>
-  </div>`;
+  const reason = String(body?.reason || '').trim().slice(0, 500)
+    || 'Candidate rejected the accommodation fee and requested cancellation of the accommodation invoice.';
 
   try {
-    await sendAccommodationEmail({ to: ['overseas@bimedhealthcare.com', 'manager@bimedhealthcare.com'], subject, html });
+    const result = await requestStaffSponsorshipCancellationAtomic(client, {
+      staffId: staff.id,
+      actor: session.email,
+      reason,
+    });
+
+    const { data: updatedPermit } = await client
+      .from('recruitment_staff_permit_cases')
+      .select('*')
+      .eq('id', permit.id)
+      .single();
+
+    return safeRateHeaders(NextResponse.json({
+      ok: true,
+      status: 'cancellation_requested',
+      cancellationDeadline: result.deadline_at,
+      permit: updatedPermit,
+    }));
   } catch (error) {
-    console.error(JSON.stringify({ level: 'error', event: 'invoice_cancellation_admin_email_failed', invoice_id: updated.id, reason: error instanceof Error ? error.message : String(error) }));
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('SPONSORSHIP_CANCELLATION_DEADLINE_PASSED')) {
+      return safeRateHeaders(NextResponse.json({
+        error: 'The 24-hour cancellation window has expired. BIMED is processing the withdrawal and portal restriction.',
+        code: 'cancellation_deadline_passed',
+      }, { status: 409 }));
+    }
+    if (message.includes('SPONSORSHIP_CANCELLATION_FINALIZED')) {
+      return safeRateHeaders(NextResponse.json({
+        error: 'This sponsorship cancellation has already been finalised.',
+        code: 'cancellation_finalized',
+      }, { status: 409 }));
+    }
+    return safeRateHeaders(NextResponse.json({ error: 'Unable to record the sponsorship cancellation.' }, { status: 500 }));
   }
-
-  await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'cancellation_requested', updated_at: now }).eq('id', permit.id);
-
-  await createStaffNotification(client, {
-    staffId: staff.id,
-    category: 'billing',
-    title: 'Invoice cancellation request received',
-    body: `BIMED has received your cancellation request for invoice ${updated.invoice_number}. The billing team will review it.`,
-    actionUrl: '/staff/permit',
-  });
-
-  await createStaffAudit(client, {
-    staffId: staff.id,
-    actor: 'candidate',
-    eventType: 'accommodation_invoice_cancellation_requested',
-    metadata: { invoice_id: updated.id, invoice_number: updated.invoice_number, reason },
-  });
-
-  return safeRateHeaders(NextResponse.json({ ok: true, status: updated.status }));
 }
