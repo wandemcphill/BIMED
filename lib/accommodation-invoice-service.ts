@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { appUrl, ACCOMMODATION_PAYMENT_ACCOUNT, sendAccommodationEmail } from '@/lib/accommodation-billing';
+import { accommodationGbpEquivalent } from '@/lib/employment-permit-options';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 
 type InvoiceStaff = {
@@ -126,7 +127,7 @@ export async function issueAccommodationInvoice(input: {
     staffId: staff.id,
     category: 'billing',
     title: automatic ? 'Accommodation invoice issued automatically' : 'Accommodation invoice issued',
-    body: `Your accommodation invoice ${updatedInvoice.invoice_number} for €${Number(updatedInvoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} has been issued. Open the invoice from the Staff Portal to review the payment details and terms.`,
+    body: `Your accommodation invoice ${updatedInvoice.invoice_number} for €${Number(updatedInvoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR (GBP equivalent ≈ £${accommodationGbpEquivalent(Number(updatedInvoice.amount_eur)).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP) has been issued. Open the invoice from the Staff Portal to review the payment details and terms.`,
     actionUrl: `/invoices/accommodation/${updatedInvoice.public_token}`,
   });
 

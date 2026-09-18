@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { accommodationGbpEquivalent } from '@/lib/employment-permit-options';
 
 type Row = {
   id: string;
@@ -93,7 +94,7 @@ export default function BillingQueuePage() {
         <div style={{ marginTop: 14 }}>
           <div style={eyebrow}>OVERSEAS BILLING</div>
           <h1 style={{ margin: '4px 0' }}>Accommodation invoice queue</h1>
-          <p style={muted}>Every accommodation request appears here. Legacy requests remain available for review and issue; new requests are issued automatically when the candidate confirms an accommodation package.</p>
+          <p style={muted}>Every accommodation request appears here. Legacy requests remain available for review and issue; new requests are issued automatically when the candidate confirms an accommodation package. GBP equivalents are indicative reference amounts.</p>
         </div>
 
         {error && <div style={{ ...notice, background: '#fff5f5', borderColor: '#fecaca', color: '#991b1b' }}>{error}</div>}
@@ -127,7 +128,7 @@ export default function BillingQueuePage() {
                   <tr key={row.id} style={{ borderTop: '1px solid #edf2f7' }}>
                     <td style={td}><strong>{row.staff.full_name}</strong><div style={small}>{row.staff.bimed_id} · {row.bill_to_email}</div></td>
                     <td style={td}><strong>{row.invoice_number}</strong><div style={small}><a href={`/invoices/accommodation/${row.public_token}`} target="_blank" rel="noreferrer">Open invoice ↗</a></div></td>
-                    <td style={td}><strong>{money(Number(row.amount_eur), row.currency)}</strong></td>
+                    <td style={td}><strong>{money(Number(row.amount_eur), row.currency)}</strong><div style={small}>GBP equivalent: £{accommodationGbpEquivalent(Number(row.amount_eur)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</div></td>
                     <td style={td}><span style={pill}>{statusLabel[row.status] || row.status}</span>{row.cancellation_reason ? <div style={{ ...small, marginTop: 6 }}>Reason: {row.cancellation_reason}</div> : null}</td>
                     <td style={td}><div>{date(row.created_at)}</div>{row.issued_at ? <div style={small}>Issued {date(row.issued_at)}</div> : null}{row.payment_reported_at ? <div style={small}>Payment reported {date(row.payment_reported_at)}</div> : null}</td>
                     <td style={td}>
