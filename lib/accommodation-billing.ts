@@ -8,6 +8,18 @@ export const ACCOMMODATION_REFUND_INSTALLMENTS = 4;
 export const ACCOMMODATION_SIGNATORY_NAME = 'Dezou Maurice';
 export const ACCOMMODATION_SIGNATORY_TITLE = 'Manager, Bimed Healthcare Limited';
 
+export const ACCOMMODATION_PAYMENT_ACCOUNT = {
+  account_name: 'WEBGEEK TECHNOLOGIES LTD',
+  bank_name: 'Banking Circle - German Branch',
+  iban: 'DE81202208000048523738',
+  bic_swift: 'SXPYDEHH',
+  account_number: '00008988',
+  sort_code: '04-09-97',
+  branch_details: 'UK local account details: Account 00008988 · Sort code 04-09-97',
+  payment_reference_instructions: 'Use the BIMED invoice number as the payment reference.',
+  currency: 'EUR',
+} as const;
+
 export const ACCOMMODATION_TERMS = [
   `The €${ACCOMMODATION_AMOUNT_EUR.toLocaleString('en-IE')} payment covers BIMED-arranged accommodation for the initial ${ACCOMMODATION_PERIOD_MONTHS}-month probationary period.`,
   'The payment is a condition of the BIMED overseas-hire accommodation arrangement and is separate from the employment permit and visa decisions made by the relevant authorities.',
