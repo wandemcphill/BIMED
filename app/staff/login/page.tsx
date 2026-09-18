@@ -1,14 +1,19 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function StaffLoginPage() {
   const router = useRouter();
-  const params = useSearchParams();
-  const emailFromLink = params.get('email') || '';
-  const [identifier, setIdentifier] = useState(emailFromLink);
+  const [emailFromLink, setEmailFromLink] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  useEffect(() => {
+    const email = new URLSearchParams(window.location.search).get('email') || '';
+    if (email) {
+      setEmailFromLink(email);
+      setIdentifier(email);
+    }
+  }, []);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
