@@ -11,6 +11,15 @@ export const EMPLOYMENT_PERMIT_FEE_EUR = 1000;
 export const EMPLOYMENT_PERMIT_PLANNED_DURATION_MONTHS = 24;
 export const IRISH_REGISTRATION_FEE_GUIDANCE_EUR = 300;
 
+// GBP payment quote: latest XE mid-market EUR/GBP rate checked 18 September 2026 at 05:41 UTC.
+// This is an indicative equivalent for candidates who prefer to pay in GBP. The contractual invoice remains denominated in EUR.
+export const ACCOMMODATION_EUR_TO_GBP_RATE = 0.859194;
+export const ACCOMMODATION_GBP_RATE_SOURCE = 'XE mid-market · 18 September 2026 · 05:41 UTC';
+
+export function accommodationGbpEquivalent(amountEur: number): number {
+  return Math.round(Number(amountEur || 0) * ACCOMMODATION_EUR_TO_GBP_RATE * 100) / 100;
+}
+
 export const ACCOMMODATION_PLANS = ['three_months_4000', 'one_month_1250'] as const;
 export type AccommodationPlan = (typeof ACCOMMODATION_PLANS)[number];
 
@@ -69,7 +78,9 @@ export function permitSubmissionLabel(route: PermitSubmissionRoute): string {
 }
 
 export function accommodationPlanLabel(plan: AccommodationPlan): string {
-  return plan === 'three_months_4000' ? '€4,000 · 3-month accommodation' : '€1,250 · 1-month accommodation';
+  return plan === 'three_months_4000'
+    ? `€4,000 EUR · ≈ £${accommodationGbpEquivalent(4000).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP · 3-month accommodation`
+    : `€1,250 EUR · ≈ £${accommodationGbpEquivalent(1250).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP · 1-month accommodation`;
 }
 
 export function getAccommodationSelection(
