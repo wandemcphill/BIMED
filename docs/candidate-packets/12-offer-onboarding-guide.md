@@ -1,7 +1,7 @@
 # BIMED Offer & Onboarding Guide
 
 ## Welcome
-This guide explains what to expect after BIMED selects you for a role. Your contract, role-specific job description and applicable policies are issued separately for review and signature.
+This guide explains what to expect after BIMED selects you for a role. BIMED issues the employment offer package, including the employment contract, role-specific job description and applicable policies/documents required for onboarding. The employment contract is the formal contractual document presented for review and signature.
 
 ## Before your start date
 - Review the employment contract and job description carefully.

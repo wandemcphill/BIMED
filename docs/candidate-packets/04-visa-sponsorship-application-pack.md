@@ -4,6 +4,8 @@ This section is for candidates being considered from outside Ireland. Complete t
 
 This information is used for recruitment and, where appropriate, preparation for the relevant employment-permit and immigration process. It is administrative guidance, not immigration or legal advice.
 
+**BIMED employment offer:** Where BIMED has selected you for employment, the formal document issued by BIMED is the **employment offer / employment contract** supplied through the recruitment process. This pack does not replace that formal document.
+
 ## Important
 
 Receiving this form or an employment offer does not itself create a right to work in Ireland or guarantee an employment permit, visa, or entry permission. The relevant authorities make immigration and employment-permit decisions.

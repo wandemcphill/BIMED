@@ -4,13 +4,17 @@ Use the interactive checklist on this page to track your move and first month wi
 
 This is an operational aid. It does not replace official immigration, employment, tax, housing, or healthcare requirements.
 
-## Offer accepted
+## Employment offer and contract accepted
 
-Confirm that your BIMED employment documentation, identity information, role, location, hours, pay, expected start date, and international recruitment route are clear. Raise any outstanding evidence requests with BIMED.
+Confirm that the employment offer and employment contract issued by BIMED, identity information, role, location, hours, pay, expected start date, and international recruitment route are clear. Keep a copy of the signed employment contract for your own records. Raise any outstanding evidence requests with BIMED.
 
 ## Before travel
 
-Make sure your passport and relevant immigration or permission documents are ready. Share your travel date with BIMED, confirm accommodation and airport arrangements, confirm your first reporting or induction appointment, save your emergency contacts, and keep secure copies of critical documents.
+Keep the following states separate: **employment start date**, **proposed relocation date**, and **confirmed travel date**. Do not treat the contractual start date as proof that travel has been booked.
+
+At this stage, items controlled by BIMED may remain **To Be Confirmed**, including airport pickup, accommodation address, first reporting location and first shift/induction date. Share a proposed travel date only when you have one; BIMED will confirm the final travel and arrival arrangements.
+
+Make sure your passport and relevant immigration or permission documents are ready. Save your BIMED contact details and keep secure copies of critical documents.
 
 ## Arrival in Ireland
 
