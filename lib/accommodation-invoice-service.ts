@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { appUrl, ACCOMMODATION_PAYMENT_ACCOUNT, sendAccommodationEmail } from '@/lib/accommodation-billing';
-import { invoiceHtml } from '@/lib/accommodation-documents';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 
 type InvoiceStaff = {
