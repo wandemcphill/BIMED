@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { PacketMode, PacketSlug } from '@/lib/document-packets';
-import { recruitmentRoleSlug } from '@/lib/bimed-role-policy';
+import { supportingDocumentRequirements, missingSupportingDocuments } from '@/lib/supporting-document-requirements';
 
 type Application = {
   full_name: string;
@@ -150,8 +150,8 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
   };
 
   const checklist = checklistMap[slug] || [];
-  const roleSlug = recruitmentRoleSlug(application.role_applied);
-  const registrationEvidenceRequired = roleSlug === 'physiotherapist';
+  const supportingRequirements = supportingDocumentRequirements(application.role_applied);
+  const registrationEvidenceRequired = supportingRequirements.registrationRequired;
   const checked = useMemo(() => new Set<string>(Array.isArray(response.checked) ? response.checked : []), [response.checked]);
 
   const toggleCheck = (key: string) => {
@@ -177,12 +177,6 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
   }
 
   if (mode === 'checklist') {
-    const candidateNow = checklist.filter((item) =>
-      item.audience === 'candidate'
-      && item.stage === 'now'
-      && !(item.key === 'registration' && !registrationEvidenceRequired)
-    );
-    const allCandidateNowDone = candidateNow.length > 0 && candidateNow.every((item) => checked.has(item.key));
     return <PacketShell title={title} description={description} completed={complete} saved={saved} error={error} message={message}>
       <div style={{ display: 'grid', gap: 12 }}>
         {checklist.map((item) => item.audience === 'bimed' || item.stage === 'upcoming'
@@ -213,9 +207,18 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
           ? 'For this role, the professional registration/licence evidence item is required before submission.'
           : 'For your current role, the professional registration/licence item does not block submission. If BIMED later needs role-specific evidence, the recruitment team will contact you.'}
       </div>
+      {(() => {
+        const missing = missingSupportingDocuments(application.role_applied, response.checked);
+        if (!missing.length || complete) return null;
+        return <div style={{ marginTop: 10, padding: 12, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, color: '#9a3412', fontSize: 13, lineHeight: 1.5 }}>
+          <strong>Before you submit:</strong> please confirm the following items are ready:
+          <ul style={{ margin: '7px 0 0 18px' }}>{missing.map((item) => <li key={item.key}>{item.label}</li>)}</ul>
+          <div style={{ marginTop: 7 }}>The Submit button remains available so that any missing requirement is explained rather than appearing unresponsive.</div>
+        </div>;
+      })()}
       <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
         <Button disabled={busy} onClick={() => void save(false)}>Save progress</Button>
-        <Button disabled={busy || !allCandidateNowDone || complete} onClick={() => void save(true)}>{complete ? 'Already submitted' : busy ? 'Submitting…' : 'Submit current checklist'}</Button>
+        <Button disabled={busy || complete} onClick={() => void save(true)}>{complete ? 'Already submitted' : busy ? 'Submitting…' : 'Submit current checklist'}</Button>
       </div>
     </PacketShell>;
   }
