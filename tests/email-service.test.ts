@@ -340,6 +340,9 @@ describe('staff portal activation emails', () => {
     expect(sent[0].html).toContain('ada.byron@bimedhealthcare.com');
     expect(sent[0].html).toContain('/staff/activate?token=');
     expect(sent[0].text).toContain('YOUR NEW BIMED STAFF PORTAL ACTIVATION LINK');
+    expect(sent[0].html).toContain('Overseas Relocation &amp; Accommodation Guide');
+    expect(sent[0].html).not.toContain('€4,000 Accommodation Guide');
+    expect(sent[0].text).not.toContain('€4,000 Accommodation Guide');
   });
 });
 
