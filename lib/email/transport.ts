@@ -42,7 +42,8 @@ export type EmailType =
   | 'recruitment_invite'
   | 'second_interview_invite'
   | 'admin_second_interview_completed'
-  | 'staff_portal_welcome';
+  | 'staff_portal_welcome'
+  | 'staff_password_reset';
 
 export type SendResult =
   | { status: 'sent'; messageId: string | null }
