@@ -208,19 +208,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unable to record the accommodation acknowledgement. No partial acknowledgement was saved.' }, { status: 500 });
     }
 
+    let issuedInvoice: any = null;
+    let invoicePublicUrl: string | null = null;
+
     if (!result.data.already_acknowledged) {
-      const subject = `Accommodation payment request: ${staff.full_name} (${staff.bimed_id})`;
-      const bodyHtml = `<div style="font-family:Arial,sans-serif;color:#172b4d"><h2>Accommodation payment request</h2><p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has acknowledged the selected BIMED accommodation arrangement.</p><p>Accommodation: <strong>€${selection.accommodation_amount_eur.toFixed(2)}</strong> for <strong>${selection.accommodation_period_months} month${selection.accommodation_period_months === 1 ? '' : 's'}</strong><br>Plan: <strong>${selection.accommodation_plan_label}</strong><br>Permit route: <strong>${selection.permit_submission_label}</strong><br>Permit type: <strong>${selection.permit_type_label}</strong><br>Terms version: <strong>${ACCOMMODATION_OPTIONS_TERMS_VERSION}</strong></p><p>The invoice is currently <strong>${result.data.invoice_status}</strong>. Permit assistance and flight planning unlock after BIMED issues the invoice.</p><p><a href="${appUrl()}/admin/permit/billing/${staff.id}">Open the billing workspace</a></p></div>`;
-      try {
-        await sendAccommodationEmail({ to: ['overseas@bimedhealthcare.com', 'manager@bimedhealthcare.com'], subject, html: bodyHtml });
-      } catch (emailError) {
-        console.error(JSON.stringify({ level: 'error', event: 'accommodation_acknowledgement_email_failed', staff_id: staff.id, reason: emailError instanceof Error ? emailError.message : String(emailError) }));
+      const { data: createdInvoice } = await client
+        .from('recruitment_accommodation_invoices')
+        .select('*')
+        .eq('id', result.data.invoice_id)
+        .maybeSingle();
+
+      if (!createdInvoice) {
+        return NextResponse.json({ error: 'The accommodation invoice record could not be loaded after the selection was saved. BIMED has been notified.' }, { status: 500 });
       }
-      await createStaffNotification(client, { staffId: staff.id, category: 'billing', title: 'Accommodation arrangement recorded', body: `${selection.accommodation_plan_label} and the ${selection.permit_type_label} submission route have been recorded. The billing team has been notified.`, actionUrl: '/staff/permit' });
+
+      try {
+        const issuance = await issueAccommodationInvoice({
+          client,
+          invoice: createdInvoice,
+          staff,
+          application,
+          permit,
+          actor: session.email,
+          automatic: true,
+        });
+        issuedInvoice = issuance.invoice;
+        invoicePublicUrl = issuance.publicUrl;
+      } catch (error) {
+        console.error(JSON.stringify({ level: 'error', event: 'accommodation_invoice_auto_issue_failed', staff_id: staff.id, invoice_id: createdInvoice.id, reason: error instanceof Error ? error.message : String(error) }));
+        await createStaffNotification(client, { staffId: staff.id, category: 'billing', title: 'Accommodation selection recorded', body: 'Your accommodation selection was recorded, but BIMED billing could not issue the invoice automatically. BIMED will review the billing request.', actionUrl: '/staff/permit' });
+        return NextResponse.json({ error: 'Your accommodation selection was recorded, but BIMED could not issue the invoice automatically. Please refresh shortly or contact BIMED.' }, { status: 502 });
+      }
+    } else if (currentInvoice?.status === 'issued') {
+      issuedInvoice = currentInvoice;
+      invoicePublicUrl = `${appUrl()}/invoices/accommodation/${currentInvoice.public_token}`;
     }
 
     const { data: updatedPermit } = await client.from('recruitment_staff_permit_cases').select('*').eq('id', result.data.permit_id).single();
-    return NextResponse.json({ permit: updatedPermit || { id: result.data.permit_id }, invoice: { id: result.data.invoice_id, invoice_number: result.data.invoice_number, status: result.data.invoice_status }, already_acknowledged: Boolean(result.data.already_acknowledged) }, { status: result.data.already_acknowledged ? 200 : 201 });
+    return NextResponse.json({
+      permit: updatedPermit || { id: result.data.permit_id },
+      invoice: issuedInvoice
+        ? { id: issuedInvoice.id, invoice_number: issuedInvoice.invoice_number, status: issuedInvoice.status }
+        : { id: result.data.invoice_id, invoice_number: result.data.invoice_number, status: result.data.invoice_status },
+      invoiceUrl: invoicePublicUrl,
+      already_acknowledged: Boolean(result.data.already_acknowledged),
+    }, { status: result.data.already_acknowledged ? 200 : 201 });
   }
 
   if (action === 'select_permit_route') {
