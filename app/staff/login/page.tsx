@@ -1,11 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function StaffLoginPage() {
   const router = useRouter();
+  const [emailFromLink, setEmailFromLink] = useState('');
   const [identifier, setIdentifier] = useState('');
+  useEffect(() => {
+    const email = new URLSearchParams(window.location.search).get('email') || '';
+    if (email) {
+      setEmailFromLink(email);
+      setIdentifier(email);
+    }
+  }, []);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -25,7 +33,7 @@ export default function StaffLoginPage() {
     <form onSubmit={submit} style={{width:'100%',maxWidth:440,background:'#fff',padding:32,borderRadius:20,boxShadow:'0 14px 44px rgba(15,23,42,.08)'}}>
       <div style={{fontSize:13,fontWeight:800,letterSpacing:1.4,textTransform:'uppercase',color:'#0f766e'}}>BIMED Healthcare</div>
       <h1 style={{fontSize:30,margin:'10px 0 8px',color:'#102a43'}}>Staff Portal</h1>
-      <p style={{color:'#627d98',marginBottom:24}}>Sign in with your permanent BIMED account.</p>
+      <p style={{color:'#627d98',marginBottom:24}}>Sign in with your permanent BIMED account.</p>{emailFromLink && <div style={{background:'#effcf6',border:'1px solid #b7e4cc',color:'#166534',padding:12,borderRadius:10,marginBottom:16,fontSize:13,lineHeight:1.5}}>This account has already been activated. Sign in below with the password you created during activation.</div>}
       <label style={{display:'block',fontWeight:700,marginBottom:6}}>BIMED ID or BIMED email</label>
       <input value={identifier} onChange={e=>setIdentifier(e.target.value)} type='text' autoComplete='username' required placeholder='BIM-2026-AB12CD or firstname.lastname@bimedhealthcare.com' style={{width:'100%',padding:'12px 14px',border:'1px solid #d9e2ec',borderRadius:10,marginBottom:16,boxSizing:'border-box'}} />
       <label style={{display:'block',fontWeight:700,marginBottom:6}}>Password</label>

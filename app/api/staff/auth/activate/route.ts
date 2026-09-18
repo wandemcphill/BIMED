@@ -6,6 +6,85 @@ import { createStaffAudit } from '@/lib/staff';
 
 const ACTIVATABLE_STATUSES = ['active', 'pre_arrival', 'on_leave'];
 
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get('token')?.trim() || '';
+  const email = url.searchParams.get('email')?.trim().toLowerCase() || null;
+
+  if (!token) {
+    return NextResponse.json({ status: 'activation_invalid', error: 'This activation link is missing its secure token.' }, { status: 400 });
+  }
+
+  const client = db();
+  const tokenHash = hashActivationToken(token);
+  const { data: staff, error } = await client
+    .from('recruitment_staff')
+    .select('id,email,status,activation_expires_at,activated_at')
+    .eq('activation_token_hash', tokenHash)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ status: 'activation_error', error: 'Unable to check this activation link right now.' }, { status: 500 });
+  }
+
+  if (!staff) {
+    if (email) {
+      const { data: byEmail } = await client
+        .from('recruitment_staff')
+        .select('id,email,status,activated_at')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (byEmail?.activated_at && ACTIVATABLE_STATUSES.includes(byEmail.status)) {
+        return NextResponse.json({
+          status: 'already_activated',
+          redirectToLogin: true,
+          email: byEmail.email,
+          message: 'This BIMED account is already activated. Please sign in to the Staff Portal.',
+        });
+      }
+    }
+
+    return NextResponse.json({
+      status: 'activation_invalid',
+      error: 'This activation link is no longer valid. Request a new activation link or contact BIMED.',
+    }, { status: 400 });
+  }
+
+  if (!ACTIVATABLE_STATUSES.includes(staff.status)) {
+    return NextResponse.json({ status: 'account_unavailable', error: 'This BIMED staff account is not currently eligible for activation.' }, { status: 409 });
+  }
+
+  if (staff.activated_at) {
+    return NextResponse.json({
+      status: 'already_activated',
+      redirectToLogin: true,
+      email: staff.email,
+      message: 'This BIMED account is already activated. Please sign in to the Staff Portal.',
+    });
+  }
+
+  if (!staff.activation_expires_at || new Date(staff.activation_expires_at).getTime() <= Date.now()) {
+    return NextResponse.json({
+      status: 'activation_expired',
+      error: 'This activation link has expired. Request a new activation link.',
+    }, { status: 410 });
+  }
+
+  if (email && email !== String(staff.email).trim().toLowerCase()) {
+    return NextResponse.json({
+      status: 'email_mismatch',
+      error: 'The email entered does not match the BIMED email attached to this activation link.',
+    }, { status: 400 });
+  }
+
+  return NextResponse.json({
+    status: 'activation_required',
+    email: staff.email,
+    expiresAt: staff.activation_expires_at,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const limiter = await checkRateLimit({ key: 'staff-activation', limit: 6, windowMs: 15 * 60 * 1000, request });
   if (!limiter.allowed) {
