@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
       const { data: current, error: currentError } = await client
         .from('recruitment_staff')
-        .select('id,email,bimed_id,application_id,full_name,preferred_name,job_title,role,employment_start_date,status,activation_token_hash,activation_expires_at')
+        .select('id,email,bimed_id,application_id,full_name,preferred_name,job_title,role,employment_start_date,status,activation_token_hash,activation_expires_at,activated_at')
         .eq('id', body.staffId)
         .maybeSingle();
 
