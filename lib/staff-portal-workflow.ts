@@ -12,6 +12,46 @@ export async function reactivateRecruitmentStaffPortal(client: SupabaseClient, s
   return data;
 }
 
+export async function requestStaffSponsorshipCancellationAtomic(
+  client: SupabaseClient,
+  input: { staffId: string; actor: string; reason: string },
+) {
+  const { data, error } = await client.rpc('bimed_request_staff_sponsorship_cancellation', {
+    p_staff_id: input.staffId,
+    p_actor: input.actor,
+    p_reason: input.reason,
+  });
+  if (error) throw new Error(error.message);
+  return data as {
+    staff_id: string;
+    permit_id: string;
+    invoice_id: string;
+    invoice_number: string;
+    requested_at: string;
+    deadline_at: string;
+    already_requested: boolean;
+  };
+}
+
+export async function revokeStaffSponsorshipCancellationAtomic(
+  client: SupabaseClient,
+  input: { staffId: string; actor: string },
+) {
+  const { data, error } = await client.rpc('bimed_revoke_staff_sponsorship_cancellation', {
+    p_staff_id: input.staffId,
+    p_actor: input.actor,
+  });
+  if (error) throw new Error(error.message);
+  return data as {
+    staff_id: string;
+    permit_id: string;
+    invoice_id: string;
+    invoice_number: string;
+    restored_invoice_status: string;
+    deadline_passed: boolean;
+  };
+}
+
 export async function recordAccommodationPaymentAtomic(
   client: SupabaseClient,
   input: { invoiceId: string; paymentReference: string | null; paymentMethod: string; actor: string; receiptIssuedBy: string },
