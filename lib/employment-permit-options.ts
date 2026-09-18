@@ -13,8 +13,8 @@ export const IRISH_REGISTRATION_FEE_GUIDANCE_EUR = 300;
 
 // GBP payment quote: latest XE mid-market EUR/GBP rate checked 18 September 2026 at 05:41 UTC.
 // This is an indicative equivalent for candidates who prefer to pay in GBP. The contractual invoice remains denominated in EUR.
-export const ACCOMMODATION_EUR_TO_GBP_RATE = 0.859194;
-export const ACCOMMODATION_GBP_RATE_SOURCE = 'XE mid-market · 18 September 2026 · 05:41 UTC';
+export const ACCOMMODATION_EUR_TO_GBP_RATE = 0.859163;
+export const ACCOMMODATION_GBP_RATE_SOURCE = 'XE mid-market · 18 September 2026 · 05:54 UTC';
 
 export function accommodationGbpEquivalent(amountEur: number): number {
   return Math.round(Number(amountEur || 0) * ACCOMMODATION_EUR_TO_GBP_RATE * 100) / 100;
