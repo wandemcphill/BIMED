@@ -3,7 +3,7 @@ import { getAdminSession } from '@/lib/admin-session';
 import { db } from '@/lib/db';
 import { createStaffAudit } from '@/lib/staff';
 import { ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl, makeReceiptNumber, sendAccommodationEmail } from '@/lib/accommodation-billing';
-import { invoiceHtml, receiptHtml } from '@/lib/accommodation-documents';
+import { receiptHtml } from '@/lib/accommodation-documents';
 import { recordAccommodationPaymentAtomic } from '@/lib/staff-portal-workflow';
 import { issueAccommodationInvoice } from '@/lib/accommodation-invoice-service';
 function safePublicUrl(token: string) { return `${appUrl()}/invoices/accommodation/${token}`; }
