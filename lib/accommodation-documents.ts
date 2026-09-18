@@ -6,7 +6,7 @@ import {
   permitTypeLabel,
   type AccommodationPermitSelection,
 } from '@/lib/employment-permit-options';
-import { ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl } from '@/lib/accommodation-billing';
+import { ACCOMMODATION_PAYMENT_ACCOUNT, ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl } from '@/lib/accommodation-billing';
 
 function e(value: unknown) {
   return String(value ?? '')
@@ -157,7 +157,8 @@ function arrangementPanel(selection: any) {
 export function invoiceHtml(input: { invoice: any; staff: any; publicUrl?: string }) {
   const selection = selectionForInvoice(input.invoice);
   const publicUrl = input.publicUrl || `${appUrl()}/invoices/accommodation/${input.invoice.public_token}`;
-  const account = input.invoice.payment_account_snapshot || {};
+  const snapshot = input.invoice.payment_account_snapshot || {};
+  const account = Object.keys(snapshot).length ? snapshot : ACCOMMODATION_PAYMENT_ACCOUNT;
   const accountRows = [
     ['Account name', account.account_name],
     ['Bank', account.bank_name],
