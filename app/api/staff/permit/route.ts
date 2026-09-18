@@ -172,6 +172,21 @@ export async function POST(request: NextRequest) {
         reason,
       });
 
+      if (result.already_requested) {
+        const { data: existingPermit } = await client
+          .from('recruitment_staff_permit_cases')
+          .select('*')
+          .eq('id', permit.id)
+          .single();
+        return NextResponse.json({
+          ok: true,
+          permit: existingPermit || permit,
+          cancellationDeadline: result.deadline_at,
+          status: 'cancellation_requested',
+          alreadyRequested: true,
+        }, { status: 200 });
+      }
+
       const deadline = result.deadline_at;
       const candidateEmail = application?.email || staff.email;
       const subject = `Sponsorship cancellation submitted: ${staff.full_name} (${staff.bimed_id})`;
