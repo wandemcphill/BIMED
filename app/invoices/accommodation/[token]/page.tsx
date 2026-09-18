@@ -44,5 +44,36 @@ export default async function AccommodationInvoicePage({ params, searchParams }:
       <div style={{ padding: '10px 14px', marginBottom: 14, background: '#fff', border: '1px solid #d9e2ec', borderRadius: 8, color: '#627d98', fontSize: 13 }}>Use your browser Print command and choose <strong>Save as PDF</strong> to keep a PDF copy. {receipt && receiptMode !== '1' ? <a href={`${publicUrl}?receipt=1`} style={{ marginLeft: 12, fontWeight: 800 }}>View payment receipt</a> : null}</div>
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </div>
+    <script dangerouslySetInnerHTML={{ __html: `
+      document.querySelectorAll('[data-invoice-action]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const el = button;
+          const action = el.getAttribute('data-invoice-action');
+          const tokenValue = el.getAttribute('data-token');
+          const message = document.getElementById('invoice-action-message');
+          if (!action || !tokenValue || !message) return;
+          el.disabled = true;
+          el.textContent = 'Please wait…';
+          try {
+            const response = await fetch('/api/invoices/accommodation/' + encodeURIComponent(tokenValue), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ action }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to complete this action.');
+            message.textContent = action === 'payment_reported'
+              ? 'Payment notice recorded. Please send your payment receipt to overseas@bimedhealthcare.com.'
+              : 'Cancellation request recorded. BIMED billing has been notified for review.';
+            window.setTimeout(() => window.location.reload(), 600);
+          } catch (error) {
+            message.style.color = '#9b2c2c';
+            message.textContent = error instanceof Error ? error.message : 'Unable to complete this action.';
+            el.disabled = false;
+            el.textContent = action === 'payment_reported' ? 'I have made payment' : 'Request cancellation';
+          }
+        });
+      });
+    ` }} />
   </main>;
 }
