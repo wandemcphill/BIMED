@@ -152,7 +152,6 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
   const checklist = checklistMap[slug] || [];
   const roleSlug = recruitmentRoleSlug(application.role_applied);
   const registrationEvidenceRequired = roleSlug === 'physiotherapist';
-  const registrationChecklistItem = checklist.find((item) => item.key === 'registration');
   const checked = useMemo(() => new Set<string>(Array.isArray(response.checked) ? response.checked : []), [response.checked]);
 
   const toggleCheck = (key: string) => {
