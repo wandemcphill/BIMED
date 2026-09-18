@@ -22,8 +22,25 @@ export default async function AccommodationInvoicePage({ params, searchParams }:
     ? receiptHtml({ receipt, invoice, staff, publicUrl: `${publicUrl}?receipt=1` })
     : invoiceHtml({ invoice, staff, publicUrl });
 
+  const actionPanel = !receipt && ['issued', 'payment_reported', 'cancellation_requested'].includes(invoice.status)
+    ? <div style={{ maxWidth: 900, margin: '0 auto 14px', background: '#fff', border: '1px solid #d9e2ec', borderRadius: 10, padding: 16 }}>
+        <div style={{ fontWeight: 800, color: '#163247', marginBottom: 7 }}>Payment & invoice actions</div>
+        <div style={{ color: '#627d98', fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
+          Pay the amount shown on the invoice using the official account details. After you make the transfer, click <strong>I have made payment</strong> and send your payment receipt to <strong>overseas@bimedhealthcare.com</strong>.
+          {invoice.status === 'payment_reported' ? ' Your payment notice has already been recorded and is awaiting BIMED verification.' : ''}
+          {invoice.status === 'cancellation_requested' ? ' Your cancellation request has already been recorded and is awaiting BIMED review.' : ''}
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {invoice.status === 'issued' ? <button data-invoice-action="payment_reported" data-token={token} style={{ padding: '11px 16px', border: 0, borderRadius: 9, background: '#0f766e', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>I have made payment</button> : null}
+          {invoice.status === 'issued' ? <button data-invoice-action="cancellation_requested" data-token={token} style={{ padding: '11px 16px', border: '1px solid #d9e2ec', borderRadius: 9, background: '#fff', color: '#334e68', fontWeight: 800, cursor: 'pointer' }}>Request cancellation</button> : null}
+          {invoice.status === 'payment_reported' ? <a href={\`mailto:overseas@bimedhealthcare.com?subject=Payment%20receipt%20-%20\${encodeURIComponent(invoice.invoice_number)}&body=Please%20find%20attached%20my%20payment%20receipt%20for%20BIMED%20accommodation%20invoice%20\${encodeURIComponent(invoice.invoice_number)}.\`} style={{ display: 'inline-block', padding: '11px 16px', border: '1px solid #0f766e', borderRadius: 9, background: '#fff', color: '#0f766e', fontWeight: 800, textDecoration: 'none' }}>Email payment receipt to BIMED</a> : null}
+        </div>
+        <div id="invoice-action-message" style={{ marginTop: 12, color: '#166534', fontSize: 13 }} />
+      </div>
+    : null;
+
   return <main style={{ minHeight: '100vh', background: '#eef2f5', padding: 20, fontFamily: 'Arial,sans-serif' }}>
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ maxWidth: 900, margin: '0 auto' }}>{actionPanel}
       <div style={{ padding: '10px 14px', marginBottom: 14, background: '#fff', border: '1px solid #d9e2ec', borderRadius: 8, color: '#627d98', fontSize: 13 }}>Use your browser Print command and choose <strong>Save as PDF</strong> to keep a PDF copy. {receipt && receiptMode !== '1' ? <a href={`${publicUrl}?receipt=1`} style={{ marginLeft: 12, fontWeight: 800 }}>View payment receipt</a> : null}</div>
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </div>
