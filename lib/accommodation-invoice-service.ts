@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { appUrl, ACCOMMODATION_PAYMENT_ACCOUNT, sendAccommodationEmail } from '@/lib/accommodation-billing';
-import { invoiceHtml } from '@/lib/accommodation-documents';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 
 type InvoiceStaff = {
@@ -103,8 +102,15 @@ export async function issueAccommodationInvoice(input: {
   try {
     await sendAccommodationEmail({
       to: recipients,
-      subject: `BIMED accommodation invoice ${updatedInvoice.invoice_number}`,
-      html: invoiceHtml({ invoice: updatedInvoice, staff, publicUrl }),
+      subject: `BIMED accommodation invoice ${updatedInvoice.invoice_number} is ready`,
+      html: `<div style="font-family:Arial,sans-serif;color:#172b4d">
+        <h2>Your BIMED accommodation invoice is ready</h2>
+        <p>Hello ${staff.full_name},</p>
+        <p>Your accommodation invoice <strong>${updatedInvoice.invoice_number}</strong> has been issued.</p>
+        <p>Please open the invoice in the BIMED Staff Portal to review the accommodation terms, amount due, and the official payment details.</p>
+        <p><a href="${publicUrl}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f766e;color:#fff;text-decoration:none;font-weight:800">Open accommodation invoice</a></p>
+        <p style="font-size:12px;color:#627d98">For security and accuracy, the bank account and payment instructions are displayed on the portal invoice itself rather than repeated in this email.</p>
+      </div>`,
     });
   } catch (error) {
     emailSent = false;

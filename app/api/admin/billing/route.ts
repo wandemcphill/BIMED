@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { issueAccommodationInvoice } from '@/lib/accommodation-invoice-service';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 import { appUrl, makeReceiptNumber, sendAccommodationEmail, ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE } from '@/lib/accommodation-billing';
-import { invoiceHtml, receiptHtml } from '@/lib/accommodation-documents';
+import { receiptHtml } from '@/lib/accommodation-documents';
 import { recordAccommodationPaymentAtomic } from '@/lib/staff-portal-workflow';
 
 async function loadInvoiceContext(client: ReturnType<typeof db>, invoiceId: string) {
@@ -150,7 +150,16 @@ export async function POST(request: NextRequest) {
     const recipient = String(body?.email || application?.email || staff.email).trim();
     if (!recipient || !recipient.includes('@')) return NextResponse.json({ error: 'Provide a valid recipient email address.' }, { status: 400 });
     try {
-      await sendAccommodationEmail({ to: recipient, subject: `BIMED accommodation invoice ${invoice.invoice_number}`, html: invoiceHtml({ invoice, staff, publicUrl }) });
+      await sendAccommodationEmail({
+        to: recipient,
+        subject: `BIMED accommodation invoice ${invoice.invoice_number} is ready`,
+        html: `<div style="font-family:Arial,sans-serif;color:#172b4d">
+          <h2>BIMED accommodation invoice ready</h2>
+          <p>The invoice <strong>${invoice.invoice_number}</strong> is available in the BIMED invoice portal.</p>
+          <p><a href="${publicUrl}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f766e;color:#fff;text-decoration:none;font-weight:800">Open invoice</a></p>
+          <p style="font-size:12px;color:#627d98">Payment details are shown on the portal invoice. They are not included in this email.</p>
+        </div>`,
+      });
       await client.from('recruitment_accommodation_invoices').update({ sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', invoice.id);
       return NextResponse.json({ ok: true });
     } catch (error) {
