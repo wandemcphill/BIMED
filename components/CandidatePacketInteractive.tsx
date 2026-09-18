@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { PacketMode, PacketSlug } from '@/lib/document-packets';
+import { recruitmentRoleSlug } from '@/lib/bimed-role-policy';
 
 type Application = {
   full_name: string;
@@ -149,6 +150,8 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
   };
 
   const checklist = checklistMap[slug] || [];
+  const roleSlug = recruitmentRoleSlug(application.role_applied);
+  const registrationEvidenceRequired = roleSlug === 'physiotherapist';
   const checked = useMemo(() => new Set<string>(Array.isArray(response.checked) ? response.checked : []), [response.checked]);
 
   const toggleCheck = (key: string) => {
@@ -174,7 +177,11 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
   }
 
   if (mode === 'checklist') {
-    const candidateNow = checklist.filter((item) => item.audience === 'candidate' && item.stage === 'now');
+    const candidateNow = checklist.filter((item) =>
+      item.audience === 'candidate'
+      && item.stage === 'now'
+      && !(item.key === 'registration' && !registrationEvidenceRequired)
+    );
     const allCandidateNowDone = candidateNow.length > 0 && candidateNow.every((item) => checked.has(item.key));
     return <PacketShell title={title} description={description} completed={complete} saved={saved} error={error} message={message}>
       <div style={{ display: 'grid', gap: 12 }}>
@@ -185,14 +192,26 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
                 <span style={{ flexShrink: 0, padding: '5px 8px', borderRadius: 999, background: '#fff8e1', color: '#975a16', fontSize: 11, fontWeight: 900 }}>BIMED / UPCOMING</span>
               </div>
             </div>
-          : <label key={item.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, border: '1px solid #dce4e8', borderRadius: 10, background: '#fff' }}>
-              <input type="checkbox" checked={checked.has(item.key)} onChange={() => toggleCheck(item.key)} style={{ marginTop: 3, width: 18, height: 18 }} />
-              <span style={{ lineHeight: 1.45 }}>{item.label}</span>
-            </label>
+          : item.key === 'registration' && !registrationEvidenceRequired
+            ? <div key={item.key} style={{ padding: 12, border: '1px solid #dce4e8', borderRadius: 10, background: '#f8fbfc' }}>
+                <strong style={{ display: 'block', lineHeight: 1.45 }}>{item.label}</strong>
+                <span style={{ display: 'block', marginTop: 5, fontSize: 12, color: '#627d98', lineHeight: 1.5 }}>
+                  This item is not required to submit this checklist for your current role. Only provide professional registration/licence evidence where BIMED specifically requests it or the role is professionally regulated.
+                </span>
+              </div>
+            : <label key={item.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, border: '1px solid #dce4e8', borderRadius: 10, background: '#fff' }}>
+                <input type="checkbox" checked={checked.has(item.key)} onChange={() => toggleCheck(item.key)} style={{ marginTop: 3, width: 18, height: 18 }} />
+                <span style={{ lineHeight: 1.45 }}>{item.label}</span>
+              </label>
         )}
       </div>
       <div style={{ marginTop: 16, padding: 12, background: '#f8fbfc', borderRadius: 10, color: '#59676f', fontSize: 13 }}>
-        Candidate checkboxes confirm that you have the item ready or have completed the candidate-side action. BIMED-controlled and future steps are shown for visibility only and must not be marked complete by you.
+        Candidate checkboxes confirm that you have the item ready or have completed the candidate-side action. Professional registration/licence evidence is only a submission requirement where it applies to the role.
+      </div>
+      <div style={{ marginTop: 10, padding: 12, background: '#fff8e1', border: '1px solid #f2d28a', borderRadius: 10, color: '#73520f', fontSize: 13, lineHeight: 1.5 }}>
+        {registrationEvidenceRequired
+          ? 'For this role, the professional registration/licence evidence item is required before submission.'
+          : 'For your current role, the professional registration/licence item does not block submission. If BIMED later needs role-specific evidence, the recruitment team will contact you.'}
       </div>
       <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
         <Button disabled={busy} onClick={() => void save(false)}>Save progress</Button>
