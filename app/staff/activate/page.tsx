@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useSearchParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
 
 function ActivateForm() {
   const params = useSearchParams();
