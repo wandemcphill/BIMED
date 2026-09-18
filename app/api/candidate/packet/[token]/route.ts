@@ -78,23 +78,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid response.' }, { status: 400 });
   }
 
-  if (access.packet_slug === 'supporting-documents') {
-    const { data: application } = await db()
-      .from('recruitment_applications')
-      .select('role_applied')
-      .eq('id', access.application_id)
-      .maybeSingle();
-
-    const missing = missingSupportingDocuments(application?.role_applied, responseData.checked);
-    if (missing.length) {
-      return NextResponse.json({
-        error: 'Please confirm all required supporting-document items before submitting.',
-        code: 'supporting_documents_incomplete',
-        missing: missing.map((item) => item.label),
-      }, { status: 400 });
-    }
-  }
-
   const now = new Date().toISOString();
   const { data, error } = await db()
     .from('recruitment_document_packet_access')
@@ -129,6 +112,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     responseData = sanitiseResponse((body.data as Record<string, unknown>)?.response);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid response.' }, { status: 400 });
+  }
+
+  if (access.packet_slug === 'supporting-documents') {
+    const { data: application } = await db()
+      .from('recruitment_applications')
+      .select('role_applied')
+      .eq('id', access.application_id)
+      .maybeSingle();
+
+    const missing = missingSupportingDocuments(application?.role_applied, responseData.checked);
+    if (missing.length) {
+      return NextResponse.json({
+        error: 'Please confirm all required supporting-document items before submitting.',
+        code: 'supporting_documents_incomplete',
+        missing: missing.map((item) => item.label),
+      }, { status: 400 });
+    }
   }
 
   const now = new Date().toISOString();
