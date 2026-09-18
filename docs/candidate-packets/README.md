@@ -11,7 +11,7 @@ This directory contains the controlled source documents used for shortlisted can
 4. `04-visa-sponsorship-application-pack.md` — international candidate immigration and sponsorship information/checklist.
 
 ### Offer and onboarding pack
-5. `05-employment-contract-template.md` — BIMED employment contract source template. HR/legal approval is required before issue.
+5. `05-employment-contract-template.md` — BIMED employment contract source template. HR/legal approval is required before issue. The signed employment contract is the formal contractual record; candidates should retain their own copy and can retrieve the signed copy from the Staff Portal after activation.
 6. `06-welcome-to-ireland-pack.md` — practical pre-arrival and arrival information for overseas hires.
 7. `07-care-in-ireland-handbook.md` — care-work orientation, professional conduct, safeguarding, communication, and first-week expectations.
 8. `08-international-relocation-checklist.md` — candidate checklist from offer acceptance through first month in Ireland.
