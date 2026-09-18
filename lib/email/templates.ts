@@ -789,6 +789,24 @@ export function adminStatusChangeNotificationEmail(input: {
 // Admin account templates
 // ---------------------------------------------------------------------------
 
+export function staffPasswordResetEmail(input: { displayName: string; resetUrl: string; expiryMinutes: number }): EmailContent {
+  return build('Reset your Bimed Staff Portal password', {
+    preheader: 'A password reset was requested for your Bimed Staff Portal account.',
+    heading: 'Reset your Staff Portal password',
+    paragraphs: [
+      `Hello ${input.displayName},`,
+      'We received a request to reset the password for your Bimed Staff Portal account. Use the button below to choose a new password.',
+    ],
+    callout: `This link can only be used once and expires in ${input.expiryMinutes} minutes.`,
+    cta: { label: 'Reset Staff Portal password', url: input.resetUrl },
+    bullets: [
+      'If you did not request this, you can ignore this email and your current password will remain unchanged.',
+      'Never share your reset link or password with anyone.',
+    ],
+    closing: 'Bimed Healthcare Staff Portal',
+  });
+}
+
 export function adminPasswordResetEmail(input: { displayName: string; resetUrl: string; expiryMinutes: number }): EmailContent {
   return build('Reset your Bimed recruitment portal password', {
     preheader: 'A password reset was requested for your Bimed admin account.',
