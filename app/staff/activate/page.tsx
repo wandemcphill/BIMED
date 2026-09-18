@@ -95,7 +95,7 @@ function ActivateForm() {
     }
   }
 
-  const canRequestNewLink = ['activation_expired', 'activation_replaced', 'activation_invalid'].includes(errorCode) && !resendSent;
+  const canRequestNewLink = errorCode === 'activation_expired' && !resendSent;
   const alreadyActivated = errorCode === 'already_activated';
 
   return (
