@@ -149,6 +149,15 @@ export async function POST(request: NextRequest, { params }: Params) {
       reason,
     });
 
+    if (result.already_requested) {
+      return safeRateHeaders(NextResponse.json({
+        ok: true,
+        status: 'cancellation_requested',
+        cancellationDeadline: result.deadline_at,
+        alreadyRequested: true,
+      }));
+    }
+
     await createStaffNotification(client, {
       staffId: staff.id,
       category: 'permit',
