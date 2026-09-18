@@ -7,12 +7,15 @@ export default function EmploymentContractDocument({
   template,
   employeeSignatureSlot,
   prefilledFor,
+  employerSignatureDate,
 }: {
   template: ContractTemplate;
   /** Replaces the default blank employee signature line - used by the live e-signing page. */
   employeeSignatureSlot?: ReactNode;
   /** Candidate identity shown when the contract was opened from a specific application. */
   prefilledFor?: { name: string; email: string };
+  /** Actual employer signature/issue date for an archived contract copy. */
+  employerSignatureDate?: string | null;
 }) {
   const employeeName = template.editableFields.find((field) => field.label === 'Employee name')?.value || 'Employee';
   return (
@@ -118,7 +121,7 @@ export default function EmploymentContractDocument({
             <div className="signature-line signature-line-signed">{template.employerSignatory.name}</div>
             <strong>{template.employerSignatory.name}</strong>
             <small>{template.employerSignatory.title}</small>
-            <small>Dated: {formatSignatureDate()}</small>
+            <small>Dated: {employerSignatureDate ? formatSignatureDate(employerSignatureDate) : formatSignatureDate()}</small>
           </div>
           <div>
             <span>Employee</span>
@@ -136,8 +139,11 @@ export default function EmploymentContractDocument({
   );
 }
 
-function formatSignatureDate(): string {
-  return new Date().toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' });
+function formatSignatureDate(value?: string): string {
+  const date = value ? new Date(value) : new Date();
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 const placeholderPattern = /(\[[^[\]]+\])/g;
