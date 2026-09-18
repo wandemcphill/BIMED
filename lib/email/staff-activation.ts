@@ -23,7 +23,7 @@ export async function sendStaffPortalActivationEmail(
   return sendTransactionalEmail({
     to: deliveryAddress,
     content,
-    emailType: replacement ? 'staff_portal_activation_resend' : 'staff_portal_welcome',
+    emailType: 'staff_portal_welcome',
     dedupeKey: `${replacement ? 'staff_portal_activation_resend' : 'staff_portal_welcome'}:${staff.id}:${hashActivationToken(token)}`,
     client,
     replyTo: 'info@bimedhealthcare.com',
