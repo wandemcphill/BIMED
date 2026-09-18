@@ -21,7 +21,10 @@ const sections = [
   },
   {
     title: 'Overseas',
-    items: [{ href: '/admin/permit', label: 'Permit & Travel' }],
+    items: [
+      { href: '/admin/permit', label: 'Permit & Travel' },
+      { href: '/admin/billing', label: 'Accommodation Billing' },
+    ],
   },
   {
     title: 'Administration',
