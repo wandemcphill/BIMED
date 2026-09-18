@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
 import {
   __setEmailSenderForTests,
   isCandidateNotifiableStatus,
@@ -295,6 +296,50 @@ describe('interviews', () => {
     expect(candidateEmail?.subject).toContain('cancelled');
     expect(candidateEmail?.html).toContain('Interviewer unavailable');
     expect(sent.some((email) => email.to === 'info@bimedhealthcare.com')).toBe(true);
+  });
+});
+
+describe('staff portal activation emails', () => {
+  it('sends replacement activation emails to the recruitment email with clear recovery copy', async () => {
+    const db = createFakeSupabase({
+      recruitment_staff_mailboxes: [
+        {
+          id: 'mailbox-1',
+          staff_id: 'staff-1',
+          handle: 'ada.byron',
+          namespace: 'bimedcare',
+          enabled: true,
+        },
+      ],
+    });
+
+    const result = await sendStaffPortalActivationEmail(
+      db as never,
+      {
+        id: 'staff-1',
+        full_name: 'Ada Byron',
+        preferred_name: 'Ada',
+        job_title: 'Support Worker',
+        role: 'Support Worker',
+        bimed_id: 'BIM-2026-ABCD',
+        email: 'ada.byron@bimedhealthcare.com',
+        application_id: 'app-1',
+        status: 'pre_arrival',
+        employment_start_date: '2026-10-01',
+      },
+      'replacement-token-123',
+      'ada.personal@example.com',
+      { mode: 'replacement' },
+    );
+
+    expect(result.status).toBe('sent');
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe('ada.personal@example.com');
+    expect(sent[0].subject).toBe('Your new BIMED Staff Portal activation link');
+    expect(sent[0].html).toContain('Your previous activation link is no longer valid');
+    expect(sent[0].html).toContain('ada.byron@bimedhealthcare.com');
+    expect(sent[0].html).toContain('/staff/activate?token=');
+    expect(sent[0].text).toContain('YOUR NEW BIMED STAFF PORTAL ACTIVATION LINK');
   });
 });
 

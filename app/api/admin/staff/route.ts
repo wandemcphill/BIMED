@@ -60,7 +60,82 @@ export async function POST(request: NextRequest) {
       const { data } = await client.from('recruitment_staff').select('*').eq('id', target.id).single(); return NextResponse.json({ staff: data, message: 'Portal access has been restored. The recruit can sign in again using the same BIMED ID, email and existing profile details.' });
     }
     if (body.action === 'rotate_activation') {
-      if (!body.staffId) return NextResponse.json({ error: 'staffId is required.' }, { status: 400 }); const token = crypto.randomBytes(32).toString('base64url'); const hash = crypto.createHash('sha256').update(token).digest('hex'); const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); const { data, error } = await client.from('recruitment_staff').update({ activation_token_hash: hash, activation_expires_at: expires, updated_at: new Date().toISOString() }).eq('id', body.staffId).select('id,email,bimed_id').single(); if (error || !data) return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 }); await createStaffAudit(client, { staffId: body.staffId, actor: session.email, eventType: 'staff_activation_rotated' }); return NextResponse.json({ activationUrl: createActivationUrl(request, token, data.email) });
+      if (!body.staffId) return NextResponse.json({ error: 'staffId is required.' }, { status: 400 });
+
+      const { data: current, error: currentError } = await client
+        .from('recruitment_staff')
+        .select('id,email,bimed_id,application_id,full_name,preferred_name,job_title,role,employment_start_date,status,activation_token_hash,activation_expires_at,activated_at')
+        .eq('id', body.staffId)
+        .maybeSingle();
+
+      if (currentError || !current) return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 });
+      if (!['active', 'pre_arrival', 'on_leave'].includes(current.status)) {
+        return NextResponse.json({ error: 'Activation can only be reissued for an eligible staff account.' }, { status: 409 });
+      }
+      if (current.activated_at) {
+        return NextResponse.json({ error: 'This staff account has already been activated. The employee should sign in instead.' }, { status: 409 });
+      }
+
+      const { data: application, error: applicationError } = current.application_id
+        ? await client.from('recruitment_applications').select('email').eq('id', current.application_id).maybeSingle()
+        : { data: null, error: null };
+
+      if (applicationError) return NextResponse.json({ error: 'Unable to identify the candidate recruitment email.' }, { status: 500 });
+
+      const deliveryEmail = application?.email?.trim().toLowerCase() || current.email.trim().toLowerCase();
+      const token = crypto.randomBytes(32).toString('base64url');
+      const hash = crypto.createHash('sha256').update(token).digest('hex');
+      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const previousHash = current.activation_token_hash;
+      const previousExpiry = current.activation_expires_at;
+
+      const { error } = await client
+        .from('recruitment_staff')
+        .update({
+          activation_token_hash: hash,
+          activation_expires_at: expires,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', body.staffId);
+
+      if (error) return NextResponse.json({ error: 'Unable to create a new activation link.' }, { status: 500 });
+
+      let delivery;
+      try {
+        delivery = await sendStaffPortalActivationEmail(client, current, token, deliveryEmail, { mode: 'replacement' });
+      } catch (sendError) {
+        delivery = { status: 'failed', reason: sendError instanceof Error ? sendError.message : 'Unable to send activation email.' } as any;
+      }
+
+      if (delivery.status !== 'sent') {
+        await client
+          .from('recruitment_staff')
+          .update({
+            activation_token_hash: previousHash,
+            activation_expires_at: previousExpiry,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', body.staffId)
+          .eq('activation_token_hash', hash);
+
+        return NextResponse.json(
+          { error: 'The new activation link could not be emailed. The previous activation link remains unchanged.' },
+          { status: 502 },
+        );
+      }
+
+      await createStaffAudit(client, {
+        staffId: body.staffId,
+        actor: session.email,
+        eventType: 'staff_activation_rotated',
+        metadata: { delivery_email: deliveryEmail, automatic_email_sent: true, expiry: expires },
+      });
+
+      return NextResponse.json({
+        activationUrl: createActivationUrl(request, token, current.email),
+        welcomeEmailSent: true,
+        message: 'A fresh seven-day activation link was generated and emailed to the recruitment email address.',
+      });
     }
     return NextResponse.json({ error: 'Unsupported action.' }, { status: 400 });
   } catch (error) { console.error(JSON.stringify({ level: 'error', event: 'staff_admin_api_failed', reason: error instanceof Error ? error.message : 'unknown' })); return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to complete the staff action.' }, { status: 500 }); }
