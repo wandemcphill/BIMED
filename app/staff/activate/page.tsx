@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 function ActivateForm() {
   const params = useSearchParams();
@@ -17,6 +17,37 @@ function ActivateForm() {
   const [busy, setBusy] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendSent, setResendSent] = useState(false);
+  const [checkingLink, setCheckingLink] = useState(Boolean(token));
+
+  useEffect(() => {
+    if (!token) {
+      setCheckingLink(false);
+      return;
+    }
+
+    let cancelled = false;
+    void fetch('/api/staff/auth/activate?token=' + encodeURIComponent(token) + '&email=' + encodeURIComponent(email))
+      .then(async (response) => ({ response, data: await response.json() }))
+      .then(({ response, data }) => {
+        if (cancelled) return;
+        if (data.status === 'already_activated' && data.redirectToLogin) {
+          router.replace('/staff/login?email=' + encodeURIComponent(data.email || email));
+          return;
+        }
+        if (!response.ok && data.error) {
+          setError(data.error);
+          setErrorCode(data.status || 'activation_invalid');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError('Unable to check this activation link. You can still try activating it.');
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingLink(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [token, email, router]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -101,6 +132,10 @@ function ActivateForm() {
 
   const canRequestNewLink = errorCode === 'activation_expired' && !resendSent;
   const alreadyActivated = errorCode === 'already_activated';
+
+  if (checkingLink) {
+    return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f4f7fb', padding: 24 }}><div style={{ width: '100%', maxWidth: 520, background: '#fff', padding: 32, borderRadius: 20, boxShadow: '0 14px 44px rgba(15,23,42,.08)', textAlign: 'center' }}><div style={{ fontSize: 13, fontWeight: 800, letterSpacing: 1.4, textTransform: 'uppercase', color: '#0f766e' }}>BIMED Healthcare</div><h1 style={{ fontSize: 26, color: '#102a43', margin: '10px 0 8px' }}>Checking your Staff Portal link</h1><p style={{ color: '#627d98', lineHeight: 1.6, margin: 0 }}>Please wait while we check whether your account has already been activated.</p></div></main>;
+  }
 
   return (
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f4f7fb', padding: 24 }}>
