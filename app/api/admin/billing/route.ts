@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { issueAccommodationInvoice } from '@/lib/accommodation-invoice-service';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 import { appUrl, makeReceiptNumber, sendAccommodationEmail, ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE } from '@/lib/accommodation-billing';
-import { invoiceHtml, receiptHtml } from '@/lib/accommodation-documents';
+import { receiptHtml } from '@/lib/accommodation-documents';
 import { recordAccommodationPaymentAtomic } from '@/lib/staff-portal-workflow';
 
 async function loadInvoiceContext(client: ReturnType<typeof db>, invoiceId: string) {
