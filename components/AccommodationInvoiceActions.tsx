@@ -31,7 +31,7 @@ export default function AccommodationInvoiceActions({
         setMessage('Payment notice recorded. Please send your payment receipt to overseas@bimedhealthcare.com.');
         window.location.reload();
       } else {
-        setMessage('Cancellation request recorded. BIMED billing has been notified for review.');
+        setMessage('Cancellation recorded. Your 24-hour reversal window has started. Revoke it from Employment permit in the Staff Portal before the deadline to continue your application.');
         window.location.reload();
       }
     } catch (error) {
@@ -52,7 +52,7 @@ export default function AccommodationInvoiceActions({
       <div style={{ color: '#627d98', fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
         Pay the amount shown on the invoice using the official account details. After you make the transfer, click <strong>I have made payment</strong> and send your payment receipt to <strong>overseas@bimedhealthcare.com</strong>.
         {status === 'payment_reported' ? ' Your payment notice has already been recorded and is awaiting BIMED verification.' : ''}
-        {status === 'cancellation_requested' ? ' Your cancellation request has already been recorded and is awaiting BIMED review.' : ''}
+        {status === 'cancellation_requested' ? ' Your accommodation-fee rejection has been recorded and your 24-hour reversal window is active. Revoke the cancellation from Employment permit before the deadline to continue. If you do not, BIMED will restrict portal access, withdraw your application, void the employment contract and end the employment-permit / sponsorship journey.' : ''}
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {status === 'issued' && (
@@ -68,10 +68,15 @@ export default function AccommodationInvoiceActions({
             <button
               type="button"
               disabled={Boolean(busy)}
-              onClick={() => void act('cancellation_requested')}
-              style={{ padding: '11px 16px', border: '1px solid #d9e2ec', borderRadius: 9, background: '#fff', color: '#334e68', fontWeight: 800, cursor: 'pointer', opacity: busy ? .6 : 1 }}
+              onClick={() => {
+                const confirmed = window.confirm(
+                  'Reject the accommodation fee and cancel sponsorship?\\n\\nThis starts a 24-hour reversal window. Before the deadline, use Employment permit → Revoke cancellation to continue your application. If you do not revoke the cancellation within 24 hours, BIMED will automatically restrict your portal access, withdraw your recruitment application, void the employment contract and end the employment-permit / sponsorship journey.'
+                );
+                if (confirmed) void act('cancellation_requested');
+              }}
+              style={{ padding: '11px 16px', border: '1px solid #b42318', borderRadius: 9, background: '#fff7f5', color: '#9b2c2c', fontWeight: 900, cursor: 'pointer', opacity: busy ? .6 : 1 }}
             >
-              {busy === 'cancellation_requested' ? 'Requesting…' : 'Request cancellation'}
+              {busy === 'cancellation_requested' ? 'Recording…' : 'Reject accommodation fee & cancel sponsorship'}
             </button>
           </>
         )}

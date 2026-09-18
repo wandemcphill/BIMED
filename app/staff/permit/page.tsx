@@ -102,6 +102,46 @@ export default function StaffPermitPage() {
     finally { setBusy(false); }
   }
 
+  async function requestSponsorshipCancellation() {
+    const confirmed = window.confirm(
+      'Reject the accommodation fee and cancel sponsorship?\\n\\nThis starts a 24-hour reversal window. Before the deadline, use Employment permit → Revoke cancellation to continue your application. If you do not revoke the cancellation within 24 hours, BIMED will automatically restrict your portal access, withdraw your recruitment application, void the employment contract and end the employment-permit / sponsorship journey.'
+    );
+    if (!confirmed) return;
+    setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/staff/permit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'request_sponsorship_cancellation', reason: 'Candidate rejected the accommodation fee and requested cancellation of the sponsorship journey.' }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to record the cancellation.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to record the cancellation.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeSponsorshipCancellation() {
+    setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/staff/permit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke_sponsorship_cancellation' }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to revoke the cancellation.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to revoke the cancellation.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function requestJourney() {
     setBusy(true); setError('');
     try {
@@ -123,6 +163,9 @@ export default function StaffPermitPage() {
   const displayOption = selectedOption || options.find((option) => option.accommodation_plan === currentPlan && option.permit_submission_route === currentRoute) || null;
   const permitTypeLabel = displayOption?.permit_type_label || (permit.permit_type === 'critical_skills_employment_permit' ? 'Critical Skills Employment Permit (CSEP)' : permit.permit_type === 'general_employment_permit' ? 'General Employment Permit (GEP)' : 'BIMED to derive from your role');
   const checklist = getPermitChecklist(role || permit.role || null, currentRoute);
+  const cancellationPending = Boolean(permit.cancellation_requested_at && !permit.cancellation_revoked_at && !permit.cancellation_finalized_at);
+  const cancellationFinalized = Boolean(permit.cancellation_finalized_at);
+  const cancellationDeadline = permit.cancellation_deadline_at ? new Date(permit.cancellation_deadline_at) : null;
 
   return <main style={{ minHeight: '100vh', background: '#f4f7fb', color: '#102a43', fontFamily: 'system-ui', padding: 'clamp(16px,4vw,28px)' }}>
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
@@ -130,6 +173,68 @@ export default function StaffPermitPage() {
       <div style={{ marginTop: 16 }}><div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.3, color: '#0f766e' }}>OVERSEAS EMPLOYMENT</div><h1 style={{ margin: '4px 0', fontSize: 'clamp(30px,6vw,44px)', lineHeight: 1.08 }}>Employment permit & sponsorship</h1><p style={{ color: '#627d98', fontSize: 'clamp(16px,2.5vw,20px)', lineHeight: 1.6 }}>Choose the accommodation plan that applies to you and choose who will submit and pay the employment permit application. Once you confirm the package, BIMED issues the accommodation invoice immediately so you can review the terms and payment details. BIMED derives the permit type from your recruitment role. Final permit eligibility and decisions remain with the relevant Irish authorities.</p></div>
       <div style={{ ...card, marginTop: 18, borderColor: permit.work_authorised ? '#a7f3d0' : '#fde68a', background: permit.work_authorised ? '#ecfdf5' : '#fffbeb' }}><strong>{permit.work_authorised ? 'Work authorisation confirmed' : 'Work is not yet authorised'}</strong><p style={{ margin: '6px 0 0', color: '#627d98', lineHeight: 1.65 }}>{permit.work_authorised ? 'Your shift eligibility can be enabled by BIMED subject to normal rota requirements.' : 'You may use the Staff Portal for onboarding and immigration preparation, but you must not take shifts until BIMED confirms that you have the required permission to work in Ireland.'}</p></div>
       {error && <div style={{ ...card, marginTop: 14, color: '#9b2c2c' }}>{error}</div>}
+
+      {cancellationPending && cancellationDeadline && (
+        <section style={{ ...card, marginTop: 18, borderColor: '#fb923c', background: '#fff7ed' }}>
+          <div style={{ display: 'inline-flex', padding: '5px 9px', borderRadius: 999, background: '#fed7aa', color: '#9a3412', fontWeight: 900, fontSize: 12 }}>CANCELLATION PENDING</div>
+          <h2 style={{ margin: '10px 0 8px', color: '#9a3412' }}>24-hour reversal window</h2>
+          <p style={{ margin: 0, color: '#7c2d12', lineHeight: 1.7 }}>
+            You rejected the accommodation fee and requested cancellation of the sponsorship journey. Your cancellation is <strong>not yet final</strong>.
+            You may revoke it before <strong>{cancellationDeadline.toLocaleString()}</strong> and continue your application.
+          </p>
+          <p style={{ margin: '10px 0 0', color: '#7c2d12', lineHeight: 1.7 }}>
+            If you do not revoke it before the deadline, BIMED will automatically <strong>restrict your Staff Portal access, withdraw your recruitment application, void your employment contract, and end your employment-permit / sponsorship journey</strong>.
+          </p>
+          <button
+            type='button'
+            disabled={busy}
+            onClick={() => void revokeSponsorshipCancellation()}
+            style={{ ...button, background: '#0f766e', width: '100%', maxWidth: 620 }}
+          >
+            {busy ? 'Restoring…' : 'Revoke cancellation and continue my application'}
+          </button>
+          <div style={{ marginTop: 10, color: '#7c2d12', fontSize: 13 }}>
+            Need clarification? Contact <strong>info@bimedhealthcare.com</strong> before the deadline.
+          </div>
+        </section>
+      )}
+
+      {cancellationFinalized && (
+        <section style={{ ...card, marginTop: 18, borderColor: '#fecaca', background: '#fef2f2' }}>
+          <div style={{ display: 'inline-flex', padding: '5px 9px', borderRadius: 999, background: '#fecaca', color: '#991b1b', fontWeight: 900, fontSize: 12 }}>SPONSORSHIP CLOSED</div>
+          <h2 style={{ margin: '10px 0 8px', color: '#991b1b' }}>Application withdrawn</h2>
+          <p style={{ margin: 0, color: '#7f1d1d', lineHeight: 1.7 }}>
+            The 24-hour cancellation window expired. Your recruitment application has been withdrawn, your employment contract has been voided, and the employment-permit / sponsorship journey has ended. Staff Portal access is restricted.
+          </p>
+          <p style={{ margin: '10px 0 0', color: '#7f1d1d', lineHeight: 1.7 }}>
+            Contact <strong>info@bimedhealthcare.com</strong> if you believe this action was applied in error.
+          </p>
+        </section>
+      )}
+
+      {invoice && !cancellationPending && !cancellationFinalized && ['issued', 'payment_reported'].includes(invoice.status) && (
+        <section style={{ ...card, marginTop: 18, borderColor: '#fca5a5', background: '#fffafa' }}>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.1, color: '#b42318' }}>IMPORTANT DECISION</div>
+          <h2 style={{ margin: '5px 0 8px', color: '#7f1d1d' }}>Do not proceed unless you accept the required fees</h2>
+          <p style={{ margin: 0, color: '#7f1d1d', lineHeight: 1.7 }}>
+            You may reject the accommodation fee. The button below is a formal cancellation of this accommodation arrangement and your BIMED sponsorship journey. It is <strong>not</strong> a routine invoice cancellation.
+          </p>
+          <p style={{ margin: '10px 0 0', color: '#7f1d1d', lineHeight: 1.7 }}>
+            Clicking it starts a <strong>24-hour reversal window</strong>. During that window you can revoke the cancellation and continue. After 24 hours, BIMED will automatically restrict portal access, withdraw the application, void the employment contract and end sponsorship.
+          </p>
+          <button
+            type='button'
+            disabled={busy}
+            onClick={() => void requestSponsorshipCancellation()}
+            style={{ marginTop: 14, padding: '12px 15px', border: '1px solid #b42318', borderRadius: 9, background: '#fff7f5', color: '#9b2c2c', fontWeight: 900, width: '100%', maxWidth: 720 }}
+          >
+            {busy ? 'Recording…' : 'Reject accommodation fee & cancel sponsorship'}
+          </button>
+          <div style={{ marginTop: 9, color: '#7f1d1d', fontSize: 13 }}>
+            A notification is sent to <strong>info@bimedhealthcare.com</strong>. You can revoke before the deadline from this page.
+          </div>
+        </section>
+      )}
 
       <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>Your permit journey</h2><Info label='Current status' value={permit.status.replaceAll('_', ' ')} /><Info label='Recruitment role' value={role || permit.role} /><Info label='Permit type' value={permitTypeLabel} /><Info label='Submission route' value={displayOption?.permit_submission_label || permit.permit_submission_route || 'Choose below'} /><Info label='Permit fee' value={`€${Number(displayOption?.permit_fee_eur || permit.permit_fee_eur || 1000).toFixed(2)}`} /><Info label='Planned initial permit duration' value={`${Number(displayOption?.permit_duration_months || permit.permit_duration_months || 24)} months`} />
         {permit.status === 'requested' ? <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: '#ecfdf5', color: '#166534', lineHeight: 1.6 }}><strong>Permit assistance requested</strong><div>BIMED has received the request and will review the employer-side permit process for your role.</div></div> : accommodationReady && routeReady ? <div style={{ marginTop: 14 }}><p style={{ color: '#627d98', lineHeight: 1.6 }}>Your accommodation invoice has been issued and the permit route is recorded. Open the invoice to review the account details and make payment, then ask BIMED to begin the permit journey.</p><button disabled={busy} onClick={() => void requestJourney()} style={{ ...button, width: '100%', maxWidth: 620 }}>{busy ? 'Submitting…' : 'Request employment-permit assistance'}</button></div> : <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: '#fffbeb', color: '#854d0e', lineHeight: 1.6 }}><strong>Permit assistance is locked</strong><div>{!routeReady ? 'Choose the permit submission route below.' : 'BIMED must issue the accommodation invoice before the permit-assistance request can be submitted.'}</div></div>}

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getStaffSession } from '@/lib/staff-auth';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
+import { requestStaffSponsorshipCancellationAtomic } from '@/lib/staff-portal-workflow';
 import { appUrl, sendAccommodationEmail } from '@/lib/accommodation-billing';
 
 type Params = { params: Promise<{ token: string }> };
@@ -126,57 +128,106 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   if (!['issued', 'payment_reported', 'cancellation_requested'].includes(invoice.status)) {
-    return safeRateHeaders(NextResponse.json({ error: 'This invoice cannot be cancelled in its current state.', code: 'cancellation_not_allowed' }, { status: 409 }));
+    return safeRateHeaders(NextResponse.json({ error: 'This invoice cannot be rejected in its current state.', code: 'cancellation_not_allowed' }, { status: 409 }));
   }
 
-  const reason = String(body?.reason || '').trim() || 'Candidate requested invoice cancellation.';
+  const session = await getStaffSession(request);
+  if (!session || session.staff_id !== staff.id) {
+    return safeRateHeaders(NextResponse.json({
+      error: 'Please sign in to the BIMED Staff Portal before rejecting the accommodation fee.',
+      code: 'staff_session_required',
+    }, { status: 401 }));
+  }
 
-  const { data: updated, error } = await client
-    .from('recruitment_accommodation_invoices')
-    .update({
-      status: 'cancellation_requested',
-      cancellation_requested_at: invoice.cancellation_requested_at || now,
-      cancellation_requested_by: 'candidate',
-      cancellation_reason: reason,
-      updated_at: now,
-    })
-    .eq('id', invoice.id)
-    .in('status', ['issued', 'payment_reported', 'cancellation_requested'])
-    .select('*')
-    .single();
-
-  if (error || !updated) return safeRateHeaders(NextResponse.json({ error: 'Unable to record the cancellation request.' }, { status: 500 }));
-
-  const subject = `Accommodation invoice cancellation requested: ${updated.invoice_number}`;
-  const html = `<div style="font-family:Arial,sans-serif;color:#172b4d">
-    <h2>Accommodation invoice cancellation requested</h2>
-    <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has requested cancellation of invoice <strong>${updated.invoice_number}</strong>.</p>
-    <p><strong>Reason:</strong> ${reason}</p>
-    <p><a href="${appUrl()}/admin/billing">Open the accommodation invoice queue</a></p>
-  </div>`;
+  const reason = String(body?.reason || '').trim().slice(0, 500)
+    || 'Candidate rejected the accommodation fee and requested cancellation of the accommodation invoice.';
 
   try {
-    await sendAccommodationEmail({ to: ['overseas@bimedhealthcare.com', 'manager@bimedhealthcare.com'], subject, html });
+    const result = await requestStaffSponsorshipCancellationAtomic(client, {
+      staffId: staff.id,
+      actor: session.email,
+      reason,
+    });
+
+    if (result.already_requested) {
+      return safeRateHeaders(NextResponse.json({
+        ok: true,
+        status: 'cancellation_requested',
+        cancellationDeadline: result.deadline_at,
+        alreadyRequested: true,
+      }));
+    }
+
+    await createStaffNotification(client, {
+      staffId: staff.id,
+      category: 'permit',
+      title: 'Cancellation submitted: 24-hour reversal window started',
+      body: `You rejected the accommodation fee. You can revoke this cancellation in the Staff Portal before ${result.deadline_at} to continue your application. If you do not revoke it within 24 hours, BIMED will restrict portal access, withdraw your application, void the employment contract and end the employment-permit / sponsorship journey.`,
+      actionUrl: '/staff/permit',
+    });
+
+    const subject = `Sponsorship cancellation submitted: ${staff.full_name} (${staff.bimed_id})`;
+    const html = `<div style="font-family:Arial,sans-serif;color:#172b4d">
+      <h2>Accommodation fee rejection / sponsorship cancellation</h2>
+      <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has rejected the accommodation fee and submitted cancellation of invoice <strong>${result.invoice_number}</strong>.</p>
+      <p>The candidate has a <strong>24-hour reversal window</strong> ending at <strong>${result.deadline_at}</strong>. During this window the candidate may revoke the cancellation from the Staff Portal and continue the application.</p>
+      <p>If the cancellation is not revoked before the deadline, BIMED will automatically restrict Staff Portal access, withdraw the recruitment application, void the employment contract and end the employment-permit / sponsorship journey.</p>
+      <p><strong>Reason:</strong> ${reason}</p>
+      <p><a href="${appUrl()}/admin/billing">Open the accommodation invoice queue</a></p>
+    </div>`;
+    try {
+      await sendAccommodationEmail({
+        to: ['info@bimedhealthcare.com', 'overseas@bimedhealthcare.com', 'manager@bimedhealthcare.com'],
+        subject,
+        html,
+      });
+    } catch (emailError) {
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'sponsorship_cancellation_info_email_failed',
+        staff_id: staff.id,
+        invoice_id: result.invoice_id,
+        reason: emailError instanceof Error ? emailError.message : String(emailError),
+      }));
+    }
+
+    await createStaffAudit(client, {
+      staffId: staff.id,
+      actor: session.email,
+      eventType: 'sponsorship_cancellation_submitted',
+      metadata: {
+        invoice_id: result.invoice_id,
+        invoice_number: result.invoice_number,
+        deadline_at: result.deadline_at,
+      },
+    });
+
+    const { data: updatedPermit } = await client
+      .from('recruitment_staff_permit_cases')
+      .select('*')
+      .eq('id', permit.id)
+      .single();
+
+    return safeRateHeaders(NextResponse.json({
+      ok: true,
+      status: 'cancellation_requested',
+      cancellationDeadline: result.deadline_at,
+      permit: updatedPermit,
+    }));
   } catch (error) {
-    console.error(JSON.stringify({ level: 'error', event: 'invoice_cancellation_admin_email_failed', invoice_id: updated.id, reason: error instanceof Error ? error.message : String(error) }));
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('SPONSORSHIP_CANCELLATION_DEADLINE_PASSED')) {
+      return safeRateHeaders(NextResponse.json({
+        error: 'The 24-hour cancellation window has expired. BIMED is processing the withdrawal and portal restriction.',
+        code: 'cancellation_deadline_passed',
+      }, { status: 409 }));
+    }
+    if (message.includes('SPONSORSHIP_CANCELLATION_FINALIZED')) {
+      return safeRateHeaders(NextResponse.json({
+        error: 'This sponsorship cancellation has already been finalised.',
+        code: 'cancellation_finalized',
+      }, { status: 409 }));
+    }
+    return safeRateHeaders(NextResponse.json({ error: 'Unable to record the sponsorship cancellation.' }, { status: 500 }));
   }
-
-  await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'cancellation_requested', updated_at: now }).eq('id', permit.id);
-
-  await createStaffNotification(client, {
-    staffId: staff.id,
-    category: 'billing',
-    title: 'Invoice cancellation request received',
-    body: `BIMED has received your cancellation request for invoice ${updated.invoice_number}. The billing team will review it.`,
-    actionUrl: '/staff/permit',
-  });
-
-  await createStaffAudit(client, {
-    staffId: staff.id,
-    actor: 'candidate',
-    eventType: 'accommodation_invoice_cancellation_requested',
-    metadata: { invoice_id: updated.id, invoice_number: updated.invoice_number, reason },
-  });
-
-  return safeRateHeaders(NextResponse.json({ ok: true, status: updated.status }));
 }
