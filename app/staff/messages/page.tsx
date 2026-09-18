@@ -10,7 +10,7 @@ function displayName(person: any) { return person?.preferred_name || person?.ful
 function formatTime(value: string) { return new Date(value).toLocaleString('en-IE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
 
 export default function BimedMessagesPage() {
-  const [mailbox, setMailbox] = useState<any>(null); const [staffType, setStaffType] = useState(''); const [adminRecipients, setAdminRecipients] = useState<AdminRecipient[]>([]); const [notices, setNotices] = useState<any>(null); const [conversations, setConversations] = useState<Conversation[]>([]); const [active, setActive] = useState(''); const [messages, setMessages] = useState<Message[]>([]); const [olderCursor, setOlderCursor] = useState<string | null>(null); const [loadingOlder, setLoadingOlder] = useState(false); const [to, setTo] = useState(''); const [draft, setDraft] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [mailbox, setMailbox] = useState<any>(null); const [staffType, setStaffType] = useState(''); const [adminRecipients, setAdminRecipients] = useState<AdminRecipient[]>([]); const [notices, setNotices] = useState<any>(null); const [conversations, setConversations] = useState<Conversation[]>([]); const [conversationSearch, setConversationSearch] = useState(''); const [active, setActive] = useState(''); const [messages, setMessages] = useState<Message[]>([]); const [olderCursor, setOlderCursor] = useState<string | null>(null); const [loadingOlder, setLoadingOlder] = useState(false); const [to, setTo] = useState(''); const [draft, setDraft] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [hasNewMessages, setHasNewMessages] = useState(false);
   const threadBodyRef = useRef<HTMLDivElement | null>(null); const followLatestRef = useRef(true);
 
   async function load() { const response = await fetch('/api/staff/messages', { cache: 'no-store' }); if (!response.ok) { setError('Unable to load BIMED Messages.'); return; } const data = await response.json(); setMailbox(data.mailbox); setStaffType(data.staffType || ''); setConversations(data.conversations || []); setAdminRecipients(data.adminRecipients || []); setNotices(data.notices || null); if (!to && data.adminRecipients?.length) setTo(data.adminRecipients[0].email); }
@@ -33,6 +33,17 @@ export default function BimedMessagesPage() {
 
   const activeConversation = conversations.find((item) => item.id === active); const unreadCount = conversations.filter((item) => item.unread).length;
 
+  const visibleConversations = conversations.filter((item) => {
+    if (!conversationSearch.trim()) return true;
+    const query = conversationSearch.trim().toLowerCase();
+    return [
+      displayName(item.other),
+      item.other?.address,
+      item.latest?.body,
+      item.isAdminThread ? 'BIMED Admin HR official workplace inbox' : '',
+    ].filter(Boolean).join(' ').toLowerCase().includes(query);
+  });
+
   return (
     <main className="messages-page">
       <style>{`
@@ -47,8 +58,8 @@ export default function BimedMessagesPage() {
           <aside className={`messages-rail ${active?'hidden-mobile':''}`}>
             <form onSubmit={startConversation} className="messages-compose"><div style={{fontWeight:900,marginBottom:7}}>Message BIMED Admin / HR</div><select value={to} onChange={(event)=>setTo(event.target.value)} aria-label="Choose BIMED admin">{adminRecipients.map((admin)=><option key={admin.email} value={admin.email}>{admin.name} · {admin.email}</option>)}{adminRecipients.length===0&&<option value="">No BIMED admin is currently available</option>}</select><textarea value={draft} onChange={(event)=>setDraft(event.target.value)} placeholder="Write a workplace message…" rows={3}/><button disabled={busy||!draft.trim()||!to}>{busy?'Sending…':'Send message'}</button></form>
             {notices&&<div className="messages-notices"><strong>Important</strong><p>{notices.probation}</p><p>{notices.monitoring}</p></div>}
-            <div className="messages-list-head"><input className="messages-search" placeholder="Search conversations…" aria-label="Search conversations" onChange={(event)=>{const query=event.target.value.toLowerCase();setConversations((items)=>items)}}/><div style={{display:'flex',justifyContent:'space-between',marginTop:9}}><div style={{fontWeight:900}}>Inbox</div><div style={{fontSize:12,fontWeight:900,color:unreadCount?'#b42318':'#627d98'}}>{unreadCount?`${unreadCount} unread`: 'All caught up'}</div></div></div>
-            <div className="messages-list">{conversations.length===0?<div style={{padding:14,color:'#627d98',fontSize:13}}>No messages yet.</div>:conversations.map((item)=><button key={item.id} type="button" onClick={()=>{setDraft('');void openConversation(item.id)}} className={`messages-conversation-button ${active===item.id?'is-active':''}`}><div className="messages-conversation-title"><strong>{item.isAdminThread?'BIMED Admin / HR':displayName(item.other)||'BIMED staff'}</strong>{item.unread&&<span className="messages-pill unread">Unread</span>}</div><div className="messages-conversation-meta">{item.isAdminThread?'Official BIMED workplace inbox':(item.other?.address||'')}</div><div className="messages-conversation-preview">{item.latest?.body||''}</div></button>)}</div>
+            <div className="messages-list-head"><input className="messages-search" value={conversationSearch} onChange={(event)=>setConversationSearch(event.target.value)} placeholder="Search conversations…" aria-label="Search conversations" /><div style={{display:'flex',justifyContent:'space-between',marginTop:9}}><div style={{fontWeight:900}}>Inbox</div><div style={{fontSize:12,fontWeight:900,color:unreadCount?'#b42318':'#627d98'}}>{unreadCount?`${unreadCount} unread`: 'All caught up'}</div></div></div>
+            <div className="messages-list">{visibleConversations.length===0?<div style={{padding:14,color:'#627d98',fontSize:13}}>{conversationSearch.trim()?'No conversations match your search.':'No messages yet.'}</div>:visibleConversations.map((item)=><button key={item.id} type="button" onClick={()=>{setDraft('');void openConversation(item.id)}} className={`messages-conversation-button ${active===item.id?'is-active':''}`}><div className="messages-conversation-title"><strong>{item.isAdminThread?'BIMED Admin / HR':displayName(item.other)||'BIMED staff'}</strong>{item.unread&&<span className="messages-pill unread">Unread</span>}</div><div className="messages-conversation-meta">{item.isAdminThread?'Official BIMED workplace inbox':(item.other?.address||'')}</div><div className="messages-conversation-preview">{item.latest?.body||''}</div></button>)}</div>
           </aside>
           <section className={`messages-thread ${!active?'hidden-mobile':''}`}>
             {!active?<div className="messages-empty"><strong>Select a conversation</strong>Open an existing thread or send a new message to BIMED Admin / HR.</div>:<>

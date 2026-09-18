@@ -101,6 +101,16 @@ export default function Home() {
           </section>
 
           <div className="notice">
+            <b>Already have a BIMED Staff Portal account?</b>
+            <p className="muted" style={{ margin: '6px 0 10px' }}>
+              Use your BIMED ID or BIMED email and the password you created during activation.
+            </p>
+            <a className="link-button" href="/staff/login">
+              Sign in to Staff Portal →
+            </a>
+          </div>
+
+          <div className="notice">
             <b>Not invited yet?</b>
             <p className="muted" style={{ marginBottom: 0 }}>
               Please use Bimed Healthcare&apos;s official recruitment channels first. The recruitment team will issue a private portal invitation when your application is ready for the online stage.

@@ -51,6 +51,32 @@ export default function StaffDashboard() {
             <div style={card}><div style={{ color: '#627d98', fontSize: 13 }}>Payroll readiness</div><div style={{ fontSize: 28, fontWeight: 900, margin: '4px 0 12px' }}>{staff.pps_number ? 'PPS added' : 'PPS pending'}</div><div style={{ fontSize: 12, color: '#627d98' }}>{staff.pps_number ? 'Your PPS number is on your BIMED profile.' : 'Add your PPS number yourself when you receive it in Ireland.'}</div></div>
           </section>
 
+          <section style={{ ...card, marginTop: 18, background: 'linear-gradient(135deg,#ffffff 0%,#f7fcfc 100%)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ color: '#0f766e', fontSize: 12, fontWeight: 900, letterSpacing: 1.2 }}>NEXT STEPS</div>
+                <h2 style={{ margin: '4px 0 6px' }}>Your onboarding workspace</h2>
+                <p style={{ margin: 0, color: '#627d98', lineHeight: 1.55 }}>
+                  Keep the important recruitment and workforce actions in one place.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginTop: 16 }}>
+              {[
+                ['Employment permit', 'Review sponsorship, accommodation and permit steps.', '/staff/permit'],
+                ['Relocation', 'Track your arrival, travel and first-month preparation.', '/staff/relocation'],
+                ['Onboarding', 'See outstanding recruitment-linked readiness items.', '/staff/onboarding'],
+                ['Messages', 'Contact BIMED Admin / HR and follow replies.', '/staff/messages'],
+              ].map(([title, text, href]) => (
+                <a key={href} href={href} style={{ padding: 14, border: '1px solid #dce8ea', borderRadius: 14, background: '#fff', textDecoration: 'none', color: '#102a43', display: 'block', minHeight: 124 }}>
+                  <div style={{ fontWeight: 900, fontSize: 15 }}>{title}</div>
+                  <div style={{ marginTop: 7, fontSize: 12, color: '#627d98', lineHeight: 1.5 }}>{text}</div>
+                  <div style={{ marginTop: 12, color: '#0f766e', fontSize: 12, fontWeight: 900 }}>Open →</div>
+                </a>
+              ))}
+            </div>
+          </section>
+
           <section style={{ marginTop: 18 }}><h2 style={{ margin: '0 0 10px' }}>Your BIMED tools</h2><p style={{ margin: '0 0 14px', color: '#627d98' }}>Your account has the same core workforce access. Recruitment-linked staff also have their onboarding workspace.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 12 }}>
             <ToolCard title="Messages" text="Contact BIMED Admin / HR and read replies." href="/staff/messages" />
             <ToolCard title="Rota" text="View assigned shifts and request available work." href="/staff/rota" />
