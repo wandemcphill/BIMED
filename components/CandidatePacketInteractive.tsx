@@ -177,12 +177,6 @@ export default function CandidatePacketInteractive({ token, slug, title, descrip
   }
 
   if (mode === 'checklist') {
-    const candidateNow = checklist.filter((item) =>
-      item.audience === 'candidate'
-      && item.stage === 'now'
-      && !(item.key === 'registration' && !registrationEvidenceRequired)
-    );
-    const allCandidateNowDone = candidateNow.length > 0 && candidateNow.every((item) => checked.has(item.key));
     return <PacketShell title={title} description={description} completed={complete} saved={saved} error={error} message={message}>
       <div style={{ display: 'grid', gap: 12 }}>
         {checklist.map((item) => item.audience === 'bimed' || item.stage === 'upcoming'
