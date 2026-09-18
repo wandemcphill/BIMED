@@ -46,6 +46,10 @@ function ActivateForm() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.code === 'already_activated') {
+          router.replace('/staff/login?email=' + encodeURIComponent(email));
+          return;
+        }
         setError(data.error || 'Activation failed.');
         setErrorCode(data.code || '');
         return;
