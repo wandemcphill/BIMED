@@ -15,14 +15,37 @@ function formatTime(value: string) { const date = new Date(value); if (Number.is
 function initials(name: string) { return name.split(' ').map((part) => part[0]).filter(Boolean).slice(0, 2).join('').toUpperCase(); }
 
 export default function StaffDashboard() {
-  const router = useRouter(); const [staff, setStaff] = useState<Staff | null>(null); const [shifts, setShifts] = useState<Shift[]>([]); const [requests, setRequests] = useState<any[]>([]); const [payslips, setPayslips] = useState<Payslip[]>([]); const [notifications, setNotifications] = useState<Notice[]>([]); const [tab, setTab] = useState<Tab>('overview'); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [photoBusy, setPhotoBusy] = useState(false); const [photoFailed, setPhotoFailed] = useState(false); const [pps, setPps] = useState(''); const [address, setAddress] = useState(''); const [phone, setPhone] = useState('');
+  const router = useRouter(); const [staff, setStaff] = useState<Staff | null>(null); const [shifts, setShifts] = useState<Shift[]>([]); const [requests, setRequests] = useState<any[]>([]); const [payslips, setPayslips] = useState<Payslip[]>([]); const [notifications, setNotifications] = useState<Notice[]>([]); const [onboarding, setOnboarding] = useState<any>(null); const [permitSummary, setPermitSummary] = useState<any>(null); const [tab, setTab] = useState<Tab>('overview'); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [photoBusy, setPhotoBusy] = useState(false); const [photoFailed, setPhotoFailed] = useState(false); const [pps, setPps] = useState(''); const [address, setAddress] = useState(''); const [phone, setPhone] = useState('');
 
   async function load() {
-    setError(''); const [meResponse, rotaResponse, payResponse, noticeResponse] = await Promise.all([fetch('/api/staff/me'), fetch('/api/staff/rota'), fetch('/api/staff/payslips'), fetch('/api/staff/notifications')]);
+    setError('');
+    const [meResponse, rotaResponse, payResponse, noticeResponse] = await Promise.all([
+      fetch('/api/staff/me'),
+      fetch('/api/staff/rota'),
+      fetch('/api/staff/payslips'),
+      fetch('/api/staff/notifications'),
+    ]);
     if (meResponse.status === 401) { router.replace('/staff/login'); return; }
     const [me, rota, pay, notice] = await Promise.all([meResponse.json(), rotaResponse.json(), payResponse.json(), noticeResponse.json()]);
     if (!meResponse.ok) { setError(me.error || 'Unable to load your BIMED profile.'); return; }
     setStaff(me.staff); setPhotoFailed(false); setPps(me.staff.pps_number || ''); setAddress(me.staff.address_line_1 || ''); setPhone(me.staff.phone || ''); setShifts(rota.shifts || []); setRequests(rota.requests || []); setPayslips(pay.payslips || []); setNotifications(notice.notifications || []);
+
+    if (me.staff.application_id) {
+      const [onboardingResponse, permitResponse] = await Promise.all([
+        fetch('/api/staff/onboarding', { cache: 'no-store' }),
+        me.staff.status === 'pre_arrival' ? fetch('/api/staff/permit', { cache: 'no-store' }) : Promise.resolve(null),
+      ]);
+      const onboardingData = await onboardingResponse.json().catch(() => null);
+      setOnboarding(onboardingResponse.ok ? onboardingData : null);
+      if (permitResponse) {
+        const permitData = await permitResponse.json().catch(() => null);
+        setPermitSummary(permitResponse.ok ? permitData : null);
+      } else {
+        setPermitSummary(null);
+      }
+    } else {
+      setOnboarding(null); setPermitSummary(null);
+    }
   }
   useEffect(() => { void load(); }, []);
   const unreadCount = useMemo(() => notifications.filter((notice) => !notice.read_at).length, [notifications]);
@@ -33,7 +56,28 @@ export default function StaffDashboard() {
   async function logout() { await fetch('/api/staff/auth/logout', { method: 'POST' }); router.replace('/staff/login'); }
 
   if (!staff) return <main style={{ padding: 40, fontFamily: 'system-ui' }}>{error || 'Loading BIMED Staff Portal…'}</main>;
-  const name = staff.preferred_name || staff.full_name; const isIntake = Boolean(staff.application_id); const sourceLabel = isIntake ? 'Recruitment intake' : 'Internal BIMED staff';
+  const name = staff.preferred_name || staff.full_name;
+  const isIntake = Boolean(staff.application_id);
+  const sourceLabel = isIntake ? 'Recruitment intake' : 'Internal BIMED staff';
+  const onboardingProgress = Number(onboarding?.progress || 0);
+  const permitReady = Boolean(permitSummary?.accommodationReady);
+  const permitAcknowledged = Boolean(permitSummary?.permit?.accommodation_terms_acknowledged_at);
+  const permitCancellationPending = Boolean(permitSummary?.permit?.cancellation_requested_at && !permitSummary?.permit?.cancellation_finalized_at);
+  const permitComplete = permitReady || ['approved', 'approved_by_authority'].includes(permitSummary?.permit?.permit_decision || '');
+  const onboardingStageCount = isIntake ? 3 : 0;
+  const onboardingStageComplete = isIntake ? [permitAcknowledged, onboardingProgress >= 100, permitComplete].filter(Boolean).length : 0;
+  const overallProgress = isIntake ? Math.round((onboardingStageComplete / onboardingStageCount) * 100) : 100;
+  const nextAction = isIntake
+    ? permitCancellationPending
+      ? { title: 'Cancellation pending', text: 'Review the 24-hour reversal window in Employment Permit & Sponsorship.', href: '/staff/permit', label: 'Review cancellation' }
+      : !permitAcknowledged
+        ? { title: 'Choose your accommodation arrangement', text: 'Select the accommodation plan and permit submission route in your sponsorship workspace.', href: '/staff/permit', label: 'Review accommodation' }
+        : onboardingProgress < 100
+          ? { title: 'BIMED verification is still in progress', text: 'Check your recruitment-linked onboarding items and their current status.', href: '/staff/onboarding', label: 'View onboarding' }
+          : !permitComplete
+            ? { title: 'Review permit and sponsorship progress', text: 'Your accommodation choice is recorded. Check the current permit and sponsorship status.', href: '/staff/permit', label: 'Open permit workspace' }
+            : { title: 'Keep your relocation details ready', text: 'Review travel, arrival and first-month information before your move.', href: '/staff/relocation', label: 'Open relocation guide' }
+    : { title: 'Your BIMED workspace is ready', text: 'Use the dashboard shortcuts to manage your rota, profile, messages and payslips.', href: '/staff/messages', label: 'Open messages' };
 
   return (
     <main style={{ minHeight: '100vh', background: '#f4f7fb', color: '#102a43', fontFamily: 'system-ui' }}>
@@ -52,23 +96,29 @@ export default function StaffDashboard() {
           </section>
 
           <section style={{ ...card, marginTop: 18, background: 'linear-gradient(135deg,#ffffff 0%,#f7fcfc 100%)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ color: '#0f766e', fontSize: 12, fontWeight: 900, letterSpacing: 1.2 }}>NEXT STEPS</div>
-                <h2 style={{ margin: '4px 0 6px' }}>Your onboarding workspace</h2>
-                <p style={{ margin: 0, color: '#627d98', lineHeight: 1.55 }}>
-                  Keep the important recruitment and workforce actions in one place.
-                </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ color: '#0f766e', fontSize: 12, fontWeight: 900, letterSpacing: 1.2 }}>YOUR NEXT ACTION</div>
+                <h2 style={{ margin: '4px 0 6px' }}>{nextAction.title}</h2>
+                <p style={{ margin: 0, color: '#627d98', lineHeight: 1.55, maxWidth: 760 }}>{nextAction.text}</p>
+                <a href={nextAction.href} style={{ display: 'inline-flex', marginTop: 14, padding: '10px 14px', borderRadius: 10, background: '#0f766e', color: '#fff', fontWeight: 900, textDecoration: 'none' }}>{nextAction.label} →</a>
               </div>
+              <div style={{ minWidth: 150, textAlign: 'right' }}>
+                <div style={{ color: '#627d98', fontSize: 12 }}>Onboarding progress</div>
+                <div style={{ fontSize: 38, lineHeight: 1, fontWeight: 950, marginTop: 6, color: '#102a43' }}>{overallProgress}%</div>
+              </div>
+            </div>
+            <div style={{ marginTop: 18, height: 10, background: '#e6eef1', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ width: `${overallProgress}%`, height: '100%', background: 'linear-gradient(90deg,#0f766e,#1aa69d)', borderRadius: 999, transition: 'width .25s ease' }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginTop: 16 }}>
               {[
-                ['Employment permit', 'Review sponsorship, accommodation and permit steps.', '/staff/permit'],
-                ['Relocation', 'Track your arrival, travel and first-month preparation.', '/staff/relocation'],
-                ['Onboarding', 'See outstanding recruitment-linked readiness items.', '/staff/onboarding'],
-                ['Messages', 'Contact BIMED Admin / HR and follow replies.', '/staff/messages'],
+                ['Employment permit', permitComplete ? 'Progress recorded' : permitAcknowledged ? 'Arrangement selected' : 'Action required', '/staff/permit'],
+                ['Onboarding checks', onboardingProgress >= 100 ? 'Complete' : `${onboardingProgress}% complete`, '/staff/onboarding'],
+                ['Relocation', 'Guide available', '/staff/relocation'],
+                ['Messages', `${unreadCount} unread`, '/staff/messages'],
               ].map(([title, text, href]) => (
-                <a key={href} href={href} style={{ padding: 14, border: '1px solid #dce8ea', borderRadius: 14, background: '#fff', textDecoration: 'none', color: '#102a43', display: 'block', minHeight: 124 }}>
+                <a key={href} href={href} style={{ padding: 14, border: '1px solid #dce8ea', borderRadius: 14, background: '#fff', textDecoration: 'none', color: '#102a43', display: 'block', minHeight: 112 }}>
                   <div style={{ fontWeight: 900, fontSize: 15 }}>{title}</div>
                   <div style={{ marginTop: 7, fontSize: 12, color: '#627d98', lineHeight: 1.5 }}>{text}</div>
                   <div style={{ marginTop: 12, color: '#0f766e', fontSize: 12, fontWeight: 900 }}>Open →</div>
