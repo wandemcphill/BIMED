@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/admin-session';
 import { db } from '@/lib/db';
-import { createStaffAudit } from '@/lib/staff';
+import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 import { ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl, makeReceiptNumber, sendAccommodationEmail } from '@/lib/accommodation-billing';
 import { receiptHtml } from '@/lib/accommodation-documents';
 import { recordAccommodationPaymentAtomic } from '@/lib/staff-portal-workflow';
