@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStaffSession } from '@/lib/staff-auth';
 import { db } from '@/lib/db';
+import { issueAccommodationInvoice } from '@/lib/accommodation-invoice-service';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 import {
   appUrl,
