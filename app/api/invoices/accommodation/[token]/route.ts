@@ -100,6 +100,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       console.error(JSON.stringify({ level: 'error', event: 'payment_reported_admin_email_failed', invoice_id: updated.id, reason: error instanceof Error ? error.message : String(error) }));
     }
 
+    await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'payment_reported', updated_at: now }).eq('id', permit.id);
+
     await createStaffNotification(client, {
       staffId: staff.id,
       category: 'billing',
@@ -158,6 +160,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   } catch (error) {
     console.error(JSON.stringify({ level: 'error', event: 'invoice_cancellation_admin_email_failed', invoice_id: updated.id, reason: error instanceof Error ? error.message : String(error) }));
   }
+
+  await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'cancellation_requested', updated_at: now }).eq('id', permit.id);
 
   await createStaffNotification(client, {
     staffId: staff.id,
