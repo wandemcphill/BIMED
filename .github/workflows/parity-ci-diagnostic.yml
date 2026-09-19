@@ -3,11 +3,11 @@ name: Parity CI Diagnostic
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [diag/parity-ci-20260919]
 
 permissions:
-  contents: write
+  contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   diagnose:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run CI stages and capture output
+      - name: Capture CI diagnostics
         shell: bash
         run: |
           set +e
@@ -26,13 +26,9 @@ jobs:
           run_stage() {
             name="$1"
             shift
-            echo "### $name" >> .ci-diagnostic/summary.md
-            echo "command: $*" >> .ci-diagnostic/summary.md
             "$@" > ".ci-diagnostic/$name.log" 2>&1
             code=$?
-            echo "exit_code=$code" > ".ci-diagnostic/$name.exit"
-            cat ".ci-diagnostic/$name.log" >> .ci-diagnostic/summary.md
-            echo >> .ci-diagnostic/summary.md
+            echo "[$name] exit_code=$code" >> .ci-diagnostic/results.txt
           }
 
           run_stage install npm ci --legacy-peer-deps
@@ -41,26 +37,25 @@ jobs:
           run_stage build npm run build
 
           {
-            echo "# Parity CI diagnostic"
+            echo "Node/npm:"
             cat .ci-diagnostic/environment.txt
             echo
-            cat .ci-diagnostic/summary.md
+            cat .ci-diagnostic/results.txt
+            for f in typecheck test build; do
+              echo
+              echo "===== $f ====="
+              tail -n 120 ".ci-diagnostic/$f.log" 2>/dev/null || true
+            done
           } > .ci-diagnostic/report.md
 
-      - name: Commit diagnostic output
+      - name: Post diagnostic report
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .ci-diagnostic
-          git commit -m "chore(ci): record parity diagnostic output" || exit 0
-          git push origin HEAD:diag/parity-ci-20260919
+          gh pr comment ${{ github.event.pull_request.number }} --body-file .ci-diagnostic/report.md || true
 
-      - name: Fail if a stage failed
+      - name: Preserve exact report in job summary
         if: always()
-        shell: bash
-        run: |
-          for f in .ci-diagnostic/*.exit; do
-            grep -q 'exit_code=0' "$f" || exit 1
-          done
+        run: cat .ci-diagnostic/report.md >> "${GITHUB_STEP_SUMMARY}"
