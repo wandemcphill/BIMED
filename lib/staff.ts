@@ -9,6 +9,7 @@ import {
   PRE_ACCESS_CHECK_KEYS,
 } from './onboarding-readiness';
 import { generateBimedPortalEmail } from './staff-email';
+import { ensureBimedStaffOnboardingPackage } from './staff-onboarding';
 
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
@@ -79,9 +80,11 @@ export async function createStaffFromApplication(
         .select('*')
         .single();
       if (refreshError || !refreshed) throw refreshError || new Error('Unable to refresh the staff activation link.');
+      await ensureBimedStaffOnboardingPackage(client, refreshed.id, application);
       return { staff: refreshed, activationToken };
     }
 
+    await ensureBimedStaffOnboardingPackage(client, existing.id, application);
     return { staff: existing, activationToken: null as string | null };
   }
 
@@ -152,6 +155,8 @@ export async function createStaffFromApplication(
     .eq('application_id', application.id)
     .in('item_key', Array.from(POST_ACCESS_CHECK_KEYS));
   if (postAccessError) throw postAccessError;
+
+  await ensureBimedStaffOnboardingPackage(client, staff.id, application);
 
   await client.from('recruitment_applications').update({
     bimed_id: staff.bimed_id,
