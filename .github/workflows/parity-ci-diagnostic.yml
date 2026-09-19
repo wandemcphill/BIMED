@@ -1,6 +1,8 @@
 name: Parity CI Diagnostic
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [diag/parity-ci-20260919]
 
