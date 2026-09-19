@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { id: applicationId } = await context.params;
   const body = validation.data;
   const client = db();
-  const { data: before } = await client.from('recruitment_applications').select('status').eq('id', applicationId).maybeSingle();
+  const { data: before } = await client.from('recruitment_applications').select('status,email').eq('id', applicationId).maybeSingle();
   const previousStatus = before?.status || null;
 
   let staffIdentity: { bimed_id: string; bimed_email: string; activationUrl: string | null; welcomeEmailSent: boolean } | null = null;
@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       const origin = new URL(request.url).origin;
       let welcomeEmailSent = false;
       if (result.activationToken && body.status === 'Hired') {
-        const welcome = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken, data?.email || undefined);
+        const welcome = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken, before?.email || undefined);
         welcomeEmailSent = welcome.status === 'sent';
       }
       staffIdentity = {
