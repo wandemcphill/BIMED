@@ -66,5 +66,15 @@ export async function submitFlightTravelRequest(input: { client: SupabaseClient;
     if (msg) await input.client.from('recruitment_staff_conversations').update({ last_message_at: msg.created_at, updated_at: msg.created_at }).eq('id', conversation.id);
   }
 
-  return { itinerary: saved, request, message };
+  return {
+    itinerary: saved,
+    transfer,
+    request: {
+      ...request,
+      status: 'travel_request',
+      submitted_at: atomicResult.permit?.flight_request_submitted_at || new Date().toISOString(),
+      booking_status: saved?.booking_status || 'planning',
+    },
+    message,
+  };
 }
