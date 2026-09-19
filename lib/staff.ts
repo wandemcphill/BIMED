@@ -206,31 +206,43 @@ export async function createStaffFromApplication(
 
   const now = new Date().toISOString();
 
-  const { error: preAccessError } = await client
-    .from('recruitment_onboarding_checklist')
-    .update({
-      status: 'completed',
-      completed_at: now,
-      completed_by: 'BIMED recruitment verification',
-      notes: 'Pre-access evidence verified before staff portal access was issued.',
-      updated_at: now,
-    })
-    .eq('application_id', application.id)
-    .in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS));
-  if (preAccessError) throw preAccessError;
+  try {
+    const { error: preAccessError } = await client
+      .from('recruitment_onboarding_checklist')
+      .update({
+        status: 'completed',
+        completed_at: now,
+        completed_by: 'BIMED recruitment verification',
+        notes: 'Pre-access evidence verified before staff portal access was issued.',
+        updated_at: now,
+      })
+      .eq('application_id', application.id)
+      .in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS));
+    if (preAccessError) throw preAccessError;
 
-  const { error: postAccessError } = await client
-    .from('recruitment_onboarding_checklist')
-    .update({
-      status: 'pending',
-      completed_at: null,
-      completed_by: null,
-      notes: null,
-      updated_at: now,
-    })
-    .eq('application_id', application.id)
-    .in('item_key', Array.from(POST_ACCESS_CHECK_KEYS));
-  if (postAccessError) throw postAccessError;
+    const { error: postAccessError } = await client
+      .from('recruitment_onboarding_checklist')
+      .update({
+        status: 'pending',
+        completed_at: null,
+        completed_by: null,
+        notes: null,
+        updated_at: now,
+      })
+      .eq('application_id', application.id)
+      .in('item_key', Array.from(POST_ACCESS_CHECK_KEYS));
+    if (postAccessError) throw postAccessError;
+  } catch (error) {
+    if (!options?.lifecycle) throw error;
+    provisioningWarning = error instanceof Error ? error.message : 'Onboarding checklist state could not be finalized.';
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'staff.post_promotion_checklist_finalize_failed',
+      application_id: applicationId,
+      staff_id: staff.id,
+      reason: provisioningWarning,
+    }));
+  }
 
   try {
     await ensureBimedStaffOnboardingPackage(client, staff.id, application);
