@@ -29,22 +29,27 @@ export async function createSecondInterviewRequest(input: {
   const token = makeToken();
   const expiresAt = new Date(Date.now() + SECOND_INTERVIEW_LINK_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data, error } = await db()
-    .from('recruitment_second_interviews')
-    .insert({
-      application_id: input.applicationId,
-      token_hash: hashToken(token),
-      sent_by: input.sentBy,
-      expires_at: expiresAt,
-    })
-    .select('*')
-    .single();
+  const { data, error } = await db().rpc('bimed_create_second_interview_invitation', {
+    p_application_id: input.applicationId,
+    p_token_hash: hashToken(token),
+    p_sent_by: input.sentBy,
+    p_expires_at: expiresAt,
+  });
 
   if (error || !data) {
+    if (error?.message?.includes('active_second_interview_exists')) {
+      throw new Error('ACTIVE_SECOND_INTERVIEW_EXISTS');
+    }
+    if (error?.message?.includes('application_not_found')) {
+      throw new Error('APPLICATION_NOT_FOUND');
+    }
     throw new Error(error?.message || 'Unable to create second interview request.');
   }
 
-  return { record: data as SecondInterviewRecord, token, link: secondInterviewUrl(token) };
+  const row = (Array.isArray(data) ? data[0] : data) as SecondInterviewRecord | undefined;
+  if (!row?.id) throw new Error('Unable to create second interview request.');
+
+  return { record: row, token, link: secondInterviewUrl(token) };
 }
 
 export async function getSecondInterviewByToken(token: string): Promise<SecondInterviewRecord | null> {
