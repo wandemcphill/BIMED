@@ -86,8 +86,20 @@ export async function createStaffFromApplication(
         p_end_date: BIMED_DEFAULT_END_DATE_ISO,
       });
       if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
-      await ensureBimedStaffOnboardingPackage(client, promotedStaff.id, application);
-      return { staff: promotedStaff, activationToken };
+      let provisioningWarning: string | null = null;
+      try {
+        await ensureBimedStaffOnboardingPackage(client, promotedStaff.id, application);
+      } catch (error) {
+        provisioningWarning = error instanceof Error ? error.message : 'Staff onboarding package could not be completed.';
+        console.error(JSON.stringify({
+          level: 'error',
+          event: 'staff.post_promotion_enrichment_failed',
+          application_id: applicationId,
+          staff_id: promotedStaff.id,
+          reason: provisioningWarning,
+        }));
+      }
+      return { staff: promotedStaff, activationToken, provisioningWarning };
     }
 
     if (application.bimed_id !== existing.bimed_id) {
@@ -177,7 +189,21 @@ export async function createStaffFromApplication(
     staff = result.data;
   }
 
-  await ensureOnboardingChecklist(client, application);
+  let provisioningWarning: string | null = null;
+  try {
+    await ensureOnboardingChecklist(client, application);
+  } catch (error) {
+    if (!options?.lifecycle) throw error;
+    provisioningWarning = error instanceof Error ? error.message : 'Onboarding checklist could not be completed.';
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'staff.post_promotion_checklist_failed',
+      application_id: applicationId,
+      staff_id: staff.id,
+      reason: provisioningWarning,
+    }));
+  }
+
   const now = new Date().toISOString();
 
   const { error: preAccessError } = await client
@@ -206,7 +232,19 @@ export async function createStaffFromApplication(
     .in('item_key', Array.from(POST_ACCESS_CHECK_KEYS));
   if (postAccessError) throw postAccessError;
 
-  await ensureBimedStaffOnboardingPackage(client, staff.id, application);
+  try {
+    await ensureBimedStaffOnboardingPackage(client, staff.id, application);
+  } catch (error) {
+    if (!options?.lifecycle) throw error;
+    provisioningWarning = error instanceof Error ? error.message : 'Staff onboarding package could not be completed.';
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'staff.post_promotion_package_failed',
+      application_id: applicationId,
+      staff_id: staff.id,
+      reason: provisioningWarning,
+    }));
+  }
 
   await client.from('recruitment_applications').update({
     bimed_id: staff.bimed_id,
@@ -244,7 +282,7 @@ export async function createStaffFromApplication(
     actionUrl: effectiveStatus === 'pre_arrival' ? '/staff/permit' : '/staff',
   });
 
-  return { staff, activationToken };
+  return { staff, activationToken, provisioningWarning };
 }
 
 export async function createStaffNotification(
