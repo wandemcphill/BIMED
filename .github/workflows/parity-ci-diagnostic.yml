@@ -1,0 +1,101 @@
+name: Parity CI Diagnostic
+
+on:
+  push:
+    branches: [diag/parity-ci-20260919]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Environment
+        run: |
+          mkdir -p diagnostic
+          node --version | tee diagnostic/node.txt
+          npm --version | tee diagnostic/npm.txt
+
+      - name: Install
+        shell: bash
+        run: |
+          set +e
+          npm ci --legacy-peer-deps > diagnostic/install.log 2>&1
+          code=$?
+          echo "exit_code=$code" | tee diagnostic/install.exit
+          exit 0
+
+      - name: Typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > diagnostic/typecheck.log 2>&1
+          code=$?
+          echo "exit_code=$code" | tee diagnostic/typecheck.exit
+          exit 0
+
+      - name: Test
+        shell: bash
+        run: |
+          set +e
+          npm test > diagnostic/test.log 2>&1
+          code=$?
+          echo "exit_code=$code" | tee diagnostic/test.exit
+          exit 0
+
+      - name: Build
+        shell: bash
+        run: |
+          set +e
+          npm run build > diagnostic/build.log 2>&1
+          code=$?
+          echo "exit_code=$code" | tee diagnostic/build.exit
+          exit 0
+
+      - name: Summary
+        run: |
+          {
+            echo "## Diagnostic summary"
+            echo
+            for f in diagnostic/*.exit; do
+              echo "`$f`"
+              cat "$f"
+            done
+            echo
+            echo "### Typecheck tail"
+            tail -n 80 diagnostic/typecheck.log || true
+            echo
+            echo "### Test tail"
+            tail -n 80 diagnostic/test.log || true
+            echo
+            echo "### Build tail"
+            tail -n 80 diagnostic/build.log || true
+          } > diagnostic/summary.md
+          cat diagnostic/summary.md
+
+      - name: Upload diagnostic artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-ci-diagnostic
+          path: diagnostic/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Fail if any CI stage failed
+        shell: bash
+        run: |
+          for f in diagnostic/*.exit; do
+            if grep -q 'exit_code=0' "$f"; then
+              continue
+            fi
+            cat "$f"
+            exit 1
+          done
