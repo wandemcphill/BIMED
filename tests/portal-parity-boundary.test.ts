@@ -29,6 +29,8 @@ describe('BIMED portal parity boundary', () => {
 
     expect(readFileSync('app/api/staff/auth/password-reset/route.ts', 'utf8')).toContain('staff-password-reset');
     expect(readFileSync('app/staff/password-reset/page.tsx', 'utf8')).toContain('Send password reset link');
+    expect(readFileSync('app/staff/documents/page.tsx', 'utf8')).toContain('My Documents');
+    expect(readFileSync('app/staff/page.tsx', 'utf8')).toContain("'/staff/documents'");
 
     const requiredFiles = [
       'app/api/staff/messages/route.ts',
