@@ -110,12 +110,20 @@ export async function POST(request: NextRequest) {
   if (body.action === 'request_leave') {
     if (!body.startDate || !body.endDate) return NextResponse.json({ error: 'startDate and endDate are required.' }, { status: 400 });
     if (body.endDate < body.startDate) return NextResponse.json({ error: 'End date cannot be before start date.' }, { status: 400 });
-    const { data: overlap } = await client.from('recruitment_leave_requests').select('id').eq('staff_id', session.staff_id).in('status', ['pending', 'approved']).lte('start_date', body.endDate).gte('end_date', body.startDate).limit(1);
-    if (overlap?.length) return NextResponse.json({ error: 'You already have a pending or approved leave request overlapping these dates.' }, { status: 409 });
-    const { data, error } = await client.from('recruitment_leave_requests').insert({ staff_id: session.staff_id, start_date: body.startDate, end_date: body.endDate, leave_type: (body.leaveType || 'annual').trim(), reason: (body.reason || '').trim() || null }).select('*').single();
-    if (error) return NextResponse.json({ error: 'Unable to submit leave request.' }, { status: 500 });
-    await createStaffAudit(client, { staffId: session.staff_id, actor: session.email, eventType: 'leave_requested', metadata: { leave_request_id: data.id, start_date: body.startDate, end_date: body.endDate, leave_type: data.leave_type } });
-    return NextResponse.json({ leaveRequest: data }, { status: 201 });
+    const { data: atomicResult, error } = await client.rpc('bimed_request_staff_leave', {
+      p_staff_id: session.staff_id,
+      p_actor: session.email,
+      p_start_date: body.startDate,
+      p_end_date: body.endDate,
+      p_leave_type: (body.leaveType || 'annual').trim(),
+      p_reason: (body.reason || '').trim() || null,
+    });
+    if (error || !atomicResult?.leave_request) {
+      const message = error?.message || 'Unable to submit leave request.';
+      const status = message.includes('LEAVE_OVERLAP') ? 409 : message.includes('INVALID_LEAVE_DATE_RANGE') ? 400 : message.includes('STAFF_NOT_ELIGIBLE_FOR_LEAVE') ? 403 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
+    return NextResponse.json({ leaveRequest: atomicResult.leave_request }, { status: 201 });
   }
 
   if (body.action === 'cancel_leave') {
