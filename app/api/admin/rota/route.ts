@@ -107,17 +107,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ request: result || null });
     }
 
-    const { data: updated, error } = await client.from('recruitment_shift_requests').update({ status: approved ? 'approved' : 'declined', responded_by: session.email, responded_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', body.requestId).eq('status', 'pending').select('*').single();
-    if (error || !updated) return NextResponse.json({ error: 'Unable to respond to request.' }, { status: 500 });
-    if (approved && requestRow.request_type === 'shift') {
-      const { data: assigned } = await client.from('recruitment_workforce_shifts').update({ staff_id: requestRow.staff_id, status: 'assigned', assigned_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', requestRow.shift_id).eq('status', 'available').select('*').maybeSingle();
-      if (!assigned) return NextResponse.json({ error: 'The shift is no longer available.' }, { status: 409 });
+    if (!['shift', 'cancellation'].includes(requestRow.request_type)) {
+      return NextResponse.json({ error: 'Unsupported shift request type.' }, { status: 409 });
     }
-    if (approved && requestRow.request_type === 'cancellation') {
-      await client.from('recruitment_workforce_shifts').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancellation_reason: requestRow.reason || 'Cancellation approved by BIMED.', updated_at: new Date().toISOString() }).eq('id', requestRow.shift_id).eq('staff_id', requestRow.staff_id);
+
+    const { data: result, error } = await client.rpc('bimed_resolve_staff_shift_request', {
+      p_request_id: body.requestId,
+      p_actor: session.email,
+      p_approve: approved,
+    });
+    if (error || !result) {
+      const message = error?.message || 'Unable to resolve request.';
+      const code = message.includes('SHIFT_NO_LONGER_AVAILABLE') || message.includes('SHIFT_ALREADY_STARTED') || message.includes('SHIFT_NOT_CANCELLABLE') || message.includes('STAFF_SHIFT_INELIGIBLE') ? 409 : 500;
+      return NextResponse.json({ error: message }, { status: code });
     }
-    await createStaffNotification(client, { staffId: requestRow.staff_id, category: 'rota', title: approved ? 'Shift request approved' : 'Shift request declined', body: approved ? (requestRow.request_type === 'cancellation' ? 'Your shift cancellation request has been approved.' : 'Your shift request has been approved and added to your rota.') : 'Your shift request has been declined.', actionUrl: '/staff/rota' });
-    await createStaffAudit(client, { staffId: requestRow.staff_id, actor: session.email, eventType: `shift_request_${approved ? 'approved' : 'declined'}`, metadata: { request_id: body.requestId, request_type: requestRow.request_type } });
+
+    const updated = result.request;
+    await createStaffNotification(client, {
+      staffId: requestRow.staff_id,
+      category: 'rota',
+      title: approved ? 'Shift request approved' : 'Shift request declined',
+      body: approved
+        ? (requestRow.request_type === 'cancellation' ? 'Your shift cancellation request has been approved.' : 'Your shift request has been approved and added to your rota.')
+        : 'Your shift request has been declined.',
+      actionUrl: '/staff/rota',
+    });
+    await createStaffAudit(client, {
+      staffId: requestRow.staff_id,
+      actor: session.email,
+      eventType: `shift_request_${approved ? 'approved' : 'declined'}`,
+      metadata: { request_id: body.requestId, request_type: requestRow.request_type, atomic_workflow: true },
+    });
     return NextResponse.json({ request: updated });
   }
 
