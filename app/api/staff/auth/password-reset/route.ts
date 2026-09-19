@@ -124,8 +124,19 @@ export async function PUT(request: NextRequest) {
   }
 
   const client = db();
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const tokenLimit = await checkRateLimit({
+    key: `staff-password-reset-token:${tokenHash}`,
+    limit: 5,
+    windowMs: 15 * 60 * 1000,
+    request,
+  });
+  if (!tokenLimit.allowed) {
+    return NextResponse.json({ error: 'Too many password reset attempts. Please request a new reset link.' }, { status: 429 });
+  }
+
   const result = await client.rpc('bimed_complete_staff_password_reset', {
-    p_token_hash: crypto.createHash('sha256').update(token).digest('hex'),
+    p_token_hash: tokenHash,
     p_password_hash: hashStaffPassword(password),
   });
 
