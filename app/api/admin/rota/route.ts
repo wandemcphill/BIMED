@@ -144,16 +144,22 @@ export async function POST(request: NextRequest) {
   if (body.action === 'leave_response') {
     if (!body.requestId || !body.decision) return NextResponse.json({ error: 'requestId and decision are required.' }, { status: 400 });
     const approved = body.decision === 'approve';
-    const { data: leave, error: fetchError } = await client.from('recruitment_leave_requests').select('*').eq('id', body.requestId).eq('status', 'pending').single();
-    if (fetchError || !leave) return NextResponse.json({ error: 'This leave request is no longer pending.' }, { status: 409 });
-    if (approved) {
-      const { data: overlap } = await client.from('recruitment_leave_requests').select('id').eq('staff_id', leave.staff_id).eq('status', 'approved').neq('id', leave.id).lte('start_date', leave.end_date).gte('end_date', leave.start_date).limit(1);
-      if (overlap?.length) return NextResponse.json({ error: 'This leave overlaps an existing approved leave period.' }, { status: 409 });
+    const { data: currentLeave, error: fetchError } = await client.from('recruitment_leave_requests').select('*').eq('id', body.requestId).eq('status', 'pending').single();
+    if (fetchError || !currentLeave) return NextResponse.json({ error: 'This leave request is no longer pending.' }, { status: 409 });
+
+    const { data: atomicResult, error } = await client.rpc('bimed_resolve_staff_leave_request', {
+      p_request_id: body.requestId,
+      p_actor: session.email,
+      p_approve: approved,
+    });
+    if (error || !atomicResult?.leave_request) {
+      const message = error?.message || 'Unable to resolve leave request.';
+      const status = message.includes('LEAVE_OVERLAP') ? 409 : message.includes('LEAVE_REQUEST_NOT_PENDING') ? 409 : 500;
+      return NextResponse.json({ error: message }, { status });
     }
-    const { data: updated, error } = await client.from('recruitment_leave_requests').update({ status: approved ? 'approved' : 'declined', responded_by: session.email, responded_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', body.requestId).eq('status', 'pending').select('*').single();
-    if (error || !updated) return NextResponse.json({ error: 'Unable to resolve leave request.' }, { status: 500 });
-    await createStaffNotification(client, { staffId: leave.staff_id, category: 'leave', title: approved ? 'Leave request approved' : 'Leave request declined', body: approved ? `Your ${leave.leave_type} leave request has been approved.` : `Your ${leave.leave_type} leave request has been declined.`, actionUrl: '/staff/rota' });
-    await createStaffAudit(client, { staffId: leave.staff_id, actor: session.email, eventType: `leave_request_${approved ? 'approved' : 'declined'}`, metadata: { request_id: body.requestId, start_date: leave.start_date, end_date: leave.end_date } });
+
+    const updated = atomicResult.leave_request;
+    await createStaffNotification(client, { staffId: currentLeave.staff_id, category: 'leave', title: approved ? 'Leave request approved' : 'Leave request declined', body: approved ? `Your ${currentLeave.leave_type} leave request has been approved.` : `Your ${currentLeave.leave_type} leave request has been declined.`, actionUrl: '/staff/rota' });
     return NextResponse.json({ leaveRequest: updated });
   }
 
