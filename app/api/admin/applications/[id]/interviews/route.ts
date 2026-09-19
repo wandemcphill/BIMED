@@ -4,6 +4,7 @@ import { getAdminSession } from '@/lib/admin-session';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { safeUrl, sendInterviewCancelledEmails, sendInterviewInvitationEmails, sendInterviewRescheduledEmails } from '@/lib/email';
+import { BimedLifecycleError, scheduleBimedInterview } from '@/lib/bimed-lifecycle';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -67,23 +68,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const application = await loadApplication(client, applicationId);
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
 
-    const { data: interview, error: insertError } = await client.from('recruitment_interviews').insert({
-      application_id: applicationId,
-      scheduled_at: scheduledAt.iso,
-      duration_minutes: parseDuration(body.duration_minutes),
+    const interview = await scheduleBimedInterview(client, {
+      applicationId,
+      scheduledAt: scheduledAt.iso,
+      durationMinutes: parseDuration(body.duration_minutes),
       location: trimText(body.location),
-      meeting_link: meetingLinkRaw,
+      meetingLink: meetingLinkRaw,
       interviewer: trimText(body.interviewer, 200),
-      candidate_instructions: trimText(body.candidate_instructions, 1000),
-      status: 'Scheduled',
-    }).select('*').single();
-    if (insertError) throw insertError;
-
-    if (application.status !== 'Interview') await client.from('recruitment_applications').update({ status: 'Interview', updated_at: new Date().toISOString() }).eq('id', applicationId);
-    await recordRecruitmentAudit(client, { applicationId, eventType: 'interview_scheduled', actor: session.email, metadata: { interview_id: interview.id, scheduled_at: interview.scheduled_at } });
+      candidateInstructions: trimText(body.candidate_instructions, 1000),
+      actor: session.email,
+    });
     const emails = await sendInterviewInvitationEmails({ application, interview }, client);
     return NextResponse.json({ interview, email: emails.candidate });
   } catch (error) {
+    if (error instanceof BimedLifecycleError) {
+      return NextResponse.json({ error: error.message }, { status: error.code === 'APPLICATION_NOT_FOUND' ? 404 : 409 });
+    }
     console.error(JSON.stringify({ level: 'error', event: 'interview.schedule_failed', application_id: applicationId, reason: error instanceof Error ? error.message : 'unknown' }));
     return NextResponse.json({ error: 'Unable to schedule the interview right now.' }, { status: 500 });
   }
