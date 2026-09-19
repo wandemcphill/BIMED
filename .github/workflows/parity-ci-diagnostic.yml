@@ -7,7 +7,7 @@ on:
     branches: [diag/parity-ci-20260919]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   diagnose:
@@ -15,89 +15,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Environment
-        run: |
-          mkdir -p diagnostic
-          node --version | tee diagnostic/node.txt
-          npm --version | tee diagnostic/npm.txt
-
-      - name: Install
+      - name: Run CI stages and capture output
         shell: bash
         run: |
           set +e
-          npm ci --legacy-peer-deps > diagnostic/install.log 2>&1
-          code=$?
-          echo "exit_code=$code" | tee diagnostic/install.exit
-          exit 0
+          mkdir -p .ci-diagnostic
+          node --version > .ci-diagnostic/environment.txt 2>&1
+          npm --version >> .ci-diagnostic/environment.txt 2>&1
 
-      - name: Typecheck
-        shell: bash
-        run: |
-          set +e
-          npm run typecheck > diagnostic/typecheck.log 2>&1
-          code=$?
-          echo "exit_code=$code" | tee diagnostic/typecheck.exit
-          exit 0
+          run_stage() {
+            name="$1"
+            shift
+            echo "### $name" >> .ci-diagnostic/summary.md
+            echo "command: $*" >> .ci-diagnostic/summary.md
+            "$@" > ".ci-diagnostic/$name.log" 2>&1
+            code=$?
+            echo "exit_code=$code" > ".ci-diagnostic/$name.exit"
+            cat ".ci-diagnostic/$name.log" >> .ci-diagnostic/summary.md
+            echo >> .ci-diagnostic/summary.md
+          }
 
-      - name: Test
-        shell: bash
-        run: |
-          set +e
-          npm test > diagnostic/test.log 2>&1
-          code=$?
-          echo "exit_code=$code" | tee diagnostic/test.exit
-          exit 0
+          run_stage install npm ci --legacy-peer-deps
+          run_stage typecheck npm run typecheck
+          run_stage test npm test
+          run_stage build npm run build
 
-      - name: Build
-        shell: bash
-        run: |
-          set +e
-          npm run build > diagnostic/build.log 2>&1
-          code=$?
-          echo "exit_code=$code" | tee diagnostic/build.exit
-          exit 0
-
-      - name: Summary
-        run: |
           {
-            echo "## Diagnostic summary"
+            echo "# Parity CI diagnostic"
+            cat .ci-diagnostic/environment.txt
             echo
-            for f in diagnostic/*.exit; do
-              echo "`$f`"
-              cat "$f"
-            done
-            echo
-            echo "### Typecheck tail"
-            tail -n 80 diagnostic/typecheck.log || true
-            echo
-            echo "### Test tail"
-            tail -n 80 diagnostic/test.log || true
-            echo
-            echo "### Build tail"
-            tail -n 80 diagnostic/build.log || true
-          } > diagnostic/summary.md
-          cat diagnostic/summary.md
+            cat .ci-diagnostic/summary.md
+          } > .ci-diagnostic/report.md
 
-      - name: Upload diagnostic artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: parity-ci-diagnostic
-          path: diagnostic/
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Fail if any CI stage failed
+      - name: Commit diagnostic output
+        if: always()
         shell: bash
         run: |
-          for f in diagnostic/*.exit; do
-            if grep -q 'exit_code=0' "$f"; then
-              continue
-            fi
-            cat "$f"
-            exit 1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .ci-diagnostic
+          git commit -m "chore(ci): record parity diagnostic output" || exit 0
+          git push origin HEAD:diag/parity-ci-20260919
+
+      - name: Fail if a stage failed
+        if: always()
+        shell: bash
+        run: |
+          for f in .ci-diagnostic/*.exit; do
+            grep -q 'exit_code=0' "$f" || exit 1
           done
