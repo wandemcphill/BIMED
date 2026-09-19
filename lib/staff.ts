@@ -28,7 +28,14 @@ function mapResidentialAddress(address: string | null | undefined) {
 export async function createStaffFromApplication(
   client: SupabaseClient,
   applicationId: string,
-  options?: { refreshActivation?: boolean },
+  options?: {
+    refreshActivation?: boolean;
+    lifecycle?: {
+      toStatus: 'Onboarding' | 'Hired';
+      actor: string;
+      note?: string | null;
+    };
+  },
 ) {
   const { data: application, error: applicationError } = await client
     .from('recruitment_applications')
@@ -63,6 +70,26 @@ export async function createStaffFromApplication(
     .eq('application_id', applicationId)
     .maybeSingle();
   if (existing) {
+    if (options?.lifecycle) {
+      const activationToken = options.refreshActivation && !existing.activated_at ? createActivationToken() : null;
+      const { data: promotedStaff, error: promotionError } = await client.rpc('bimed_promote_application_to_staff', {
+        p_application_id: applicationId,
+        p_to_status: options.lifecycle.toStatus,
+        p_actor: options.lifecycle.actor,
+        p_note: options.lifecycle.note || null,
+        p_expected_role_slug: expectedRoleSlug,
+        p_portal_email: null,
+        p_activation_token_hash: activationToken ? hashActivationToken(activationToken) : null,
+        p_activation_expires_at: activationToken ? activationExpiresAt() : null,
+        p_refresh_activation: Boolean(activationToken),
+        p_start_date: BIMED_DEFAULT_START_DATE_ISO,
+        p_end_date: BIMED_DEFAULT_END_DATE_ISO,
+      });
+      if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
+      await ensureBimedStaffOnboardingPackage(client, promotedStaff.id, application);
+      return { staff: promotedStaff, activationToken };
+    }
+
     if (application.bimed_id !== existing.bimed_id) {
       await client.from('recruitment_applications').update({ bimed_id: existing.bimed_id, updated_at: new Date().toISOString() }).eq('id', applicationId);
     }
@@ -102,30 +129,51 @@ export async function createStaffFromApplication(
   const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
   const portalEmail = await generateBimedPortalEmail(client, effectiveName);
 
-  const { data: staff, error } = await client
-    .from('recruitment_staff')
-    .insert({
-      application_id: application.id,
-      full_name: effectiveName,
-      preferred_name: application.preferred_name,
-      email: portalEmail,
-      phone: application.phone,
-      date_of_birth: application.date_of_birth,
-      nationality: application.nationality,
-      role: application.role_applied,
-      job_title: application.role_applied,
-      employment_type: application.employment_type,
-      employment_start_date: effectiveStartDate,
-      employment_end_date: effectiveEndDate,
-      country: 'Ireland',
-      status: effectiveStatus,
-      ...mapResidentialAddress(effectiveAddress),
-      activation_token_hash: hashActivationToken(activationToken),
-      activation_expires_at: activationExpiresAt(),
-    })
-    .select('*')
-    .single();
-  if (error || !staff) throw error || new Error('Unable to create staff profile.');
+  let staff = null as Awaited<ReturnType<SupabaseClient['from']>> | any;
+
+  if (options?.lifecycle) {
+    const { data: promotedStaff, error: promotionError } = await client.rpc('bimed_promote_application_to_staff', {
+      p_application_id: applicationId,
+      p_to_status: options.lifecycle.toStatus,
+      p_actor: options.lifecycle.actor,
+      p_note: options.lifecycle.note || null,
+      p_expected_role_slug: expectedRoleSlug,
+      p_portal_email: portalEmail,
+      p_activation_token_hash: hashActivationToken(activationToken),
+      p_activation_expires_at: activationExpiresAt(),
+      p_refresh_activation: false,
+      p_start_date: effectiveStartDate,
+      p_end_date: effectiveEndDate,
+    });
+    if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
+    staff = promotedStaff;
+  } else {
+    const result = await client
+      .from('recruitment_staff')
+      .insert({
+        application_id: application.id,
+        full_name: effectiveName,
+        preferred_name: application.preferred_name,
+        email: portalEmail,
+        phone: application.phone,
+        date_of_birth: application.date_of_birth,
+        nationality: application.nationality,
+        role: application.role_applied,
+        job_title: application.role_applied,
+        employment_type: application.employment_type,
+        employment_start_date: effectiveStartDate,
+        employment_end_date: effectiveEndDate,
+        country: 'Ireland',
+        status: effectiveStatus,
+        ...mapResidentialAddress(effectiveAddress),
+        activation_token_hash: hashActivationToken(activationToken),
+        activation_expires_at: activationExpiresAt(),
+      })
+      .select('*')
+      .single();
+    if (result.error || !result.data) throw result.error || new Error('Unable to create staff profile.');
+    staff = result.data;
+  }
 
   await ensureOnboardingChecklist(client, application);
   const now = new Date().toISOString();
