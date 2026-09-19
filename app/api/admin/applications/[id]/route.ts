@@ -162,11 +162,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     metadata: { status: body.status || data.status, previous_status: previousStatus, notes_updated: body.notes !== undefined },
   });
 
-  if (statusChanges && body.status === 'Hired') {
-    // Hired has an activation identity by contract with the lifecycle gate above.
-    staffProvisioningWarning = null;
-  }
-
   let statusEmail = null;
   if (body.status && previousStatus && body.status !== previousStatus) {
     try {
