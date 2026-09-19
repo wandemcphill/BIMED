@@ -27,7 +27,7 @@ function mapResidentialAddress(address: string | null | undefined) {
 export async function createStaffFromApplication(
   client: SupabaseClient,
   applicationId: string,
-  options?: { refreshActivation?: boolean; allowUncontractedHire?: boolean },
+  options?: { refreshActivation?: boolean },
 ) {
   const { data: application, error: applicationError } = await client
     .from('recruitment_applications')
@@ -52,7 +52,7 @@ export async function createStaffFromApplication(
   if (signedContract && signedContract.role_slug !== expectedRoleSlug) {
     throw new Error('The signed contract role does not match the candidate\'s applied role.');
   }
-  if (!signedContract && !options?.allowUncontractedHire) {
+  if (!signedContract) {
     throw new Error('The employment contract must be signed before the candidate can be promoted to staff.');
   }
 
@@ -85,12 +85,10 @@ export async function createStaffFromApplication(
     return { staff: existing, activationToken: null as string | null };
   }
 
-  if (!options?.allowUncontractedHire) {
-    const readiness = await getOnboardingReadiness(client, application);
-    if (!readiness.ready) {
-      const missing = readiness.missing.map((item) => item.title).join(', ');
-      throw new Error(`Pre-access verification is not complete. Complete the following before staff creation: ${missing}`);
-    }
+  const readiness = await getOnboardingReadiness(client, application);
+  if (!readiness.ready) {
+    const missing = readiness.missing.map((item) => item.title).join(', ');
+    throw new Error(`Pre-access verification is not complete. Complete the following before staff creation: ${missing}`);
   }
 
   const activationToken = createActivationToken();
