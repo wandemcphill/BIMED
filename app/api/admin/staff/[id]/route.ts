@@ -19,8 +19,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     profilePhotoUrl = data?.signedUrl || null;
   }
 
-  const [shiftsResult, leaveResult, payslipsResult, auditResult] = await Promise.all([
+  const [shiftsResult, attendanceResult, leaveResult, payslipsResult, auditResult] = await Promise.all([
     client.from('recruitment_workforce_shifts').select('*').eq('staff_id', id).order('shift_date', { ascending: false }).order('start_at', { ascending: false }).limit(50),
+    client.from('recruitment_staff_attendance').select('id,shift_id,clock_in_at,clock_out_at,break_minutes,status,notes,approved_by,approved_at,created_at,updated_at,shift:recruitment_workforce_shifts(id,shift_date,start_at,end_at,shift_type,role,location,status)').eq('staff_id', id).order('created_at', { ascending: false }).limit(100),
     client.from('recruitment_leave_requests').select('*').eq('staff_id', id).order('start_date', { ascending: false }).limit(50),
     client.from('recruitment_staff_payslips').select('*').eq('staff_id', id).order('pay_period_end', { ascending: false }).limit(24),
     client.from('recruitment_staff_audit_log').select('*').eq('staff_id', id).order('created_at', { ascending: false }).limit(50),
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   return NextResponse.json({
     staff: { ...staff, profile_photo_url: profilePhotoUrl },
     shifts: shiftsResult.data || [],
+    attendance: attendanceResult.data || [],
     leaveRequests: leaveResult.data || [],
     payslips: payslipsResult.data || [],
     auditLog: auditResult.data || [],

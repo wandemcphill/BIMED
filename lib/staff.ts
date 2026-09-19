@@ -9,6 +9,7 @@ import {
   PRE_ACCESS_CHECK_KEYS,
 } from './onboarding-readiness';
 import { generateBimedPortalEmail } from './staff-email';
+import { ensureBimedStaffOnboardingPackage } from './staff-onboarding';
 
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
@@ -27,7 +28,14 @@ function mapResidentialAddress(address: string | null | undefined) {
 export async function createStaffFromApplication(
   client: SupabaseClient,
   applicationId: string,
-  options?: { refreshActivation?: boolean; allowUncontractedHire?: boolean },
+  options?: {
+    refreshActivation?: boolean;
+    lifecycle?: {
+      toStatus: 'Onboarding' | 'Hired';
+      actor: string;
+      note?: string | null;
+    };
+  },
 ) {
   const { data: application, error: applicationError } = await client
     .from('recruitment_applications')
@@ -52,7 +60,7 @@ export async function createStaffFromApplication(
   if (signedContract && signedContract.role_slug !== expectedRoleSlug) {
     throw new Error('The signed contract role does not match the candidate\'s applied role.');
   }
-  if (!signedContract && !options?.allowUncontractedHire) {
+  if (!signedContract) {
     throw new Error('The employment contract must be signed before the candidate can be promoted to staff.');
   }
 
@@ -62,6 +70,38 @@ export async function createStaffFromApplication(
     .eq('application_id', applicationId)
     .maybeSingle();
   if (existing) {
+    if (options?.lifecycle) {
+      const activationToken = options.refreshActivation && !existing.activated_at ? createActivationToken() : null;
+      const { data: promotedStaff, error: promotionError } = await client.rpc('bimed_promote_application_to_staff', {
+        p_application_id: applicationId,
+        p_to_status: options.lifecycle.toStatus,
+        p_actor: options.lifecycle.actor,
+        p_note: options.lifecycle.note || null,
+        p_expected_role_slug: expectedRoleSlug,
+        p_portal_email: null,
+        p_activation_token_hash: activationToken ? hashActivationToken(activationToken) : null,
+        p_activation_expires_at: activationToken ? activationExpiresAt() : null,
+        p_refresh_activation: Boolean(activationToken),
+        p_start_date: BIMED_DEFAULT_START_DATE_ISO,
+        p_end_date: BIMED_DEFAULT_END_DATE_ISO,
+      });
+      if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
+      let provisioningWarning: string | null = null;
+      try {
+        await ensureBimedStaffOnboardingPackage(client, promotedStaff.id, application);
+      } catch (error) {
+        provisioningWarning = error instanceof Error ? error.message : 'Staff onboarding package could not be completed.';
+        console.error(JSON.stringify({
+          level: 'error',
+          event: 'staff.post_promotion_enrichment_failed',
+          application_id: applicationId,
+          staff_id: promotedStaff.id,
+          reason: provisioningWarning,
+        }));
+      }
+      return { staff: promotedStaff, activationToken, provisioningWarning };
+    }
+
     if (application.bimed_id !== existing.bimed_id) {
       await client.from('recruitment_applications').update({ bimed_id: existing.bimed_id, updated_at: new Date().toISOString() }).eq('id', applicationId);
     }
@@ -79,13 +119,15 @@ export async function createStaffFromApplication(
         .select('*')
         .single();
       if (refreshError || !refreshed) throw refreshError || new Error('Unable to refresh the staff activation link.');
-      return { staff: refreshed, activationToken };
+      await ensureBimedStaffOnboardingPackage(client, refreshed.id, application);
+      return { staff: refreshed, activationToken, provisioningWarning: null };
     }
 
-    return { staff: existing, activationToken: null as string | null };
+    await ensureBimedStaffOnboardingPackage(client, existing.id, application);
+    return { staff: existing, activationToken: null as string | null, provisioningWarning: null };
   }
 
-  if (!options?.allowUncontractedHire) {
+  if (!options?.lifecycle) {
     const readiness = await getOnboardingReadiness(client, application);
     if (!readiness.ready) {
       const missing = readiness.missing.map((item) => item.title).join(', ');
@@ -101,59 +143,120 @@ export async function createStaffFromApplication(
   const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
   const portalEmail = await generateBimedPortalEmail(client, effectiveName);
 
-  const { data: staff, error } = await client
-    .from('recruitment_staff')
-    .insert({
-      application_id: application.id,
-      full_name: effectiveName,
-      preferred_name: application.preferred_name,
-      email: portalEmail,
-      phone: application.phone,
-      date_of_birth: application.date_of_birth,
-      nationality: application.nationality,
-      role: application.role_applied,
-      job_title: application.role_applied,
-      employment_type: application.employment_type,
-      employment_start_date: effectiveStartDate,
-      employment_end_date: effectiveEndDate,
-      country: 'Ireland',
-      status: effectiveStatus,
-      ...mapResidentialAddress(effectiveAddress),
-      activation_token_hash: hashActivationToken(activationToken),
-      activation_expires_at: activationExpiresAt(),
-    })
-    .select('*')
-    .single();
-  if (error || !staff) throw error || new Error('Unable to create staff profile.');
+  let staff: any = null;
 
-  await ensureOnboardingChecklist(client, application);
+  if (options?.lifecycle) {
+    const { data: promotedStaff, error: promotionError } = await client.rpc('bimed_promote_application_to_staff', {
+      p_application_id: applicationId,
+      p_to_status: options.lifecycle.toStatus,
+      p_actor: options.lifecycle.actor,
+      p_note: options.lifecycle.note || null,
+      p_expected_role_slug: expectedRoleSlug,
+      p_portal_email: portalEmail,
+      p_activation_token_hash: hashActivationToken(activationToken),
+      p_activation_expires_at: activationExpiresAt(),
+      p_refresh_activation: false,
+      p_start_date: effectiveStartDate,
+      p_end_date: effectiveEndDate,
+    });
+    if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
+    staff = promotedStaff;
+  } else {
+    const result = await client
+      .from('recruitment_staff')
+      .insert({
+        application_id: application.id,
+        full_name: effectiveName,
+        preferred_name: application.preferred_name,
+        email: portalEmail,
+        phone: application.phone,
+        date_of_birth: application.date_of_birth,
+        nationality: application.nationality,
+        role: application.role_applied,
+        job_title: application.role_applied,
+        employment_type: application.employment_type,
+        employment_start_date: effectiveStartDate,
+        employment_end_date: effectiveEndDate,
+        country: 'Ireland',
+        status: effectiveStatus,
+        ...mapResidentialAddress(effectiveAddress),
+        activation_token_hash: hashActivationToken(activationToken),
+        activation_expires_at: activationExpiresAt(),
+      })
+      .select('*')
+      .single();
+    if (result.error || !result.data) throw result.error || new Error('Unable to create staff profile.');
+    staff = result.data;
+  }
+
+  let provisioningWarning: string | null = null;
+  try {
+    await ensureOnboardingChecklist(client, application);
+  } catch (error) {
+    if (!options?.lifecycle) throw error;
+    provisioningWarning = error instanceof Error ? error.message : 'Onboarding checklist could not be completed.';
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'staff.post_promotion_checklist_failed',
+      application_id: applicationId,
+      staff_id: staff.id,
+      reason: provisioningWarning,
+    }));
+  }
+
   const now = new Date().toISOString();
 
-  const { error: preAccessError } = await client
-    .from('recruitment_onboarding_checklist')
-    .update({
-      status: 'completed',
-      completed_at: now,
-      completed_by: 'BIMED recruitment verification',
-      notes: 'Pre-access evidence verified before staff portal access was issued.',
-      updated_at: now,
-    })
-    .eq('application_id', application.id)
-    .in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS));
-  if (preAccessError) throw preAccessError;
+  try {
+    const { error: preAccessError } = await client
+      .from('recruitment_onboarding_checklist')
+      .update({
+        status: 'completed',
+        completed_at: now,
+        completed_by: 'BIMED recruitment verification',
+        notes: 'Pre-access evidence verified before staff portal access was issued.',
+        updated_at: now,
+      })
+      .eq('application_id', application.id)
+      .in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS));
+    if (preAccessError) throw preAccessError;
 
-  const { error: postAccessError } = await client
-    .from('recruitment_onboarding_checklist')
-    .update({
-      status: 'pending',
-      completed_at: null,
-      completed_by: null,
-      notes: null,
-      updated_at: now,
-    })
-    .eq('application_id', application.id)
-    .in('item_key', Array.from(POST_ACCESS_CHECK_KEYS));
-  if (postAccessError) throw postAccessError;
+    const { error: postAccessError } = await client
+      .from('recruitment_onboarding_checklist')
+      .update({
+        status: 'pending',
+        completed_at: null,
+        completed_by: null,
+        notes: null,
+        updated_at: now,
+      })
+      .eq('application_id', application.id)
+      .in('item_key', Array.from(POST_ACCESS_CHECK_KEYS));
+    if (postAccessError) throw postAccessError;
+  } catch (error) {
+    if (!options?.lifecycle) throw error;
+    provisioningWarning = error instanceof Error ? error.message : 'Onboarding checklist state could not be finalized.';
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'staff.post_promotion_checklist_finalize_failed',
+      application_id: applicationId,
+      staff_id: staff.id,
+      reason: provisioningWarning,
+    }));
+  }
+
+  try {
+    await ensureBimedStaffOnboardingPackage(client, staff.id, application);
+  } catch (error) {
+    if (!options?.lifecycle) throw error;
+    provisioningWarning = error instanceof Error ? error.message : 'Staff onboarding package could not be completed.';
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'staff.post_promotion_package_failed',
+      application_id: applicationId,
+      staff_id: staff.id,
+      reason: provisioningWarning,
+    }));
+  }
 
   await client.from('recruitment_applications').update({
     bimed_id: staff.bimed_id,
@@ -191,7 +294,7 @@ export async function createStaffFromApplication(
     actionUrl: effectiveStatus === 'pre_arrival' ? '/staff/permit' : '/staff',
   });
 
-  return { staff, activationToken };
+  return { staff, activationToken, provisioningWarning };
 }
 
 export async function createStaffNotification(

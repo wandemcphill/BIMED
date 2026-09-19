@@ -123,52 +123,22 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'A valid reset link and a password of at least 10 characters are required.' }, { status: 400 });
   }
 
-  const hash = crypto.createHash('sha256').update(token).digest('hex');
   const client = db();
-  const { data: reset } = await client
-    .from('recruitment_staff_password_reset_tokens')
-    .select('id,staff_id,expires_at,consumed_at')
-    .eq('token_hash', hash)
-    .maybeSingle();
+  const result = await client.rpc('bimed_complete_staff_password_reset', {
+    p_token_hash: crypto.createHash('sha256').update(token).digest('hex'),
+    p_password_hash: hashStaffPassword(password),
+  });
 
-  if (!reset || reset.consumed_at || new Date(reset.expires_at).getTime() <= Date.now()) {
-    return NextResponse.json({ error: 'This password reset link is invalid or has expired. Request a new reset link.' }, { status: 410 });
-  }
-
-  const { data: staff } = await client
-    .from('recruitment_staff')
-    .select('id,bimed_id,email,status,activated_at,session_version')
-    .eq('id', reset.staff_id)
-    .maybeSingle();
-
-  if (!staff || !staff.activated_at || !['active', 'pre_arrival', 'on_leave'].includes(staff.status)) {
-    return NextResponse.json({ error: 'This Staff Portal account is not currently eligible for password reset.' }, { status: 409 });
-  }
-
-  const { error: updateError } = await client
-    .from('recruitment_staff')
-    .update({
-      password_hash: hashStaffPassword(password),
-      session_version: Math.max(Number(staff.session_version) || 1, 1) + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', staff.id);
-
-  if (updateError) {
+  if (result.error) {
+    if (result.error.message?.includes('STAFF_PASSWORD_RESET_INVALID_OR_EXPIRED') || result.error.message?.includes('STAFF_PASSWORD_RESET_ALREADY_USED')) {
+      return NextResponse.json({ error: 'This password reset link is invalid or has expired. Request a new reset link.' }, { status: 410 });
+    }
+    if (result.error.message?.includes('STAFF_PASSWORD_RESET_NOT_ELIGIBLE')) {
+      return NextResponse.json({ error: 'This Staff Portal account is not currently eligible for password reset.' }, { status: 409 });
+    }
+    console.error(JSON.stringify({ level: 'error', event: 'staff.password_reset.complete_failed', reason: result.error.message }));
     return NextResponse.json({ error: 'Unable to update the Staff Portal password.' }, { status: 500 });
   }
-
-  await client
-    .from('recruitment_staff_password_reset_tokens')
-    .update({ consumed_at: new Date().toISOString() })
-    .eq('id', reset.id)
-    .is('consumed_at', null);
-
-  await createStaffAudit(client, {
-    staffId: staff.id,
-    actor: 'staff_password_reset',
-    eventType: 'staff_password_reset_completed',
-  });
 
   return NextResponse.json({ ok: true, message: 'Your Staff Portal password has been changed. You can now sign in with your BIMED ID or BIMED email.' });
 }

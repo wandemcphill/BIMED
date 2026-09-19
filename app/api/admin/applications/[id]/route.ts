@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/admin-session';
 import { db } from '@/lib/db';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
-import { sendApplicationStatusUpdateEmails } from '@/lib/email';
+import { sendApplicationStatusUpdateEmails, type ApplicationEmailRecord } from '@/lib/email';
 import { MAX_JSON_BYTES, readJsonBody, validateAdminApplicationPatch } from '@/lib/request-validation';
 import { createSignedAudioUrl, INTERVIEW_AUDIO_BUCKET } from '@/lib/interview-audio';
-import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
+import { createStaffFromApplication } from '@/lib/staff';
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
+import { BimedLifecycleError, type BimedRecruitmentStatus, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
 
 type RouteContext = { params: Promise<{ id: string }> };
+type AdminApplicationEmailRecord = ApplicationEmailRecord & { invite_id: string | null };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   if (!await getAdminSession(request)) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
@@ -58,17 +60,100 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { id: applicationId } = await context.params;
   const body = validation.data;
   const client = db();
-  const { data: before } = await client.from('recruitment_applications').select('status').eq('id', applicationId).maybeSingle();
+  const { data: before } = await client.from('recruitment_applications').select('status,email').eq('id', applicationId).maybeSingle();
   const previousStatus = before?.status || null;
 
-  const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
-  if (body.status) updatePayload.status = body.status;
-  if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
+  let staffIdentity: { bimed_id: string; bimed_email: string; activationUrl: string | null; welcomeEmailSent: boolean } | null = null;
+  let staffProvisioningWarning: string | null = null;
+  const statusChanges = Boolean(body.status && previousStatus && body.status !== previousStatus);
 
-  const { data, error } = await client.from('recruitment_applications')
-    .update(updatePayload).eq('id', applicationId).select('*').single();
+  if (statusChanges && body.status && previousStatus && isBimedRecruitmentStatus(previousStatus) && isBimedRecruitmentStatus(body.status)) {
+    if (!localBimedTransitionAllowed(previousStatus, body.status)) {
+      return NextResponse.json({ error: `Transition from ${previousStatus} to ${body.status} is not permitted.` }, { status: 409 });
+    }
+  }
+
+  if (statusChanges && body.status && ['Onboarding', 'Hired'].includes(body.status)) {
+    try {
+      const result = await createStaffFromApplication(client, applicationId, {
+        refreshActivation: body.status === 'Hired',
+        lifecycle: {
+          toStatus: body.status as 'Onboarding' | 'Hired',
+          actor: session.email,
+          note: body.notes !== undefined ? body.notes : null,
+        },
+      });
+      const origin = new URL(request.url).origin;
+      let welcomeEmailSent = false;
+      if (result.activationToken && body.status === 'Hired') {
+        const welcome = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken, before?.email || undefined);
+        welcomeEmailSent = welcome.status === 'sent';
+      }
+      staffIdentity = {
+        bimed_id: result.staff.bimed_id,
+        bimed_email: result.staff.email,
+        activationUrl: result.activationToken
+          ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}`
+          : null,
+        welcomeEmailSent,
+      };
+      staffProvisioningWarning = result.provisioningWarning || null;
+
+    } catch (staffError) {
+      staffProvisioningWarning = staffError instanceof Error ? staffError.message : 'Staff Portal provisioning could not be completed.';
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'staff.identity_creation_blocked_status_transition',
+        application_id: applicationId,
+        requested_status: body.status,
+        reason: staffProvisioningWarning,
+      }));
+      return NextResponse.json(
+        { error: staffProvisioningWarning, staffProvisioningWarning },
+        { status: 409 },
+      );
+    }
+  }
+
+  let data: AdminApplicationEmailRecord | null = null;
+  const lifecycleTransitionHandled = Boolean(statusChanges && body.status && ['Onboarding', 'Hired'].includes(body.status));
+
+  try {
+    if (statusChanges && body.status && !lifecycleTransitionHandled) {
+      data = await transitionBimedApplicationStatus(client, {
+        applicationId,
+        toStatus: body.status as BimedRecruitmentStatus,
+        actor: session.email,
+        note: body.notes !== undefined ? body.notes : null,
+      });
+    } else if (lifecycleTransitionHandled) {
+      const result = await client.from('recruitment_applications')
+        .select('*')
+        .eq('id', applicationId)
+        .single();
+      if (result.error || !result.data) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+      data = result.data;
+    } else {
+      const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
+      if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
+      const result = await client.from('recruitment_applications')
+        .update(updatePayload)
+        .eq('id', applicationId)
+        .select('*')
+        .single();
+      if (result.error) return NextResponse.json({ error: 'Unable to update application.' }, { status: 500 });
+      data = result.data;
+    }
+  } catch (error) {
+    if (error instanceof BimedLifecycleError) {
+      const status = error.code === 'APPLICATION_NOT_FOUND' ? 404 : 409;
+      return NextResponse.json({ error: error.message }, { status });
+    }
+    console.error(JSON.stringify({ level: 'error', event: 'admin_application.lifecycle_transition_failed', application_id: applicationId, reason: error instanceof Error ? error.message : String(error) }));
+    return NextResponse.json({ error: 'Unable to update application.' }, { status: 500 });
+  }
+
   if (!data) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
-  if (error) return NextResponse.json({ error: 'Unable to update application.' }, { status: 500 });
 
   await recordRecruitmentAudit(client, {
     applicationId,
@@ -77,64 +162,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     actor: session.email,
     metadata: { status: body.status || data.status, previous_status: previousStatus, notes_updated: body.notes !== undefined },
   });
-
-  let staffIdentity: { bimed_id: string; bimed_email: string; activationUrl: string | null; welcomeEmailSent: boolean } | null = null;
-  let staffProvisioningWarning: string | null = null;
-
-  if (body.status === 'Hired' && previousStatus !== 'Hired') {
-    try {
-      const result = await createStaffFromApplication(client, applicationId, { refreshActivation: true, allowUncontractedHire: true });
-      const origin = new URL(request.url).origin;
-      let welcomeEmailSent = false;
-      if (result.activationToken) {
-        const welcome = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken, data.email);
-        welcomeEmailSent = welcome.status === 'sent';
-      }
-      staffIdentity = {
-        bimed_id: result.staff.bimed_id,
-        bimed_email: result.staff.email,
-        activationUrl: result.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}` : null,
-        welcomeEmailSent,
-      };
-      await createStaffAudit(client, {
-        staffId: result.staff.id,
-        actor: session.email,
-        eventType: 'candidate_promoted_to_hired',
-        metadata: {
-          application_id: applicationId,
-          recruitment_status: 'Hired',
-          bimed_id: result.staff.bimed_id,
-          bimed_email: result.staff.email,
-          welcome_email_sent: welcomeEmailSent,
-          promotion_override: true,
-        },
-      });
-    } catch (staffError) {
-      staffProvisioningWarning = staffError instanceof Error ? staffError.message : 'Staff Portal provisioning could not be completed.';
-      console.error(JSON.stringify({ level: 'error', event: 'staff.identity_creation_failed_on_hire', application_id: applicationId, reason: staffProvisioningWarning }));
-      await recordRecruitmentAudit(client, {
-        applicationId,
-        inviteId: data.invite_id,
-        eventType: 'candidate_hired_staff_provisioning_failed',
-        actor: session.email,
-        metadata: { promotion_override: true, reason: staffProvisioningWarning },
-      });
-    }
-  } else if (body.status && ['Selected', 'Offer Issued', 'Onboarding'].includes(body.status)) {
-    try {
-      const result = await createStaffFromApplication(client, applicationId);
-      const origin = new URL(request.url).origin;
-      staffIdentity = {
-        bimed_id: result.staff.bimed_id,
-        bimed_email: result.staff.email,
-        activationUrl: result.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}` : null,
-        welcomeEmailSent: false,
-      };
-      await createStaffAudit(client, { staffId: result.staff.id, actor: session.email, eventType: 'recruitment_status_linked_to_staff', metadata: { application_id: applicationId, recruitment_status: body.status } });
-    } catch (staffError) {
-      console.error(JSON.stringify({ level: 'error', event: 'staff.identity_creation_failed', application_id: applicationId, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
-    }
-  }
 
   let statusEmail = null;
   if (body.status && previousStatus && body.status !== previousStatus) {

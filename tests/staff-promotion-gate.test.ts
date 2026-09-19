@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs/promises';
 import { createStaffFromApplication } from '@/lib/staff';
 
 function clientMock(signatureRow: unknown) {
@@ -63,5 +64,38 @@ describe('staff promotion contract gate', () => {
         signed_at: '2026-09-09T12:00:00.000Z',
       }), 'app-1'),
     ).rejects.toThrow('The signed contract role does not match the candidate\'s applied role.');
+  });
+});
+
+
+describe('staff promotion escape-hatch regression', () => {
+  it('does not expose an uncontracted hire override', async () => {
+    const source = await fs.readFile('lib/staff.ts', 'utf8');
+    expect(source).not.toContain('allowUncontractedHire');
+  });
+});
+
+
+describe('staff provisioning boundary', () => {
+  it('keeps staff provisioning at onboarding or Hired rather than early recruitment statuses', async () => {
+    const route = await import('node:fs/promises').then((fs) => fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8'));
+    expect(route).toContain("['Onboarding', 'Hired'].includes(body.status)");
+    expect(route).not.toContain("['Selected', 'Offer Issued', 'Onboarding', 'Hired'].includes(body.status)");
+  });
+
+  it('routes lifecycle-linked staff creation through the atomic promotion RPC', async () => {
+    const [route, migration] = await Promise.all([
+      import('node:fs/promises').then((fs) => fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8')),
+      import('node:fs/promises').then((fs) => fs.readFile(
+        'supabase/migrations/20260919zz_bimed_atomic_staff_promotion.sql',
+        'utf8',
+      )),
+    ]);
+    expect(route).toContain('lifecycle: {');
+    expect(route).toContain("toStatus: body.status as 'Onboarding' | 'Hired'");
+    expect(route).toContain('provisioningWarning');
+    expect(migration).toContain('bimed_promote_application_to_staff');
+    expect(migration).toContain('perform public.bimed_transition_application_status(');
+    expect(migration).toContain('insert into public.recruitment_staff(');
   });
 });
