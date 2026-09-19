@@ -5,7 +5,7 @@ import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
 import { sendApplicationStatusUpdateEmails } from '@/lib/email';
 import { MAX_JSON_BYTES, readJsonBody, validateAdminApplicationPatch } from '@/lib/request-validation';
 import { createSignedAudioUrl, INTERVIEW_AUDIO_BUCKET } from '@/lib/interview-audio';
-import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
+import { createStaffFromApplication } from '@/lib/staff';
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
 import { BimedLifecycleError, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
@@ -76,6 +76,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     try {
       const result = await createStaffFromApplication(client, applicationId, {
         refreshActivation: body.status === 'Hired',
+        lifecycle: {
+          toStatus: body.status as 'Onboarding' | 'Hired',
+          actor: session.email,
+          note: body.notes !== undefined ? body.notes : null,
+        },
       });
       const origin = new URL(request.url).origin;
       let welcomeEmailSent = false;
@@ -91,19 +96,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           : null,
         welcomeEmailSent,
       };
-      await createStaffAudit(client, {
-        staffId: result.staff.id,
-        actor: session.email,
-        eventType: body.status === 'Hired' ? 'candidate_promoted_to_hired' : 'recruitment_status_linked_to_staff',
-        metadata: {
-          application_id: applicationId,
-          recruitment_status: body.status,
-          bimed_id: result.staff.bimed_id,
-          bimed_email: result.staff.email,
-          welcome_email_sent: welcomeEmailSent,
-          promotion_override: false,
-        },
-      });
+
     } catch (staffError) {
       staffProvisioningWarning = staffError instanceof Error ? staffError.message : 'Staff Portal provisioning could not be completed.';
       console.error(JSON.stringify({
@@ -121,15 +114,23 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   let data: Record<string, any> | null = null;
+  const lifecycleTransitionHandled = Boolean(statusChanges && body.status && ['Onboarding', 'Hired'].includes(body.status));
 
   try {
-    if (statusChanges && body.status) {
+    if (statusChanges && body.status && !lifecycleTransitionHandled) {
       data = await transitionBimedApplicationStatus(client, {
         applicationId,
         toStatus: body.status,
         actor: session.email,
         note: body.notes !== undefined ? body.notes : null,
       });
+    } else if (lifecycleTransitionHandled) {
+      const result = await client.from('recruitment_applications')
+        .select('*')
+        .eq('id', applicationId)
+        .single();
+      if (result.error || !result.data) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+      data = result.data;
     } else {
       const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
       if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
