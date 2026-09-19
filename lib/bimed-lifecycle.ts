@@ -82,3 +82,42 @@ export async function transitionBimedApplicationStatus(
 
   return data;
 }
+
+
+export async function scheduleBimedInterview(
+  client: SupabaseClient,
+  input: {
+    applicationId: string;
+    scheduledAt: string;
+    durationMinutes: number | null;
+    location: string | null;
+    meetingLink: string | null;
+    interviewer: string | null;
+    candidateInstructions: string | null;
+    actor: string;
+  },
+) {
+  const { data, error } = await client.rpc('bimed_schedule_recruitment_interview', {
+    p_application_id: input.applicationId,
+    p_scheduled_at: input.scheduledAt,
+    p_duration_minutes: input.durationMinutes,
+    p_location: input.location,
+    p_meeting_link: input.meetingLink,
+    p_interviewer: input.interviewer,
+    p_candidate_instructions: input.candidateInstructions,
+    p_actor: input.actor,
+  });
+
+  if (error || !data) {
+    const message = error?.message || 'Unable to schedule the interview.';
+    if (message.includes('APPLICATION_NOT_FOUND')) {
+      throw new BimedLifecycleError('APPLICATION_NOT_FOUND', 'Application not found.');
+    }
+    if (message.includes('STATUS_TRANSITION_BLOCKED')) {
+      throw new BimedLifecycleError('STATUS_TRANSITION_BLOCKED', error?.details || 'The application cannot move to Interview from its current status.');
+    }
+    throw error || new Error(message);
+  }
+
+  return data;
+}
