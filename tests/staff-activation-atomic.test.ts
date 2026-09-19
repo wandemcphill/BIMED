@@ -9,6 +9,7 @@ describe('BIMED atomic staff activation', () => {
     expect(route).toContain("bimed_activate_staff_account");
     expect(route).not.toContain(".from('recruitment_staff').update({");
     expect(migration).toContain('for update');
+    expect(migration).toContain('lower(s.email)');
     expect(migration).toContain('ACTIVATION_CHANGED');
     expect(migration).toContain('ACTIVATION_USED');
     expect(migration).toContain('grant execute on function public.bimed_activate_staff_account');
