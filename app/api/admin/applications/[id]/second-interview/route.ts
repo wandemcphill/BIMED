@@ -76,11 +76,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ interview: record, link, email });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown';
+    if (message === 'ACTIVE_SECOND_INTERVIEW_EXISTS') {
+      return NextResponse.json({ error: 'An active second-stage invitation already exists for this candidate.' }, { status: 409 });
+    }
+    if (message === 'APPLICATION_NOT_FOUND') {
+      return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+    }
     console.error(JSON.stringify({
       level: 'error',
       event: 'second_interview.create_failed',
       application_id: applicationId,
-      reason: error instanceof Error ? error.message : 'unknown',
+      reason: message,
     }));
     return NextResponse.json({ error: 'Unable to send the second interview right now.' }, { status: 500 });
   }
