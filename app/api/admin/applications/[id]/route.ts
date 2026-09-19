@@ -61,23 +61,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { data: before } = await client.from('recruitment_applications').select('status').eq('id', applicationId).maybeSingle();
   const previousStatus = before?.status || null;
 
-  const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
-  if (body.status) updatePayload.status = body.status;
-  if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
-
-  const { data, error } = await client.from('recruitment_applications')
-    .update(updatePayload).eq('id', applicationId).select('*').single();
-  if (!data) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
-  if (error) return NextResponse.json({ error: 'Unable to update application.' }, { status: 500 });
-
-  await recordRecruitmentAudit(client, {
-    applicationId,
-    inviteId: data.invite_id,
-    eventType: 'admin_application_updated',
-    actor: session.email,
-    metadata: { status: body.status || data.status, previous_status: previousStatus, notes_updated: body.notes !== undefined },
-  });
-
   let staffIdentity: { bimed_id: string; bimed_email: string; activationUrl: string | null; welcomeEmailSent: boolean } | null = null;
   let staffProvisioningWarning: string | null = null;
   const staffProvisioningStatus = body.status && ['Selected', 'Offer Issued', 'Onboarding', 'Hired'].includes(body.status);
