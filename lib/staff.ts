@@ -129,7 +129,7 @@ export async function createStaffFromApplication(
   const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
   const portalEmail = await generateBimedPortalEmail(client, effectiveName);
 
-  let staff = null as Awaited<ReturnType<SupabaseClient['from']>> | any;
+  let staff: any = null;
 
   if (options?.lifecycle) {
     const { data: promotedStaff, error: promotionError } = await client.rpc('bimed_promote_application_to_staff', {
