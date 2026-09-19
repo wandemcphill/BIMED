@@ -72,7 +72,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
-  if (statusChanges && body.status && ['Selected', 'Offer Issued', 'Onboarding', 'Hired'].includes(body.status)) {
+  if (statusChanges && body.status && ['Onboarding', 'Hired'].includes(body.status)) {
     try {
       const result = await createStaffFromApplication(client, applicationId, {
         refreshActivation: body.status === 'Hired',
