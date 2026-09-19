@@ -21,14 +21,43 @@ jobs:
           node-version: 22.x
           cache: npm
 
+      - name: Runtime diagnostics
+        if: always()
+        run: |
+          mkdir -p ci-logs
+          {
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            echo "npm_engine_strict=$(npm config get engine-strict)"
+            echo "package_engines=$(node -p "require('./package.json').engines.node")"
+            echo "lock_engines=$(node -p "require('./package-lock.json').packages[''].engines?.node || 'unset'")"
+            echo "runner=$RUNNER_OS"
+          } | tee ci-logs/runtime.txt
+
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: |
+          set -o pipefail
+          npm ci --legacy-peer-deps 2>&1 | tee ci-logs/npm-ci.txt
 
       - name: Typecheck
-        run: npm run typecheck
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee ci-logs/typecheck.txt
 
       - name: Test
-        run: npm test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee ci-logs/test.txt
 
       - name: Build
-        run: npm run build
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee ci-logs/build.txt
+
+      - name: Upload CI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bimed-ci-${{ github.run_id }}
+          path: ci-logs
+          if-no-files-found: warn
