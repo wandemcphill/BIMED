@@ -3,6 +3,21 @@ import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 
+async function getAdminShiftEligibility(client: ReturnType<typeof db>, staffId: string) {
+  const [{ data: staff, error: staffError }, { data: permit, error: permitError }] = await Promise.all([
+    client.from('recruitment_staff').select('status').eq('id', staffId).maybeSingle(),
+    client.from('recruitment_staff_permit_cases').select('work_authorised,shift_eligibility').eq('staff_id', staffId).maybeSingle(),
+  ]);
+  if (staffError || permitError) throw staffError || permitError;
+  if (!staff) return { eligible: false, reason: 'The selected BIMED staff record could not be found.' };
+  if (staff.status !== 'active') return { eligible: false, reason: 'Only active BIMED staff can be assigned or confirmed for shifts.' };
+  if (!permit) return { eligible: true, reason: null as string | null };
+  if (permit.shift_eligibility !== 'eligible' || permit.work_authorised !== true) {
+    return { eligible: false, reason: 'This staff member is not currently authorised and eligible to work shifts.' };
+  }
+  return { eligible: true, reason: null as string | null };
+}
+
 export async function GET(request: NextRequest) {
   const session = await getAdminSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
@@ -33,6 +48,10 @@ export async function POST(request: NextRequest) {
 
   if (body.action === 'create') {
     if (!body.shiftDate || !body.startAt || !body.endAt || !body.shiftType) return NextResponse.json({ error: 'shiftDate, startAt, endAt and shiftType are required.' }, { status: 400 });
+    if (body.staffId) {
+      const eligibility = await getAdminShiftEligibility(client, body.staffId);
+      if (!eligibility.eligible) return NextResponse.json({ error: eligibility.reason }, { status: 409 });
+    }
     const { data, error } = await client.from('recruitment_workforce_shifts').insert({ shift_date: body.shiftDate, start_at: body.startAt, end_at: body.endAt, shift_type: body.shiftType, staff_id: body.staffId || null, role: body.role || null, location: body.location || null, break_minutes: Math.max(0, Number(body.breakMinutes || 0)), status: body.staffId ? 'assigned' : 'available', created_by: session.email, assigned_at: body.staffId ? new Date().toISOString() : null, notes: body.notes || null }).select('*,staff:recruitment_staff(id,bimed_id,full_name)').single();
     if (error || !data) return NextResponse.json({ error: 'Unable to create shift.' }, { status: 500 });
     if (body.staffId) await createStaffNotification(client, { staffId: body.staffId, category: 'rota', title: 'New shift assigned', body: `You have been assigned a ${body.shiftType} shift on ${body.shiftDate}.`, actionUrl: '/staff/rota' });
@@ -42,6 +61,8 @@ export async function POST(request: NextRequest) {
 
   if (body.action === 'assign') {
     if (!body.shiftId || !body.staffId) return NextResponse.json({ error: 'shiftId and staffId are required.' }, { status: 400 });
+    const eligibility = await getAdminShiftEligibility(client, body.staffId);
+    if (!eligibility.eligible) return NextResponse.json({ error: eligibility.reason }, { status: 409 });
     const { data, error } = await client.from('recruitment_workforce_shifts').update({ staff_id: body.staffId, status: 'assigned', assigned_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', body.shiftId).select('*').single();
     if (error || !data) return NextResponse.json({ error: 'Unable to assign shift.' }, { status: 500 });
     await createStaffNotification(client, { staffId: body.staffId, category: 'rota', title: 'Shift assigned', body: `A new shift has been added to your BIMED rota for ${data.shift_date}.`, actionUrl: '/staff/rota' });
@@ -67,6 +88,14 @@ export async function POST(request: NextRequest) {
     if (!requestRow || requestRow.status !== 'pending') return NextResponse.json({ error: 'This request is no longer pending.' }, { status: 409 });
 
     if (requestRow.request_type === 'swap') {
+      if (approved) {
+        const firstStaffId = requestRow.shift?.staff_id || requestRow.staff_id;
+        const secondStaffId = requestRow.requested_shift?.staff_id;
+        for (const staffId of [firstStaffId, secondStaffId].filter(Boolean)) {
+          const eligibility = await getAdminShiftEligibility(client, staffId);
+          if (!eligibility.eligible) return NextResponse.json({ error: eligibility.reason }, { status: 409 });
+        }
+      }
       const { data, error } = await client.rpc('resolve_staff_shift_swap', { p_request_id: body.requestId, p_actor: session.email, p_approve: approved });
       if (error) return NextResponse.json({ error: error.message || 'Unable to resolve this shift swap.' }, { status: 409 });
       const result = data?.[0];
