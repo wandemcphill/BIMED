@@ -18,6 +18,15 @@ describe('BIMED portal parity boundary', () => {
   });
 
   it('retains BIMED-specific staff and overseas workflow surfaces', () => {
+    const home = readFileSync('app/staff/page.tsx', 'utf8');
+    const staff360 = readFileSync('app/admin/staff/[id]/page.tsx', 'utf8');
+    const staff360Api = readFileSync('app/api/admin/staff/[id]/route.ts', 'utf8');
+    expect(home).toContain("'leave', 'Leave'");
+    expect(home).toContain("action: 'request_leave'");
+    expect(home).toContain('My leave history');
+    expect(staff360).toContain('Time & attendance');
+    expect(staff360Api).toContain("from('recruitment_staff_attendance')");
+
     const requiredFiles = [
       'app/api/staff/messages/route.ts',
       'app/api/staff/rota/route.ts',
