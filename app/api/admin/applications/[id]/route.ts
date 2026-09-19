@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/admin-session';
 import { db } from '@/lib/db';
 import { recordRecruitmentAudit } from '@/lib/recruitment-audit';
-import { sendApplicationStatusUpdateEmails } from '@/lib/email';
+import { sendApplicationStatusUpdateEmails, type ApplicationEmailRecord } from '@/lib/email';
 import { MAX_JSON_BYTES, readJsonBody, validateAdminApplicationPatch } from '@/lib/request-validation';
 import { createSignedAudioUrl, INTERVIEW_AUDIO_BUCKET } from '@/lib/interview-audio';
 import { createStaffFromApplication } from '@/lib/staff';
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
-import { BimedLifecycleError, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
+import { BimedLifecycleError, type BimedRecruitmentStatus, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -114,14 +114,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
-  let data: Record<string, any> | null = null;
+  let data: ApplicationEmailRecord | null = null;
   const lifecycleTransitionHandled = Boolean(statusChanges && body.status && ['Onboarding', 'Hired'].includes(body.status));
 
   try {
     if (statusChanges && body.status && !lifecycleTransitionHandled) {
       data = await transitionBimedApplicationStatus(client, {
         applicationId,
-        toStatus: body.status,
+        toStatus: body.status as BimedRecruitmentStatus,
         actor: session.email,
         note: body.notes !== undefined ? body.notes : null,
       });
