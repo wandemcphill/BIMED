@@ -115,10 +115,12 @@ export async function createStaffFromApplication(
     return { staff: existing, activationToken: null as string | null };
   }
 
-  const readiness = await getOnboardingReadiness(client, application);
-  if (!readiness.ready) {
-    const missing = readiness.missing.map((item) => item.title).join(', ');
-    throw new Error(`Pre-access verification is not complete. Complete the following before staff creation: ${missing}`);
+  if (!options?.lifecycle) {
+    const readiness = await getOnboardingReadiness(client, application);
+    if (!readiness.ready) {
+      const missing = readiness.missing.map((item) => item.title).join(', ');
+      throw new Error(`Pre-access verification is not complete. Complete the following before staff creation: ${missing}`);
+    }
   }
 
   const activationToken = createActivationToken();
