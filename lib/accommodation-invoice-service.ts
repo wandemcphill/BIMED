@@ -128,7 +128,7 @@ export async function issueAccommodationInvoice(input: {
     metadata: {
       invoice_number: updatedInvoice.invoice_number,
       amount_eur: updatedInvoice.amount_eur,
-      issued_at: issuedAt,
+      issued_at: updatedInvoice.issued_at,
       email_sent: emailSent,
       automatic,
     },
