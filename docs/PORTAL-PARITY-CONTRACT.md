@@ -19,7 +19,7 @@ Every portal must support and enforce:
 7. A backend-enforced contract gate before staff conversion.
 8. A backend-enforced readiness gate before staff conversion.
 9. Server-side staff provisioning with a permanent employee identifier.
-10. Secure staff activation and authenticated self-service.
+10. Secure staff activation, authenticated self-service and self-service password recovery.
 11. Staff onboarding package/tasks with acknowledgement where required.
 12. Internal staff messaging with anti-enumeration controls.
 13. Workforce operations appropriate to the product, including shifts/rota, attendance/timesheets, leave and payroll/pay records.
