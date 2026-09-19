@@ -9,6 +9,7 @@ import { sendFullOnboardingPackEmail } from '@/lib/full-onboarding-pack';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
+import { BimedLifecycleError, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -38,6 +39,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
     if (!expectedRoleSlug) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
     if (requestedRoleSlug !== expectedRoleSlug) return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
+
+    if (application.status !== 'Offer Issued') {
+      if (!isBimedRecruitmentStatus(application.status) || !localBimedTransitionAllowed(application.status, 'Offer Issued')) {
+        return NextResponse.json({ error: `Transition from ${application.status} to Offer Issued is not permitted.` }, { status: 409 });
+      }
+    }
 
     const startDate = BIMED_DEFAULT_START_DATE_ISO;
     const contractInfo = {
@@ -72,8 +79,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }, client);
 
     const previousStatus = application.status;
+    let transitionedApplication = application;
     if (previousStatus !== 'Offer Issued') {
-      await client.from('recruitment_applications').update({ status: 'Offer Issued', updated_at: new Date().toISOString() }).eq('id', applicationId);
+      try {
+        transitionedApplication = await transitionBimedApplicationStatus(client, {
+          applicationId,
+          toStatus: 'Offer Issued',
+          actor: session.email,
+          note: 'Full employment and onboarding pack issued.',
+        });
+      } catch (error) {
+        if (error instanceof BimedLifecycleError) {
+          return NextResponse.json({ error: error.message }, { status: error.code === 'APPLICATION_NOT_FOUND' ? 404 : 409 });
+        }
+        throw error;
+      }
     }
 
     await recordRecruitmentAudit(client, {
@@ -89,6 +109,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         international,
         role_slug: expectedRoleSlug,
         previous_status: previousStatus,
+        new_status: transitionedApplication.status,
         start_date: startDate,
         canonical_default_start_date: BIMED_DEFAULT_START_DATE,
         email_status: email.status,
