@@ -80,62 +80,78 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   let staffIdentity: { bimed_id: string; bimed_email: string; activationUrl: string | null; welcomeEmailSent: boolean } | null = null;
   let staffProvisioningWarning: string | null = null;
+  const staffProvisioningStatus = body.status && ['Selected', 'Offer Issued', 'Onboarding', 'Hired'].includes(body.status);
+  let provisionedStaff: Awaited<ReturnType<typeof createStaffFromApplication>> | null = null;
 
-  if (body.status === 'Hired' && previousStatus !== 'Hired') {
+  if (staffProvisioningStatus && previousStatus !== body.status) {
     try {
-      const result = await createStaffFromApplication(client, applicationId, { refreshActivation: true, allowUncontractedHire: true });
-      const origin = new URL(request.url).origin;
-      let welcomeEmailSent = false;
-      if (result.activationToken) {
-        const welcome = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken, data.email);
-        welcomeEmailSent = welcome.status === 'sent';
-      }
-      staffIdentity = {
-        bimed_id: result.staff.bimed_id,
-        bimed_email: result.staff.email,
-        activationUrl: result.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}` : null,
-        welcomeEmailSent,
-      };
-      await createStaffAudit(client, {
-        staffId: result.staff.id,
-        actor: session.email,
-        eventType: 'candidate_promoted_to_hired',
-        metadata: {
-          application_id: applicationId,
-          recruitment_status: 'Hired',
-          bimed_id: result.staff.bimed_id,
-          bimed_email: result.staff.email,
-          welcome_email_sent: welcomeEmailSent,
-          promotion_override: true,
-        },
+      provisionedStaff = await createStaffFromApplication(client, applicationId, {
+        refreshActivation: body.status === 'Hired',
       });
     } catch (staffError) {
       staffProvisioningWarning = staffError instanceof Error ? staffError.message : 'Staff Portal provisioning could not be completed.';
-      console.error(JSON.stringify({ level: 'error', event: 'staff.identity_creation_failed_on_hire', application_id: applicationId, reason: staffProvisioningWarning }));
-      await recordRecruitmentAudit(client, {
-        applicationId,
-        inviteId: data.invite_id,
-        eventType: 'candidate_hired_staff_provisioning_failed',
-        actor: session.email,
-        metadata: { promotion_override: true, reason: staffProvisioningWarning },
-      });
-    }
-  } else if (body.status && ['Selected', 'Offer Issued', 'Onboarding'].includes(body.status)) {
-    try {
-      const result = await createStaffFromApplication(client, applicationId);
-      const origin = new URL(request.url).origin;
-      staffIdentity = {
-        bimed_id: result.staff.bimed_id,
-        bimed_email: result.staff.email,
-        activationUrl: result.activationToken ? `${origin}/staff/activate?token=${encodeURIComponent(result.activationToken)}&email=${encodeURIComponent(result.staff.email)}` : null,
-        welcomeEmailSent: false,
-      };
-      await createStaffAudit(client, { staffId: result.staff.id, actor: session.email, eventType: 'recruitment_status_linked_to_staff', metadata: { application_id: applicationId, recruitment_status: body.status } });
-    } catch (staffError) {
-      console.error(JSON.stringify({ level: 'error', event: 'staff.identity_creation_failed', application_id: applicationId, reason: staffError instanceof Error ? staffError.message : 'unknown' }));
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'staff.identity_creation_blocked_status_transition',
+        application_id: applicationId,
+        requested_status: body.status,
+        reason: staffProvisioningWarning,
+      }));
+      return NextResponse.json(
+        { error: staffProvisioningWarning, staffProvisioningWarning },
+        { status: 409 },
+      );
     }
   }
 
+  const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
+  if (body.status) updatePayload.status = body.status;
+  if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
+
+  const { data, error } = await client.from('recruitment_applications')
+    .update(updatePayload).eq('id', applicationId).select('*').single();
+  if (!data) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+  if (error) return NextResponse.json({ error: 'Unable to update application.' }, { status: 500 });
+
+  await recordRecruitmentAudit(client, {
+    applicationId,
+    inviteId: data.invite_id,
+    eventType: 'admin_application_updated',
+    actor: session.email,
+    metadata: { status: body.status || data.status, previous_status: previousStatus, notes_updated: body.notes !== undefined },
+  });
+
+  if (provisionedStaff) {
+    const origin = new URL(request.url).origin;
+    let welcomeEmailSent = false;
+    if (provisionedStaff.activationToken && body.status === 'Hired') {
+      const welcome = await sendStaffPortalActivationEmail(client, provisionedStaff.staff, provisionedStaff.activationToken, data.email);
+      welcomeEmailSent = welcome.status === 'sent';
+    }
+
+    staffIdentity = {
+      bimed_id: provisionedStaff.staff.bimed_id,
+      bimed_email: provisionedStaff.staff.email,
+      activationUrl: provisionedStaff.activationToken
+        ? `${origin}/staff/activate?token=${encodeURIComponent(provisionedStaff.activationToken)}&email=${encodeURIComponent(provisionedStaff.staff.email)}`
+        : null,
+      welcomeEmailSent,
+    };
+
+    await createStaffAudit(client, {
+      staffId: provisionedStaff.staff.id,
+      actor: session.email,
+      eventType: body.status === 'Hired' ? 'candidate_promoted_to_hired' : 'recruitment_status_linked_to_staff',
+      metadata: {
+        application_id: applicationId,
+        recruitment_status: body.status,
+        bimed_id: provisionedStaff.staff.bimed_id,
+        bimed_email: provisionedStaff.staff.email,
+        welcome_email_sent: welcomeEmailSent,
+        promotion_override: false,
+      },
+    });
+  }
   let statusEmail = null;
   if (body.status && previousStatus && body.status !== previousStatus) {
     try {
