@@ -74,3 +74,12 @@ describe('staff promotion escape-hatch regression', () => {
     expect(source).not.toContain('allowUncontractedHire');
   });
 });
+
+
+describe('staff provisioning boundary', () => {
+  it('keeps staff provisioning at onboarding or Hired rather than early recruitment statuses', async () => {
+    const route = await import('node:fs/promises').then((fs) => fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8'));
+    expect(route).toContain("['Onboarding', 'Hired'].includes(body.status)");
+    expect(route).not.toContain("['Selected', 'Offer Issued', 'Onboarding', 'Hired'].includes(body.status)");
+  });
+});
