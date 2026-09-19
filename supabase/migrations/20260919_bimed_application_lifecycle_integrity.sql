@@ -73,6 +73,7 @@ begin
 
   update public.recruitment_applications
   set status = p_to_status,
+      admin_notes = case when p_note is null then admin_notes else p_note end,
       updated_at = now()
   where id = p_application_id
   returning * into result_row;
