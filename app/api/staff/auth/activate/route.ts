@@ -206,35 +206,46 @@ export async function POST(request: NextRequest) {
   }
 
   const passwordHash = hashStaffPassword(password);
-  const nextSessionVersion = Math.max(Number(staff.session_version) || 1, 1) + 1;
+  const expectedSessionVersion = Math.max(Number(staff.session_version) || 1, 1);
 
-  const { data: updated, error: updateError } = await client
-    .from('recruitment_staff')
-    .update({
-      password_hash: passwordHash,
-      activation_token_hash: null,
-      activation_expires_at: null,
-      activated_at: new Date().toISOString(),
-      session_version: nextSessionVersion,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', staff.id)
-    .select('id,bimed_id,email,status,session_version')
-    .single();
+  const { data: activatedRows, error: activationError } = await client.rpc('bimed_activate_staff_account', {
+    p_email: email || staff.email,
+    p_token_hash: tokenHash,
+    p_password_hash: passwordHash,
+    p_expected_session_version: expectedSessionVersion,
+  });
 
-  if (updateError || !updated) {
+  if (activationError) {
+    const reason = activationError.message || '';
+    if (reason.includes('ACTIVATION_INVALID') || reason.includes('ACTIVATION_EXPIRED') || reason.includes('ACTIVATION_USED') || reason.includes('ACTIVATION_CHANGED')) {
+      return NextResponse.json(
+        { error: 'This activation link is invalid or expired. Please request a new activation link.', code: 'activation_invalid' },
+        { status: 400 },
+      );
+    }
+    if (reason.includes('ACTIVATION_NOT_ELIGIBLE')) {
+      return NextResponse.json(
+        { error: 'This BIMED staff account is not currently eligible for activation. Please contact BIMED.', code: 'account_unavailable' },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: 'Unable to activate the staff account.', code: 'activation_error' }, { status: 500 });
   }
 
-  await createStaffAudit(client, {
-    staffId: staff.id,
-    actor: staff.email,
-    eventType: 'staff_account_activated',
-  });
+  const updated = Array.isArray(activatedRows) ? activatedRows[0] : activatedRows;
+  if (!updated) {
+    return NextResponse.json({ error: 'Unable to activate the staff account.', code: 'activation_error' }, { status: 500 });
+  }
 
-  const response = NextResponse.json({ ok: true, staff: updated });
+  const response = NextResponse.json({ ok: true, staff: {
+    id: updated.staff_id,
+    bimed_id: updated.bimed_id,
+    email: updated.email,
+    status: updated.status,
+    session_version: updated.session_version,
+  } });
   const sessionToken = createStaffSessionToken({
-    staff_id: updated.id,
+    staff_id: updated.staff_id,
     bimed_id: updated.bimed_id,
     email: updated.email,
     session_version: updated.session_version,
