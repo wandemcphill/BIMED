@@ -63,23 +63,33 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
   try {
     if (body.action === 'save_flight_booking') {
-      const bookingCleared = current.status === 'visa_granted' || current.visa_status === 'granted' || current.work_authorised === true;
-      if (!bookingCleared) return NextResponse.json({ error: 'Flight booking is blocked until BIMED records visa/immigration clearance for this overseas case.' }, { status: 409 });
-      const { data: itinerary } = await client.from('recruitment_flight_itineraries').select('*').eq('permit_case_id', current.id).maybeSingle();
-      if (!itinerary) return NextResponse.json({ error: 'Travel request not found.' }, { status: 404 });
       const flightNumber = String(body.flight_number || '').trim();
       const arrivalAt = String(body.arrival_at || '').trim();
       const bookingReference = String(body.booking_reference || '').trim() || null;
       if (!flightNumber || !arrivalAt) return NextResponse.json({ error: 'Flight number and arrival time are required.' }, { status: 400 });
       if (Number.isNaN(new Date(arrivalAt).getTime())) return NextResponse.json({ error: 'Arrival time must be valid.' }, { status: 400 });
-      const now = new Date().toISOString();
-      const { data: saved, error } = await client.from('recruitment_flight_itineraries').update({ booking_status: 'booked', status: 'booked', booking_reference: bookingReference, airline: String(body.airline || '').trim() || null, flight_number: flightNumber, arrival_at: new Date(arrivalAt).toISOString(), booked_at: now, booking_notes: String(body.booking_notes || '').trim() || null, updated_at: now }).eq('id', itinerary.id).select('*').single();
-      if (error || !saved) return NextResponse.json({ error: 'Unable to save the confirmed flight.' }, { status: 500 });
-      const { data: transfer } = await client.from('recruitment_arrival_transfers').upsert({ permit_case_id: current.id, itinerary_id: saved.id, status: 'ready_to_dispatch', pickup_airport_code: 'DUB', passenger_count: saved.passenger_count, passenger_names: saved.passengers, flight_number: flightNumber, flight_booking_reference: bookingReference, flight_arrival_at: saved.arrival_at, updated_at: now }, { onConflict: 'permit_case_id' }).select('*').single();
-      await client.from('recruitment_staff_permit_cases').update({ flight_request_status: 'booked', flight_virtual_itinerary: { ...(current.flight_virtual_itinerary || {}), status: 'booked', flight_number: flightNumber, booking_reference: bookingReference, airline: saved.airline, arrival_at: saved.arrival_at }, flight_updated_at: now, updated_at: now }).eq('id', current.id);
-      await createStaffNotification(client, { staffId: id, category: 'travel', title: 'BIMED has booked your flight', body: `Your BIMED flight to Dublin has been booked. Flight ${flightNumber} arrives at ${new Date(saved.arrival_at).toLocaleString('en-IE')}. No fare information is displayed in the Staff Portal.`, actionUrl: '/staff/travel' });
-      await createStaffAudit(client, { staffId: id, actor: session.email, eventType: 'flight_booked_by_bimed', metadata: { flight_number: flightNumber, booking_reference: bookingReference, arrival_at: saved.arrival_at } });
-      return NextResponse.json({ itinerary: saved, transfer: transfer || null });
+      try {
+        const { data: result, error } = await client.rpc('bimed_confirm_staff_flight_booking', {
+          p_permit_case_id: current.id,
+          p_actor: session.email,
+          p_flight_number: flightNumber,
+          p_arrival_at: new Date(arrivalAt).toISOString(),
+          p_booking_reference: bookingReference,
+          p_airline: String(body.airline || '').trim() || null,
+          p_booking_notes: String(body.booking_notes || '').trim() || null,
+        });
+        if (error || !result) {
+          const message = error?.message || 'Unable to save the confirmed flight.';
+          const code = message.includes('FLIGHT_BOOKING_CLEARANCE_REQUIRED') ? 409 : message.includes('TRAVEL_REQUEST_NOT_FOUND') ? 404 : 500;
+          return NextResponse.json({ error: message }, { status: code });
+        }
+        const saved = result.itinerary;
+        const transfer = result.transfer;
+        await createStaffNotification(client, { staffId: id, category: 'travel', title: 'BIMED has booked your flight', body: `Your BIMED flight to Dublin has been booked. Flight ${flightNumber} arrives at ${new Date(saved.arrival_at).toLocaleString('en-IE')}. No fare information is displayed in the Staff Portal.`, actionUrl: '/staff/travel' });
+        return NextResponse.json({ itinerary: saved, transfer: transfer || null });
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to save the confirmed flight.' }, { status: 500 });
+      }
     }
 
     if (body.action === 'save_transfer') {
