@@ -93,6 +93,7 @@ describe('staff provisioning boundary', () => {
     ]);
     expect(route).toContain('lifecycle: {');
     expect(route).toContain("toStatus: body.status as 'Onboarding' | 'Hired'");
+    expect(route).toContain('provisioningWarning');
     expect(migration).toContain('bimed_promote_application_to_staff');
     expect(migration).toContain('perform public.bimed_transition_application_status(');
     expect(migration).toContain('insert into public.recruitment_staff(');
