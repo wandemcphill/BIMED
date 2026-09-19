@@ -96,6 +96,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           : null,
         welcomeEmailSent,
       };
+      staffProvisioningWarning = result.provisioningWarning || null;
 
     } catch (staffError) {
       staffProvisioningWarning = staffError instanceof Error ? staffError.message : 'Staff Portal provisioning could not be completed.';
