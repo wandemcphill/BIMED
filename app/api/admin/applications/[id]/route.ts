@@ -11,6 +11,7 @@ import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
 import { BimedLifecycleError, type BimedRecruitmentStatus, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
 
 type RouteContext = { params: Promise<{ id: string }> };
+type AdminApplicationEmailRecord = ApplicationEmailRecord & { invite_id: string | null };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   if (!await getAdminSession(request)) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
@@ -114,7 +115,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
-  let data: ApplicationEmailRecord | null = null;
+  let data: AdminApplicationEmailRecord | null = null;
   const lifecycleTransitionHandled = Boolean(statusChanges && body.status && ['Onboarding', 'Hired'].includes(body.status));
 
   try {
