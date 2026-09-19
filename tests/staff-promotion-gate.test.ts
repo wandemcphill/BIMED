@@ -82,4 +82,19 @@ describe('staff provisioning boundary', () => {
     expect(route).toContain("['Onboarding', 'Hired'].includes(body.status)");
     expect(route).not.toContain("['Selected', 'Offer Issued', 'Onboarding', 'Hired'].includes(body.status)");
   });
+
+  it('routes lifecycle-linked staff creation through the atomic promotion RPC', async () => {
+    const [route, migration] = await Promise.all([
+      import('node:fs/promises').then((fs) => fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8')),
+      import('node:fs/promises').then((fs) => fs.readFile(
+        'supabase/migrations/20260919zz_bimed_atomic_staff_promotion.sql',
+        'utf8',
+      )),
+    ]);
+    expect(route).toContain('lifecycle: {');
+    expect(route).toContain("toStatus: body.status as 'Onboarding' | 'Hired'");
+    expect(migration).toContain('bimed_promote_application_to_staff');
+    expect(migration).toContain('perform public.bimed_transition_application_status(');
+    expect(migration).toContain('insert into public.recruitment_staff(');
+  });
 });
