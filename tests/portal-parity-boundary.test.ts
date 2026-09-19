@@ -27,6 +27,9 @@ describe('BIMED portal parity boundary', () => {
     expect(staff360).toContain('Time & attendance');
     expect(staff360Api).toContain("from('recruitment_staff_attendance')");
 
+    expect(readFileSync('app/api/staff/auth/password-reset/route.ts', 'utf8')).toContain('staff-password-reset');
+    expect(readFileSync('app/staff/password-reset/page.tsx', 'utf8')).toContain('Send password reset link');
+
     const requiredFiles = [
       'app/api/staff/messages/route.ts',
       'app/api/staff/rota/route.ts',
