@@ -63,37 +63,27 @@ export async function issueAccommodationInvoice(input: {
       }
     : ACCOMMODATION_PAYMENT_ACCOUNT;
 
-  const now = new Date();
-  const issuedAt = now.toISOString();
-  const issueDate = issuedAt.slice(0, 10);
-  const dueDate = invoice.due_date || new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+  const dueDate = invoice.due_date || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
-  const { data: updatedInvoice, error: invoiceError } = await client
-    .from('recruitment_accommodation_invoices')
-    .update({
-      status: 'issued',
-      issue_date: issueDate,
-      due_date: dueDate,
-      issued_at: issuedAt,
-      payment_account_snapshot: accountSnapshot,
-      updated_at: issuedAt,
-    })
-    .eq('id', invoice.id)
-    .eq('status', 'draft')
-    .select('*')
-    .single();
+  const { data: atomicResult, error: invoiceError } = await client.rpc('bimed_issue_accommodation_invoice', {
+    p_invoice_id: invoice.id,
+    p_actor: actor,
+    p_due_date: dueDate,
+    p_payment_account_snapshot: accountSnapshot,
+  });
 
-  if (invoiceError || !updatedInvoice) {
-    throw new Error('ACCOMMODATION_INVOICE_ISSUE_FAILED');
+  if (invoiceError || !atomicResult?.invoice) {
+    throw new Error(invoiceError?.message || 'ACCOMMODATION_INVOICE_ISSUE_FAILED');
   }
 
-  await client
-    .from('recruitment_staff_permit_cases')
-    .update({
-      accommodation_payment_status: 'invoice_issued',
-      updated_at: issuedAt,
-    })
-    .eq('id', permit.id);
+  const updatedInvoice = atomicResult.invoice;
+  if (atomicResult.already_issued) {
+    return {
+      invoice: updatedInvoice,
+      publicUrl: `${appUrl()}/invoices/accommodation/${updatedInvoice.public_token}`,
+      alreadyIssued: true,
+    };
+  }
 
   const publicUrl = `${appUrl()}/invoices/accommodation/${updatedInvoice.public_token}`;
   const candidateEmail = application?.email || staff.email;
@@ -138,7 +128,7 @@ export async function issueAccommodationInvoice(input: {
     metadata: {
       invoice_number: updatedInvoice.invoice_number,
       amount_eur: updatedInvoice.amount_eur,
-      issued_at: issuedAt,
+      issued_at: updatedInvoice.issued_at,
       email_sent: emailSent,
       automatic,
     },
@@ -150,4 +140,42 @@ export async function issueAccommodationInvoice(input: {
     alreadyIssued: false,
     emailSent,
   };
+}
+
+
+export async function cancelAccommodationInvoice(input: {
+  client: SupabaseClient;
+  invoice: any;
+  staff: InvoiceStaff;
+  actor: string;
+}) {
+  const { client, invoice, staff, actor } = input;
+  if (!invoice) throw new Error('ACCOMMODATION_INVOICE_NOT_FOUND');
+
+  const { data, error } = await client.rpc('bimed_cancel_accommodation_invoice', {
+    p_invoice_id: invoice.id,
+    p_actor: actor,
+  });
+
+  if (error || !data?.invoice) {
+    throw new Error(error?.message || 'ACCOMMODATION_INVOICE_CANCEL_FAILED');
+  }
+
+  const cancelledInvoice = data.invoice;
+  await createStaffNotification(client, {
+    staffId: staff.id,
+    category: 'billing',
+    title: 'Accommodation invoice cancelled',
+    body: `BIMED has cancelled accommodation invoice ${cancelledInvoice.invoice_number}.`,
+    actionUrl: '/staff/permit',
+  });
+
+  await createStaffAudit(client, {
+    staffId: staff.id,
+    actor,
+    eventType: 'accommodation_invoice_cancelled',
+    metadata: { invoice_number: cancelledInvoice.invoice_number, atomic_workflow: true },
+  });
+
+  return cancelledInvoice;
 }

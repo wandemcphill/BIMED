@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/admin-session';
 import { db } from '@/lib/db';
-import { issueAccommodationInvoice } from '@/lib/accommodation-invoice-service';
+import { cancelAccommodationInvoice, issueAccommodationInvoice } from '@/lib/accommodation-invoice-service';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 import { appUrl, makeReceiptNumber, sendAccommodationEmail, ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE } from '@/lib/accommodation-billing';
 import { receiptHtml } from '@/lib/accommodation-documents';
@@ -129,19 +129,19 @@ export async function POST(request: NextRequest) {
 
   if (action === 'cancel_invoice') {
     if (!['issued', 'payment_reported', 'cancellation_requested'].includes(invoice.status)) return NextResponse.json({ error: 'Only active invoices can be cancelled.' }, { status: 409 });
-    const now = new Date().toISOString();
-    const { data: cancelled, error } = await client
-      .from('recruitment_accommodation_invoices')
-      .update({ status: 'cancelled', admin_action_at: now, admin_action_by: session.email, updated_at: now })
-      .eq('id', invoice.id)
-      .in('status', ['issued', 'payment_reported', 'cancellation_requested'])
-      .select('*')
-      .single();
-    if (error || !cancelled) return NextResponse.json({ error: 'Unable to cancel invoice.' }, { status: 500 });
-    await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'cancelled', updated_at: now }).eq('id', permit.id);
-    await createStaffNotification(client, { staffId: staff.id, category: 'billing', title: 'Accommodation invoice cancelled', body: `BIMED has cancelled accommodation invoice ${cancelled.invoice_number}.`, actionUrl: '/staff/permit' });
-    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'accommodation_invoice_cancelled', metadata: { invoice_number: cancelled.invoice_number } });
-    return NextResponse.json({ ok: true, invoice: cancelled });
+    try {
+      const cancelled = await cancelAccommodationInvoice({
+        client,
+        invoice,
+        staff,
+        actor: session.email,
+      });
+      return NextResponse.json({ ok: true, invoice: cancelled });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to cancel invoice.';
+      const status = message.includes('ACCOMMODATION_INVOICE_NOT_CANCELABLE') ? 409 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
   }
 
   if (action === 'send_invoice') {
