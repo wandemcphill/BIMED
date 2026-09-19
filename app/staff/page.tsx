@@ -136,8 +136,10 @@ export default function StaffDashboard() {
             <ToolCard title="Attendance" text="Record and review your attendance information." href="/staff/attendance" />
             <ToolCard title="Leave" text="Request time away and track approval decisions." onClick={() => setTab('leave')} />
             <ToolCard title="Payslips" text="View issued payslips and payroll records." onClick={() => setTab('pay')} />
-            {isIntake ? <ToolCard title="Employment contract" text="Open your signed BIMED employment contract and print/save a copy." href="/staff/documents/contract" />
-            <ToolCard title="My Documents" text="Open your signed contract, employee handbook and role documents in one place." href="/staff/documents" /> : null}
+            {isIntake ? <>
+              <ToolCard title="Employment contract" text="Open your signed BIMED employment contract and print/save a copy." href="/staff/documents/contract" />
+              <ToolCard title="My Documents" text="Open your signed contract, employee handbook and role documents in one place." href="/staff/documents" />
+            </> : null}
             <ToolCard title="My profile" text="Maintain your contact details and photograph." onClick={() => setTab('profile')} />
             {isIntake ? <ToolCard title="Onboarding" text="View the BIMED verification record and current recruitment-linked readiness." href="/staff/onboarding" /> : <ToolCard title="Work profile" text="Your internal BIMED employment details and workplace identity are managed here." onClick={() => setTab('profile')} />}
           </div></section>
