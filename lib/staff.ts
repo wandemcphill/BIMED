@@ -120,11 +120,11 @@ export async function createStaffFromApplication(
         .single();
       if (refreshError || !refreshed) throw refreshError || new Error('Unable to refresh the staff activation link.');
       await ensureBimedStaffOnboardingPackage(client, refreshed.id, application);
-      return { staff: refreshed, activationToken };
+      return { staff: refreshed, activationToken, provisioningWarning: null };
     }
 
     await ensureBimedStaffOnboardingPackage(client, existing.id, application);
-    return { staff: existing, activationToken: null as string | null };
+    return { staff: existing, activationToken: null as string | null, provisioningWarning: null };
   }
 
   if (!options?.lifecycle) {
