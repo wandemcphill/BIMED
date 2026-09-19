@@ -8,7 +8,7 @@ import { createSignedAudioUrl, INTERVIEW_AUDIO_BUCKET } from '@/lib/interview-au
 import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
-import { BimedLifecycleError, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
+import { BimedLifecycleError, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
