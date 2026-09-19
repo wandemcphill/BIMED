@@ -1,6 +1,8 @@
 name: BIMED Actions Smoke
 
 on:
+  push:
+    branches: [diag/bimed-actions-smoke-20260919]
   pull_request:
     branches: [main]
 
