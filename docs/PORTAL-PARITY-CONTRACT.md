@@ -25,7 +25,8 @@ Every portal must support and enforce:
 13. Workforce operations appropriate to the product, including shifts/rota, attendance/timesheets, leave and payroll/pay records.
 14. Administrative Staff 360/workforce oversight.
 15. Audit history for sensitive recruitment, contract, onboarding and workforce actions.
-16. Release/schema health checks and regression coverage for critical lifecycle rules.
+16. Critical invitations and lifecycle actions are idempotent or protected against concurrent duplicate execution.
+17. Release/schema health checks and regression coverage for critical lifecycle rules.
 
 ## Jurisdiction boundary
 
@@ -52,6 +53,8 @@ A candidate must never become a staff identity merely because an administrator c
 The backend must prove the applicable contract and readiness requirements before staff provisioning and before a status transition that represents staff conversion.
 
 The UI is a presentation layer. It is never the authority for eligibility.
+
+Invitation and status operations that can be triggered more than once must not create duplicate active records when the underlying business state permits only one active workflow.
 
 ## Change discipline
 
