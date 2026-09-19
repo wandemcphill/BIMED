@@ -26,7 +26,7 @@ describe('BIMED portal parity boundary', () => {
       'app/api/staff/permit/route.ts',
       'app/api/staff/travel/route.ts',
       'app/api/admin/staff/route.ts',
-      'app/api/admin/permit/page.tsx',
+      'app/admin/permit/page.tsx',
     ];
     for (const path of requiredFiles) expect(existsSync(path), path).toBe(true);
   });
