@@ -9,6 +9,7 @@ describe('BIMED staff password recovery', () => {
 
     expect(route).toContain('staff-password-reset-email:');
     expect(route).toContain('bimed_complete_staff_password_reset');
+    expect(route).toContain('staff-password-reset-token:');
     expect(migration).toContain('recruitment_staff_password_reset_tokens');
     expect(atomicMigration).toContain('bimed_complete_staff_password_reset');
     expect(atomicMigration).toContain('for update');
