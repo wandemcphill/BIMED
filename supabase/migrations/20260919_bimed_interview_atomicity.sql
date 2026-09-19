@@ -31,11 +31,7 @@ begin
   end if;
 
   if app_row.status <> 'Interview' then
-    if not (
-      (app_row.status = 'Submitted' and 'Interview' in ('Under Review','Interview','Rejected','Withdrawn'))
-      or (app_row.status = 'Under Review' and 'Interview' in ('Interview','Documents Awaiting','Rejected','Withdrawn'))
-      or (app_row.status = 'Interview')
-    ) then
+    if app_row.status not in ('Submitted','Under Review','Interview') then
       raise exception using
         errcode='P0001',
         message='STATUS_TRANSITION_BLOCKED',
