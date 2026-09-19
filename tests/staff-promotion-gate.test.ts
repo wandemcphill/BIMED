@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs/promises';
 import { createStaffFromApplication } from '@/lib/staff';
 
 function clientMock(signatureRow: unknown) {
@@ -63,5 +64,13 @@ describe('staff promotion contract gate', () => {
         signed_at: '2026-09-09T12:00:00.000Z',
       }), 'app-1'),
     ).rejects.toThrow('The signed contract role does not match the candidate\'s applied role.');
+  });
+});
+
+
+describe('staff promotion escape-hatch regression', () => {
+  it('does not expose an uncontracted hire override', async () => {
+    const source = await fs.readFile('lib/staff.ts', 'utf8');
+    expect(source).not.toContain('allowUncontractedHire');
   });
 });
