@@ -52,6 +52,7 @@ declare
   v_staff public.recruitment_staff%rowtype;
   v_application_id uuid;
   v_allowed boolean := false;
+  v_from_status text;
   v_now timestamptz := clock_timestamp();
 begin
   if nullif(btrim(p_actor), '') is null then raise exception 'PERMIT_ACTOR_REQUIRED'; end if;
@@ -71,6 +72,8 @@ begin
   for update;
 
   if not found then raise exception 'STAFF_NOT_FOUND'; end if;
+
+  v_from_status := v_permit.status;
 
   if p_to_status is null or p_to_status not in (
     'not_started','requested','admin_review','permit_preparation',
@@ -134,7 +137,7 @@ begin
     p_actor,
     'permit_status_transition',
     jsonb_build_object(
-      'from_status', v_permit.status,
+      'from_status', v_from_status,
       'to_status', p_to_status,
       'note', p_note,
       'atomic_workflow', true
