@@ -115,18 +115,41 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (body.action === 'update_pickup') {
       const { data: transfer } = await client.from('recruitment_arrival_transfers').select('*').eq('permit_case_id', current.id).maybeSingle();
       if (!transfer) return NextResponse.json({ error: 'Arrival transfer record not found.' }, { status: 404 });
-      const allowed = ['pending_flight_booking','ready_to_dispatch','supplier_requested','supplier_confirmed','driver_assigned','en_route','arrived','completed','cancelled','failed'];
       const status = String(body.status || transfer.status);
-      if (!allowed.includes(status)) return NextResponse.json({ error: 'Invalid pickup status.' }, { status: 400 });
-      const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
-      for (const key of ['supplier_booking_reference','driver_name','driver_phone','vehicle_description','driver_meet_point','supplier_status_note']) if (key in body) update[key] = String(body[key] || '').trim() || null;
-      if (status === 'supplier_confirmed' && !transfer.supplier_confirmed_at) update.supplier_confirmed_at = new Date().toISOString();
-      if (status === 'completed' && !transfer.completed_at) update.completed_at = new Date().toISOString();
-      if (status === 'cancelled' && !transfer.cancelled_at) update.cancelled_at = new Date().toISOString();
-      const { data: updated, error } = await client.from('recruitment_arrival_transfers').update(update).eq('id', transfer.id).select('*').single();
-      if (error || !updated) return NextResponse.json({ error: 'Unable to update the pickup.' }, { status: 500 });
-      if (['supplier_confirmed','driver_assigned','en_route'].includes(status)) await createStaffNotification(client, { staffId: id, category: 'travel', title: 'Airport pickup updated', body: updated.driver_name ? `Pickup status: ${status.replaceAll('_',' ')}. Driver: ${updated.driver_name}${updated.driver_phone ? ` · ${updated.driver_phone}` : ''}.` : `Pickup status: ${status.replaceAll('_',' ')}.`, actionUrl: '/staff/travel' });
-      await createStaffAudit(client, { staffId: id, actor: session.email, eventType: 'arrival_transfer_status_updated', metadata: { status, supplier_booking_reference: updated.supplier_booking_reference } });
+      const patch: Record<string, string> = {};
+      for (const key of ['supplier_booking_reference','driver_name','driver_phone','vehicle_description','driver_meet_point','supplier_status_note']) {
+        if (key in body) patch[key] = String(body[key] || '').trim();
+      }
+      if ('error' in body) patch.error = String(body.error || '').trim();
+
+      const { data: updated, error } = await client.rpc('bimed_transition_arrival_transfer_status', {
+        p_transfer_id: transfer.id,
+        p_actor: session.email,
+        p_to_status: status,
+        p_patch: patch,
+      });
+
+      if (error || !updated) {
+        const message = error?.message || 'Unable to update the pickup.';
+        const code = message.includes('ARRIVAL_TRANSFER_STATUS_TRANSITION_BLOCKED') ||
+          message.includes('ARRIVAL_TRANSFER_ITINERARY_REQUIRED') ? 409 :
+          message.includes('INVALID_ARRIVAL_TRANSFER_STATUS') ? 400 :
+          500;
+        return NextResponse.json({ error: message }, { status: code });
+      }
+
+      if (['supplier_confirmed','driver_assigned','en_route'].includes(status)) {
+        await createStaffNotification(client, {
+          staffId: id,
+          category: 'travel',
+          title: 'Airport pickup updated',
+          body: updated.driver_name
+            ? `Pickup status: ${status.replaceAll('_',' ')}. Driver: ${updated.driver_name}${updated.driver_phone ? ` · ${updated.driver_phone}` : ''}.`
+            : `Pickup status: ${status.replaceAll('_',' ')}.`,
+          actionUrl: '/staff/travel',
+        });
+      }
+
       return NextResponse.json({ transfer: updated });
     }
 
