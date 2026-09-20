@@ -18,6 +18,7 @@ declare
   v_invoice public.recruitment_accommodation_invoices%rowtype;
   v_permit public.recruitment_staff_permit_cases%rowtype;
   v_staff public.recruitment_staff%rowtype;
+  v_previous_invoice_status text;
   v_now timestamptz := clock_timestamp();
 begin
   if nullif(btrim(p_actor), '') is null then
@@ -37,6 +38,8 @@ begin
   if v_invoice.status not in ('issued', 'payment_reported', 'cancellation_requested') then
     raise exception 'ACCOMMODATION_INVOICE_NOT_CANCELABLE';
   end if;
+
+  v_previous_invoice_status := v_invoice.status;
 
   select *
     into v_permit
@@ -83,7 +86,7 @@ begin
     jsonb_build_object(
       'invoice_id', v_invoice.id,
       'invoice_number', v_invoice.invoice_number,
-      'previous_invoice_status', v_invoice.status,
+      'previous_invoice_status', v_previous_invoice_status,
       'permit_id', v_permit.id,
       'accommodation_payment_status', v_permit.accommodation_payment_status,
       'atomic_workflow', true
