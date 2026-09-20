@@ -12,7 +12,7 @@ function validEmail(value: string) {
   return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(value) && !/[\r\n\t]/.test(value);
 }
 
-async function sendSupplierEmail(input: { staff: any; transfer: any }) {
+async function sendSupplierEmail(input: { staff: any; transfer: any; idempotencyKey?: string }) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) return { status: 'not_configured' as const };
   if (!validEmail(input.transfer.supplier_email)) return { status: 'invalid_recipient' as const };
@@ -37,7 +37,7 @@ async function sendSupplierEmail(input: { staff: any; transfer: any }) {
   ].join('\n');
 
   const resend = new Resend(apiKey);
-  const { data, error } = await resend.emails.send({ from: getResendFromEmail(), to: input.transfer.supplier_email, subject, html, text, replyTo: 'overseas@bimedhealthcare.com' });
+  const { data, error } = await resend.emails.send({ from: getResendFromEmail(), to: input.transfer.supplier_email, subject, html, text, replyTo: 'overseas@bimedhealthcare.com' }, input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined);
   if (error) return { status: 'failed' as const, reason: error.message };
   return { status: 'sent' as const, messageId: data?.id || null };
 }
