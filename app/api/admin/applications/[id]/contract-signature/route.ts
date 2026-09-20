@@ -72,13 +72,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       issuedBy: session.email,
     });
 
-    await recordRecruitmentAudit(client, {
-      applicationId: application.id,
-      eventType: 'contract_signature_requested',
-      actor: session.email,
-      metadata: { signature_id: record.id, role_slug: expectedRoleSlug, start_date: startDate, canonical_default_start_date: BIMED_DEFAULT_START_DATE },
-    });
-
     const email = await sendContractReadyToSignEmail(
       { application, signUrl, signatureId: record.id },
       client
