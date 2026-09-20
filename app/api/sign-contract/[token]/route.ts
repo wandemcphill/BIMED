@@ -40,6 +40,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const signature = await getContractSignatureByToken(token);
     if (!signature) return NextResponse.json({ error: 'Signature request not found.' }, { status: 404 });
+    if (signature.status === 'revoked') return NextResponse.json({ error: 'This contract-signing link has been superseded. Ask BIMED to issue the current contract link.' }, { status: 409 });
     if (signature.status === 'signed') return NextResponse.json({ error: 'This contract has already been signed.' }, { status: 409 });
     if (signature.expires_at && new Date(signature.expires_at).getTime() < Date.now()) return NextResponse.json({ error: 'This signing link has expired. Ask Bimed to issue a new one.' }, { status: 410 });
 
