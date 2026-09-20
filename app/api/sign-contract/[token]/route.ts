@@ -53,7 +53,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     let staffProvisioning: { staff: any; activationSent: boolean } | null = null;
     try {
-      const provisioned = await createStaffFromApplication(client, updated.application_id);
+      const provisioned = await createStaffFromApplication(client, updated.application_id, {
+        lifecycle: {
+          toStatus: 'Onboarding',
+          actor: 'system:contract-signature',
+          note: 'Contract signed by candidate. Promote into the canonical onboarding lifecycle when readiness gates pass.',
+        },
+      });
       if (provisioned.activationToken && provisioned.staff) {
         const activation = await sendStaffPortalActivationEmail(client, provisioned.staff, provisioned.activationToken, application?.email || null);
         staffProvisioning = { staff: provisioned.staff, activationSent: activation.status === 'sent' };
