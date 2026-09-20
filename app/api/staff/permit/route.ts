@@ -477,9 +477,18 @@ export async function POST(request: NextRequest) {
     if (!current.permit_submission_route || !current.permit_type) return NextResponse.json({ error: 'Select the employment-permit submission route before requesting permit assistance.' }, { status: 409 });
     if (['permit_granted','visa_granted','arrived','closed'].includes(current.status)) return NextResponse.json({ error: 'This permit journey has already progressed beyond the request stage.' }, { status: 409 });
     if (current.status === 'requested' || current.requested_at) return NextResponse.json({ permit: current, already_requested: true }, { status: 200 });
-    const now = new Date().toISOString();
-    const { data: updated, error } = await client.from('recruitment_staff_permit_cases').update({ status: 'requested', requested_at: now, updated_at: now }).eq('staff_id', staff.id).select('*').single();
-    if (error || !updated) return NextResponse.json({ error: 'Unable to submit the sponsorship request.' }, { status: 500 });
+    const { data: updated, error } = await client.rpc('bimed_transition_staff_permit_status', {
+      p_permit_case_id: current.id,
+      p_actor: session.email,
+      p_to_status: 'requested',
+      p_note: 'Employment permit assistance requested by staff member.',
+    });
+    if (error || !updated) {
+      const message = error?.message || 'Unable to submit the sponsorship request.';
+      const status = message.includes('PERMIT_STATUS_TRANSITION_BLOCKED') ? 409 :
+        message.includes('INVALID_PERMIT_STATUS') ? 400 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
     await createStaffNotification(client, { staffId: staff.id, category: 'permit', title: 'Employment permit assistance requested', body: `Your ${updated.permit_type === 'critical_skills_employment_permit' ? 'Critical Skills Employment Permit' : 'General Employment Permit'} route has been selected and your request has been received. BIMED will review your complete profile and prepare the relevant documentation.`, actionUrl: '/staff/permit' });
     return NextResponse.json({ permit: updated, already_requested: false }, { status: 201 });
   }
