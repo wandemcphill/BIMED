@@ -194,10 +194,11 @@ begin
   where id = v_transfer.permit_case_id;
 
   insert into public.recruitment_staff_audit_log(
-    staff_id, actor, event_type, metadata
+    staff_id, action, actor, event_type, metadata
   )
   values (
     v_staff_id,
+    'arrival_transfer_supplier_dispatched',
     p_actor,
     'arrival_transfer_supplier_dispatched',
     jsonb_build_object(
@@ -255,10 +256,11 @@ begin
   where id = v_transfer.permit_case_id;
 
   insert into public.recruitment_staff_audit_log(
-    staff_id, actor, event_type, metadata
+    staff_id, action, actor, event_type, metadata
   )
   values (
     v_staff_id,
+    'arrival_transfer_dispatch_failed',
     p_actor,
     'arrival_transfer_dispatch_failed',
     jsonb_build_object(
