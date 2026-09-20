@@ -187,7 +187,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         });
         if (error || !permit) {
           const message = error?.message || 'Unable to update permit journey.';
-          const status = message.includes('PERMIT_STATUS_TRANSITION_BLOCKED') ? 409 : 500;
+          const status = message.includes('PERMIT_STATUS_TRANSITION_BLOCKED') ? 409 :
+            message.includes('INVALID_PERMIT_STATUS') ? 400 : 500;
           return NextResponse.json({ error: message }, { status });
         }
         await createStaffNotification(client, {
@@ -207,11 +208,36 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       }
     }
 
-    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    for (const key of ['permit_type','permit_application_id','permit_decision','permit_refusal_reason','visa_status','visa_application_reference','visa_decision','visa_refusal_reason','accommodation_payment_status','accommodation_refund_status','accommodation_refund_amount_eur','accommodation_refund_installments_paid','accommodation_agreement_path','notes']) if (key in body) update[key] = body[key];
+    const detailKeys = [
+      'permit_type',
+      'permit_application_id',
+      'permit_refusal_reason',
+      'visa_status',
+      'visa_application_reference',
+      'visa_refusal_reason',
+      'notes',
+    ] as const;
+    const patch = Object.fromEntries(
+      detailKeys
+        .filter((key) => key in body)
+        .map((key) => [key, body[key]]),
+    );
 
-    const { data: permit, error } = await client.from('recruitment_staff_permit_cases').update(update).eq('staff_id', id).select('*').single();
-    if (error || !permit) return NextResponse.json({ error: 'Unable to update permit case fields.' }, { status: 500 });
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: 'No editable permit details were supplied.' }, { status: 400 });
+    }
+
+    const { data: permit, error } = await client.rpc('bimed_update_staff_permit_details', {
+      p_permit_case_id: current.id,
+      p_actor: session.email,
+      p_patch: patch,
+    });
+    if (error || !permit) {
+      const message = error?.message || 'Unable to update permit case details.';
+      const status = message.includes('STATUS_REQUIRED') || message.includes('STAGE_REQUIRED') ? 409 :
+        message.includes('FIELD_NOT_ALLOWED') || message.includes('PATCH_REQUIRED') ? 400 : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
     const { data: transfer } = await client.from('recruitment_arrival_transfers').select('*').eq('permit_case_id', current.id).maybeSingle();
     const { data: itinerary } = await client.from('recruitment_flight_itineraries').select('*').eq('permit_case_id', current.id).maybeSingle();
     return NextResponse.json({ permit, itinerary: itinerary || null, transfer: transfer || null });
