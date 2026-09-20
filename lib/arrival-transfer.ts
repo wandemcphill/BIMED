@@ -43,23 +43,58 @@ async function sendSupplierEmail(input: { staff: any; transfer: any }) {
 }
 
 export async function dispatchArrivalTransfer(input: { client: SupabaseClient; staff: any; permit: any; itinerary: any; transfer: any; actor: string }) {
-  if (!input.itinerary || input.itinerary.booking_status !== 'booked') throw new Error('Book the flight and save the confirmed flight details before dispatching the airport pickup.');
-  if (!input.transfer.destination_address?.trim()) throw new Error('Set the BIMED accommodation address before dispatching the airport pickup.');
-  if (!input.itinerary.flight_number?.trim() || !input.itinerary.arrival_at) throw new Error('Confirmed flight number and arrival time are required before pickup dispatch.');
-  if (input.transfer.supplier_request_message_id || ['supplier_requested','supplier_confirmed','driver_assigned','en_route','arrived','completed'].includes(input.transfer.status)) {
-    throw new Error('This airport pickup has already been dispatched or progressed. Use the pickup status controls instead of sending another supplier request.');
+  const { data: prepared, error: prepareError } = await input.client.rpc('bimed_prepare_arrival_transfer_dispatch', {
+    p_transfer_id: input.transfer.id,
+    p_actor: input.actor,
+  });
+  if (prepareError || !prepared?.transfer) {
+    throw new Error(prepareError?.message || 'Unable to prepare the airport pickup dispatch.');
   }
 
-  const now = new Date().toISOString();
-  const transfer = { ...input.transfer, status: 'supplier_requested', supplier_name: ARRIVAL_TRANSFER_SUPPLIER.name, supplier_email: ARRIVAL_TRANSFER_SUPPLIER.email, flight_number: input.itinerary.flight_number, flight_booking_reference: input.itinerary.booking_reference, flight_arrival_at: input.itinerary.arrival_at, passenger_count: input.itinerary.passenger_count, passenger_names: input.itinerary.passengers, updated_at: now };
-  const result = await sendSupplierEmail({ staff: input.staff, transfer });
+  const transfer = prepared.transfer;
+  const idempotencyKey = prepared.idempotency_key;
+  const transferForEmail = {
+    ...transfer,
+    supplier_name: ARRIVAL_TRANSFER_SUPPLIER.name,
+    supplier_email: ARRIVAL_TRANSFER_SUPPLIER.email,
+  };
+
+  const result = await sendSupplierEmail({ staff: input.staff, transfer: transferForEmail, idempotencyKey });
   if (result.status !== 'sent') {
-    const status = result.status === 'not_configured' ? 'not_configured' : result.status === 'invalid_recipient' ? 'invalid_recipient' : result.reason;
-    await input.client.from('recruitment_arrival_transfers').update({ status: 'failed', last_error: status, updated_at: now }).eq('id', input.transfer.id);
-    throw new Error(result.status === 'not_configured' ? 'BIMED supplier dispatch email is not configured.' : `Supplier dispatch failed: ${status}`);
+    const reason = result.status === 'not_configured'
+      ? 'BIMED supplier dispatch email is not configured.'
+      : result.status === 'invalid_recipient'
+        ? 'BIMED supplier dispatch recipient is invalid.'
+        : 'Supplier dispatch failed: ' + result.reason;
+
+    try {
+      await input.client.rpc('bimed_fail_arrival_transfer_dispatch', {
+        p_transfer_id: input.transfer.id,
+        p_actor: input.actor,
+        p_error: reason,
+      });
+    } catch (failureError) {
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'arrival_transfer_dispatch_failure_recording_failed',
+        transfer_id: input.transfer.id,
+        reason: failureError instanceof Error ? failureError.message : String(failureError),
+      }));
+    }
+
+    throw new Error(reason);
   }
 
-  const { data: updated, error } = await input.client.from('recruitment_arrival_transfers').update({ ...transfer, supplier_request_sent_at: now, supplier_request_message_id: result.messageId, last_error: null }).eq('id', input.transfer.id).select('*').single();
-  if (error || !updated) throw error || new Error('Supplier dispatch was sent but the dispatch record could not be updated.');
+  const { data: updated, error: completeError } = await input.client.rpc('bimed_complete_arrival_transfer_dispatch', {
+    p_transfer_id: input.transfer.id,
+    p_actor: input.actor,
+    p_message_id: result.messageId || 'resend:unknown',
+    p_sent_at: new Date().toISOString(),
+  });
+
+  if (completeError || !updated) {
+    throw new Error(completeError?.message || 'Supplier dispatch was sent but the dispatch state could not be finalised. Retry the same dispatch to reconcile it safely.');
+  }
+
   return updated;
 }
