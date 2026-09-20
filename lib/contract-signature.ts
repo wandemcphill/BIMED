@@ -12,7 +12,7 @@ export type ContractSignatureRecord = {
   employee_name: string;
   employee_address: string | null;
   start_date: string | null;
-  status: 'issued' | 'signed';
+  status: 'issued' | 'signed' | 'revoked';
   signed_name: string | null;
   signed_at: string | null;
   issued_by: string;
@@ -46,6 +46,23 @@ export async function createDocumentSignatureRequest(input: {
   const token = makeToken();
   const expiresAt = new Date(Date.now() + SIGNING_LINK_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+  if (input.docType === 'contract') {
+    const { data, error } = await db().rpc('bimed_issue_contract_signature_request', {
+      p_application_id: input.applicationId,
+      p_role_slug: input.roleSlug,
+      p_token_hash: hashToken(token),
+      p_employee_name: input.employeeName,
+      p_employee_address: input.employeeAddress,
+      p_start_date: input.startDate,
+      p_issued_by: input.issuedBy,
+      p_expires_at: expiresAt,
+    });
+    if (error || !data) {
+      throw new Error(error?.message || 'Unable to create signature request.');
+    }
+    return { record: data as ContractSignatureRecord, token, signUrl: documentSigningUrl(input.docType, token) };
+  }
+
   const { data, error } = await db()
     .from('recruitment_contract_signatures')
     .insert({
@@ -62,9 +79,7 @@ export async function createDocumentSignatureRequest(input: {
     .select('*')
     .single();
 
-  if (error || !data) {
-    throw new Error(error?.message || 'Unable to create signature request.');
-  }
+  if (error || !data) throw new Error(error?.message || 'Unable to create signature request.');
 
   return { record: data as ContractSignatureRecord, token, signUrl: documentSigningUrl(input.docType, token) };
 }
