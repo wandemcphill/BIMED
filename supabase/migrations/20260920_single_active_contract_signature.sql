@@ -64,8 +64,7 @@ begin
   update public.recruitment_contract_signatures
   set status = 'revoked',
       revoked_at = v_now,
-      revoked_reason = 'Replaced by a newer BIMED contract-signature request.',
-      updated_at = v_now
+      revoked_reason = 'Replaced by a newer BIMED contract-signature request.'
   where application_id = p_application_id
     and doc_type = 'contract'
     and status = 'issued';
@@ -144,8 +143,7 @@ with ranked as (
 update public.recruitment_contract_signatures c
 set status = 'revoked',
     revoked_at = clock_timestamp(),
-    revoked_reason = 'Historical reconciliation: superseded by a newer issued contract-signature request.',
-    updated_at = clock_timestamp()
+    revoked_reason = 'Historical reconciliation: superseded by a newer issued contract-signature request.'
 from ranked r
 where c.id = r.id
   and r.rn > 1;
