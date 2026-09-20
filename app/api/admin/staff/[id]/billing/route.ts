@@ -2,17 +2,61 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/admin-session';
 import { db } from '@/lib/db';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
-import { ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl, makeReceiptNumber, sendAccommodationEmail } from '@/lib/accommodation-billing';
+import { ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl, sendAccommodationEmail } from '@/lib/accommodation-billing';
 import { receiptHtml } from '@/lib/accommodation-documents';
 import { recordAccommodationPaymentAtomic } from '@/lib/staff-portal-workflow';
 import { issueAccommodationInvoice } from '@/lib/accommodation-invoice-service';
 function safePublicUrl(token: string) { return `${appUrl()}/invoices/accommodation/${token}`; }
-async function issueReceiptForPaidInvoice(client: ReturnType<typeof db>, invoice: any, staff: any, application: any, permit: any) {
-  const { data: existingReceipt } = await client.from('recruitment_accommodation_receipts').select('*').eq('invoice_id', invoice.id).maybeSingle(); if (existingReceipt) return { receipt: existingReceipt, publicUrl: `${safePublicUrl(invoice.public_token)}?receipt=1`, created: false };
-  const receiptIssuedAt = new Date().toISOString(); const { data: receipt, error } = await client.from('recruitment_accommodation_receipts').insert({ invoice_id: invoice.id, receipt_number: makeReceiptNumber(new Date(receiptIssuedAt)), amount_eur: invoice.amount_eur, currency: invoice.currency, paid_at: invoice.paid_at || receiptIssuedAt, payment_reference: invoice.payment_reference, payment_method: invoice.payment_method, issued_by: `${ACCOMMODATION_SIGNATORY_NAME} · ${ACCOMMODATION_SIGNATORY_TITLE}`, notes: `Automatically issued upon payment confirmation. Authorised by ${ACCOMMODATION_SIGNATORY_NAME}.` }).select('*').single();
-  if (error || !receipt) throw new Error('Unable to create the professional receipt.'); await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'paid_receipted', updated_at: receiptIssuedAt }).eq('id', permit.id); const publicUrl = `${safePublicUrl(invoice.public_token)}?receipt=1`;
-  try { await sendAccommodationEmail({ to: [application?.email || staff.email], subject: `BIMED payment receipt ${receipt.receipt_number}`, html: receiptHtml({ receipt, invoice, staff, publicUrl }) }); } catch (emailError) { console.error(JSON.stringify({ level: 'error', event: 'accommodation_receipt_email_failed', receipt_id: receipt.id, reason: emailError instanceof Error ? emailError.message : String(emailError) })); }
-  await createStaffAudit(client, { staffId: staff.id, actor: ACCOMMODATION_SIGNATORY_NAME, eventType: 'accommodation_payment_receipt_issued', metadata: { receipt_number: receipt.receipt_number, invoice_number: invoice.invoice_number, issued_by: ACCOMMODATION_SIGNATORY_NAME } }); return { receipt, publicUrl, created: true };
+async function issueReceiptForPaidInvoice(
+  client: ReturnType<typeof db>,
+  invoice: any,
+  staff: any,
+  application: any,
+  _permit: any,
+  actor: string,
+) {
+  const { data: result, error } = await client.rpc('bimed_issue_accommodation_receipt', {
+    p_invoice_id: invoice.id,
+    p_actor: actor,
+    p_receipt_issued_by: `${ACCOMMODATION_SIGNATORY_NAME} · ${ACCOMMODATION_SIGNATORY_TITLE}`,
+  });
+
+  if (error || !result) {
+    throw new Error(error?.message || 'Unable to issue the professional receipt.');
+  }
+
+  const { data: receipt, error: receiptError } = await client
+    .from('recruitment_accommodation_receipts')
+    .select('*')
+    .eq('id', result.receipt_id)
+    .single();
+
+  if (receiptError || !receipt) {
+    throw new Error('The receipt was committed but could not be reloaded.');
+  }
+
+  const publicUrl = `${safePublicUrl(invoice.public_token)}?receipt=1`;
+
+  try {
+    await sendAccommodationEmail({
+      to: [application?.email || staff.email],
+      subject: `BIMED payment receipt ${receipt.receipt_number}`,
+      html: receiptHtml({ receipt, invoice, staff, publicUrl }),
+    });
+  } catch (emailError) {
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'accommodation_receipt_email_failed',
+      receipt_id: receipt.id,
+      reason: emailError instanceof Error ? emailError.message : String(emailError),
+    }));
+  }
+
+  return {
+    receipt,
+    publicUrl,
+    created: !result.already_exists,
+  };
 }
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession(request); if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 }); const { id } = await context.params; const client = db();
@@ -94,21 +138,36 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   if (action === 'cancel_invoice') {
     if (!invoice) return NextResponse.json({ error: 'No accommodation invoice exists yet.' }, { status: 404 });
     if (!['issued', 'payment_reported', 'cancellation_requested'].includes(invoice.status)) return NextResponse.json({ error: 'Only an active invoice can be cancelled.' }, { status: 409 });
-    const now = new Date().toISOString();
-    const { data: cancelled, error: cancelError } = await client
-      .from('recruitment_accommodation_invoices')
-      .update({ status: 'cancelled', admin_action_at: now, admin_action_by: session.email, updated_at: now })
-      .eq('id', invoice.id)
-      .in('status', ['issued', 'payment_reported', 'cancellation_requested'])
-      .select('*')
-      .single();
-    if (cancelError || !cancelled) return NextResponse.json({ error: 'Unable to cancel the invoice.' }, { status: 500 });
-    await client.from('recruitment_staff_permit_cases').update({ accommodation_payment_status: 'cancelled', updated_at: now }).eq('id', permit.id);
-    await createStaffNotification(client, { staffId: staff.id, category: 'billing', title: 'Accommodation invoice cancelled', body: `BIMED has cancelled accommodation invoice ${cancelled.invoice_number}.`, actionUrl: '/staff/permit' });
-    await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'accommodation_invoice_cancelled', metadata: { invoice_number: cancelled.invoice_number } });
-    return NextResponse.json({ invoice: cancelled });
+
+    try {
+      const { data: result, error } = await client.rpc('bimed_cancel_accommodation_invoice', {
+        p_invoice_id: invoice.id,
+        p_actor: session.email,
+      });
+
+      if (error || !result?.invoice) {
+        const message = error?.message || 'Unable to cancel the invoice.';
+        const status = message.includes('ACCOMMODATION_INVOICE_NOT_CANCELABLE') ? 409 : 500;
+        return NextResponse.json({ error: message }, { status });
+      }
+
+      const cancelled = result.invoice;
+      await createStaffNotification(client, {
+        staffId: staff.id,
+        category: 'billing',
+        title: 'Accommodation invoice cancelled',
+        body: `BIMED has cancelled accommodation invoice ${cancelled.invoice_number}.`,
+        actionUrl: '/staff/permit',
+      });
+
+      return NextResponse.json({ invoice: cancelled });
+    } catch (error) {
+      return NextResponse.json({
+        error: error instanceof Error ? error.message : 'Unable to cancel the invoice.',
+      }, { status: 500 });
+    }
   }
 
-  if (action === 'issue_receipt') { if (!invoice || invoice.status !== 'paid') return NextResponse.json({ error: 'Record payment before issuing a receipt.' }, { status: 409 }); const receiptResult = await issueReceiptForPaidInvoice(client, invoice, staff, application, permit); return NextResponse.json({ receipt: receiptResult.receipt, publicUrl: receiptResult.publicUrl }); }
+  if (action === 'issue_receipt') { if (!invoice || invoice.status !== 'paid') return NextResponse.json({ error: 'Record payment before issuing a receipt.' }, { status: 409 }); const receiptResult = await issueReceiptForPaidInvoice(client, invoice, staff, application, permit, session.email); return NextResponse.json({ receipt: receiptResult.receipt, publicUrl: receiptResult.publicUrl }); }
   return NextResponse.json({ error: 'Unsupported billing action.' }, { status: 400 });
 }
