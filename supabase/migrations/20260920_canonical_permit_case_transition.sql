@@ -24,6 +24,7 @@ declare
   v_now timestamptz := clock_timestamp();
   v_changed_status boolean := false;
   v_changed_work_auth boolean := false;
+  v_previous_status text;
 begin
   if nullif(btrim(p_actor), '') is null then
     raise exception 'PERMIT_CASE_ACTOR_REQUIRED';
@@ -57,6 +58,8 @@ begin
     where id = v_staff.application_id
     for update;
   end if;
+
+  v_previous_status := v_permit.status;
 
   v_new_status := case
     when p_patch ? 'status' then nullif(btrim(p_patch->>'status'), '')
@@ -154,7 +157,7 @@ begin
     'employment_permit_case_updated',
     jsonb_build_object(
       'permit_id', v_permit.id,
-      'from_status', case when v_changed_status then v_permit.status else v_permit.status end,
+      'from_status', v_previous_status,
       'to_status', v_new_status,
       'work_authorised', v_permit.work_authorised,
       'shift_eligibility', v_permit.shift_eligibility,
@@ -173,7 +176,7 @@ begin
       'employment_permit_case_status_changed',
       jsonb_build_object(
         'permit_id', v_permit.id,
-        'from_status', v_permit.status,
+        'from_status', v_previous_status,
         'to_status', v_new_status,
         'atomic_workflow', true
       )
