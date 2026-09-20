@@ -38,7 +38,24 @@ export async function POST(request: NextRequest) {
       const token = crypto.randomBytes(32).toString('base64url'); const tokenHash = crypto.createHash('sha256').update(token).digest('hex'); const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); const bimedId = createBimedId();
       const { data: staff, error } = await client.from('recruitment_staff').insert({ application_id: null, bimed_id: bimedId, status: 'active', full_name: fullName, email, phone: body.phone?.trim() || null, job_title: jobTitle, role: INTERNAL_ROLE_LABEL, employment_start_date: startDate, employment_type: employmentType, department, manager_name: body.managerName?.trim() || null, address_line_1: body.address?.trim() || null, city: body.city?.trim() || null, county: body.county?.trim() || null, eircode: body.eircode?.trim() || null, country: body.country?.trim() || 'Ireland', activation_token_hash: tokenHash, activation_expires_at: expires, auth_version: 1, session_version: 1 }).select('*').single(); if (error || !staff) throw error || new Error('Unable to create the BIMED staff account.'); await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'internal_staff_created', metadata: { department, job_title: jobTitle, employment_type: employmentType } }); return NextResponse.json({ staff, activationUrl: createActivationUrl(request, token, staff.email) }, { status: 201 });
     }
-    if (body.action === 'promote') { if (!body.applicationId) return NextResponse.json({ error: 'applicationId is required.' }, { status: 400 }); const result = await createStaffFromApplication(client, body.applicationId); await createStaffAudit(client, { staffId: result.staff.id, actor: session.email, eventType: 'staff_identity_created', metadata: { application_id: body.applicationId } }); const activationUrl = result.activationToken ? createActivationUrl(request, result.activationToken, result.staff.email) : null; let welcomeEmailSent = false; if (result.activationToken) { const welcomeEmail = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken); welcomeEmailSent = welcomeEmail.status === 'sent'; } return NextResponse.json({ staff: result.staff, activationUrl, welcomeEmailSent }); }
+    if (body.action === 'promote') {
+      if (!body.applicationId) return NextResponse.json({ error: 'applicationId is required.' }, { status: 400 });
+      const result = await createStaffFromApplication(client, body.applicationId, {
+        lifecycle: {
+          toStatus: 'Onboarding',
+          actor: session.email,
+          note: 'Staff promotion initiated from Workforce Staff admin action.',
+        },
+      });
+      await createStaffAudit(client, { staffId: result.staff.id, actor: session.email, eventType: 'staff_identity_created', metadata: { application_id: body.applicationId, lifecycle: 'Onboarding', atomic_workflow: true } });
+      const activationUrl = result.activationToken ? createActivationUrl(request, result.activationToken, result.staff.email) : null;
+      let welcomeEmailSent = false;
+      if (result.activationToken) {
+        const welcomeEmail = await sendStaffPortalActivationEmail(client, result.staff, result.activationToken);
+        welcomeEmailSent = welcomeEmail.status === 'sent';
+      }
+      return NextResponse.json({ staff: result.staff, activationUrl, welcomeEmailSent, provisioningWarning: result.provisioningWarning || null });
+    }
     if (body.action === 'status') {
       const allowed = ['pre_arrival', 'active', 'on_leave', 'suspended', 'former']; if (!body.staffId || !body.status || !allowed.includes(body.status)) return NextResponse.json({ error: 'Valid staffId and status are required.' }, { status: 400 });
       const { data: target } = await client.from('recruitment_staff').select('id,application_id,status,portal_restriction_reason').eq('id', body.staffId).maybeSingle(); if (!target) return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 });
