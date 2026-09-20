@@ -131,21 +131,65 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       return NextResponse.json({ transfer: updated });
     }
 
+    if (body.action === 'set_work_authorisation') {
+      const verified = Boolean(body.work_authorised);
+      try {
+        const { data: permit, error } = await client.rpc('bimed_set_staff_work_authorisation', {
+          p_permit_case_id: current.id,
+          p_actor: session.email,
+          p_work_authorised: verified,
+          p_evidence_note: String(body.evidence_note || '').trim(),
+        });
+        if (error || !permit) {
+          const message = error?.message || 'Unable to update work authorisation.';
+          const status = message.includes('WORK_AUTHORISATION_STATUS_NOT_ELIGIBLE') || message.includes('WORK_AUTHORISATION_EVIDENCE_REQUIRED') ? 409 : 500;
+          return NextResponse.json({ error: message }, { status });
+        }
+        const notice = permit.work_authorised
+          ? 'BIMED has verified your right to work and enabled shift eligibility subject to normal rota requirements.'
+          : 'BIMED has revoked work authorisation for this case. Shift eligibility is blocked until BIMED verifies permission again.';
+        await createStaffNotification(client, { staffId: id, category: 'permit', title: 'Work authorisation updated', body: notice, actionUrl: '/staff/permit' });
+        return NextResponse.json({ permit });
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to update work authorisation.' }, { status: 500 });
+      }
+    }
+
+    if (body.status) {
+      try {
+        const { data: permit, error } = await client.rpc('bimed_transition_staff_permit_status', {
+          p_permit_case_id: current.id,
+          p_actor: session.email,
+          p_to_status: String(body.status),
+          p_note: typeof body.note === 'string' ? body.note.trim() || null : null,
+        });
+        if (error || !permit) {
+          const message = error?.message || 'Unable to update permit journey.';
+          const status = message.includes('PERMIT_STATUS_TRANSITION_BLOCKED') ? 409 : 500;
+          return NextResponse.json({ error: message }, { status });
+        }
+        await createStaffNotification(client, {
+          staffId: id,
+          category: 'permit',
+          title: 'Employment permit journey updated',
+          body: permit.work_authorised
+            ? 'BIMED has updated your immigration/work-authorisation status. Your shift eligibility remains enabled subject to normal rota requirements.'
+            : 'Your permit journey is now ' + permit.status + '. You are not permitted to take shifts until BIMED confirms that you have the required permission to work in Ireland.',
+          actionUrl: '/staff/permit',
+        });
+        const { data: transferAfterTransition } = await client.from('recruitment_arrival_transfers').select('*').eq('permit_case_id', current.id).maybeSingle();
+        const { data: itineraryAfterTransition } = await client.from('recruitment_flight_itineraries').select('*').eq('permit_case_id', current.id).maybeSingle();
+        return NextResponse.json({ permit, itinerary: itineraryAfterTransition || null, transfer: transferAfterTransition || null });
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to update permit journey.' }, { status: 500 });
+      }
+    }
+
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    for (const key of ['status','permit_type','permit_application_id','permit_decision','permit_refusal_reason','visa_status','visa_application_reference','visa_decision','visa_refusal_reason','accommodation_payment_status','accommodation_refund_status','accommodation_refund_amount_eur','accommodation_refund_installments_paid','accommodation_agreement_path','notes']) if (key in body) update[key] = body[key];
-    if ('work_authorised' in body) { update.work_authorised = Boolean(body.work_authorised); update.shift_eligibility = body.work_authorised ? 'eligible' : 'blocked'; }
-    if (['permit_submitted','permit_granted','permit_refused'].includes(String(body.status))) update.permit_submitted_at = current.permit_submitted_at || new Date().toISOString();
-    if (['permit_granted','permit_refused'].includes(String(body.status))) update.permit_decision_at = new Date().toISOString();
-    if (body.status === 'visa_submitted') update.visa_submitted_at = current.visa_submitted_at || new Date().toISOString();
-    if (['visa_granted','visa_refused'].includes(String(body.status))) update.visa_decision_at = new Date().toISOString();
+    for (const key of ['permit_type','permit_application_id','permit_decision','permit_refusal_reason','visa_status','visa_application_reference','visa_decision','visa_refusal_reason','accommodation_payment_status','accommodation_refund_status','accommodation_refund_amount_eur','accommodation_refund_installments_paid','accommodation_agreement_path','notes']) if (key in body) update[key] = body[key];
 
     const { data: permit, error } = await client.from('recruitment_staff_permit_cases').update(update).eq('staff_id', id).select('*').single();
-    if (error || !permit) return NextResponse.json({ error: 'Unable to update permit journey.' }, { status: 500 });
-    if (body.status || 'work_authorised' in body) {
-      const notice = permit.shift_eligibility === 'eligible' ? 'BIMED has updated your immigration/work-authorisation status. Your shift eligibility is now enabled subject to normal rota requirements.' : `Your permit journey is now ${permit.status}. You are not permitted to take shifts until BIMED confirms that you have the required permission to work in Ireland.`;
-      await createStaffNotification(client, { staffId: id, category: 'permit', title: 'Employment permit journey updated', body: notice, actionUrl: '/staff/permit' });
-      await createStaffAudit(client, { staffId: id, actor: session.email, eventType: 'employment_permit_case_updated', metadata: { status: permit.status, work_authorised: permit.work_authorised, shift_eligibility: permit.shift_eligibility } });
-    }
+    if (error || !permit) return NextResponse.json({ error: 'Unable to update permit case fields.' }, { status: 500 });
     const { data: transfer } = await client.from('recruitment_arrival_transfers').select('*').eq('permit_case_id', current.id).maybeSingle();
     const { data: itinerary } = await client.from('recruitment_flight_itineraries').select('*').eq('permit_case_id', current.id).maybeSingle();
     return NextResponse.json({ permit, itinerary: itinerary || null, transfer: transfer || null });
