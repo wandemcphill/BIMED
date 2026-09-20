@@ -109,7 +109,6 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       if (!itinerary || !transfer) return NextResponse.json({ error: 'Flight and airport pickup records must exist before dispatch.' }, { status: 404 });
       const updated = await dispatchArrivalTransfer({ client, staff, permit: current, itinerary, transfer, actor: session.email });
       await createStaffNotification(client, { staffId: id, category: 'travel', title: 'Airport pickup arranged', body: 'BIMED has sent your Dublin Airport pickup request to its transfer supplier. Driver details will appear in the Staff Portal when confirmed.', actionUrl: '/staff/travel' });
-      await createStaffAudit(client, { staffId: id, actor: session.email, eventType: 'arrival_transfer_supplier_dispatched', metadata: { supplier: updated.supplier_name, supplier_email: updated.supplier_email, status: updated.status } });
       return NextResponse.json({ transfer: updated });
     }
 
