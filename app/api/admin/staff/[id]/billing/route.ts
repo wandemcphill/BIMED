@@ -13,10 +13,11 @@ async function issueReceiptForPaidInvoice(
   staff: any,
   application: any,
   _permit: any,
+  actor: string,
 ) {
   const { data: result, error } = await client.rpc('bimed_issue_accommodation_receipt', {
     p_invoice_id: invoice.id,
-    p_actor: ACCOMMODATION_SIGNATORY_NAME,
+    p_actor: actor,
     p_receipt_issued_by: `${ACCOMMODATION_SIGNATORY_NAME} · ${ACCOMMODATION_SIGNATORY_TITLE}`,
   });
 
@@ -167,6 +168,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     }
   }
 
-  if (action === 'issue_receipt') { if (!invoice || invoice.status !== 'paid') return NextResponse.json({ error: 'Record payment before issuing a receipt.' }, { status: 409 }); const receiptResult = await issueReceiptForPaidInvoice(client, invoice, staff, application, permit); return NextResponse.json({ receipt: receiptResult.receipt, publicUrl: receiptResult.publicUrl }); }
+  if (action === 'issue_receipt') { if (!invoice || invoice.status !== 'paid') return NextResponse.json({ error: 'Record payment before issuing a receipt.' }, { status: 409 }); const receiptResult = await issueReceiptForPaidInvoice(client, invoice, staff, application, permit, session.email); return NextResponse.json({ receipt: receiptResult.receipt, publicUrl: receiptResult.publicUrl }); }
   return NextResponse.json({ error: 'Unsupported billing action.' }, { status: 400 });
 }
