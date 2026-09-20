@@ -61,6 +61,10 @@ begin
     raise exception 'APPLICATION_NOT_FOUND';
   end if;
 
+  if v_application.status not in ('Offer Issued','Onboarding','Hired') then
+    raise exception 'CONTRACT_ISSUANCE_STATUS_BLOCKED';
+  end if;
+
   update public.recruitment_contract_signatures
   set status = 'revoked',
       revoked_at = v_now,
@@ -147,5 +151,16 @@ set status = 'revoked',
 from ranked r
 where c.id = r.id
   and r.rn > 1;
+
+-- An unsigned contract must not remain active for an application that is already rejected.
+update public.recruitment_contract_signatures c
+set status = 'revoked',
+    revoked_at = clock_timestamp(),
+    revoked_reason = 'Historical reconciliation: application was already rejected while the contract remained unsigned.'
+from public.recruitment_applications a
+where c.application_id = a.id
+  and c.doc_type = 'contract'
+  and c.status = 'issued'
+  and a.status = 'Rejected';
 
 commit;
