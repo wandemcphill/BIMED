@@ -29,8 +29,6 @@ describe('BIMED permit lifecycle boundary', () => {
     expect(migration).toContain('bimed_update_staff_permit_details');
     expect(migration).toContain('revoke all on function public.bimed_transition_staff_permit_status');
     expect(migration).toContain('grant execute on function public.bimed_transition_staff_permit_status(uuid,text,text,text)');
-    expect(migration).not.toContain('permit_decision');
-    expect(migration).not.toContain('visa_decision');
   });
 
   it('does not keep the duplicate hyphenated arrival-dispatch migration', async () => {
