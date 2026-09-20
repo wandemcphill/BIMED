@@ -68,7 +68,7 @@ begin
     raise exception 'ARRIVAL_TRANSFER_ITINERARY_NOT_FOUND';
   end if;
 
-  select * into v_staff
+  select s.* into v_staff
   from public.recruitment_staff s
   join public.recruitment_staff_permit_cases p on p.staff_id = s.id
   where p.id = v_transfer.permit_case_id;
@@ -92,6 +92,11 @@ begin
   if v_transfer.supplier_request_message_id is not null
      or v_transfer.status in ('supplier_requested','supplier_confirmed','driver_assigned','en_route','arrived','completed') then
     raise exception 'ARRIVAL_TRANSFER_ALREADY_DISPATCHED';
+  end if;
+
+  if v_transfer.status = 'dispatching'
+     and v_transfer.updated_at < v_now - interval '24 hours' then
+    raise exception 'ARRIVAL_TRANSFER_DISPATCH_STALE_REQUIRES_REVIEW';
   end if;
 
   v_key := coalesce(
