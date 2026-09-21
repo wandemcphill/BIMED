@@ -84,10 +84,14 @@ describe('staff provisioning boundary', () => {
   });
 
   it('routes lifecycle-linked staff creation through the atomic promotion RPC', async () => {
-    const [route, migration] = await Promise.all([
+    const [route, migration, externalMigration] = await Promise.all([
       import('node:fs/promises').then((fs) => fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8')),
       import('node:fs/promises').then((fs) => fs.readFile(
         'supabase/migrations/20260921130430_20260919zz_bimed_atomic_staff_promotion_reconcile.sql',
+        'utf8',
+      )),
+      import('node:fs/promises').then((fs) => fs.readFile(
+        'supabase/migrations/20260921162947_bimed_external_contract_verification_20260921.sql',
         'utf8',
       )),
     ]);
@@ -97,6 +101,9 @@ describe('staff provisioning boundary', () => {
     expect(migration).toContain('bimed_promote_application_to_staff');
     expect(migration).toContain('perform public.bimed_transition_application_status(');
     expect(migration).toContain('insert into public.recruitment_staff(');
+    expect(externalMigration).toContain('recruitment_external_contract_verifications');
+    expect(externalMigration).toContain('bimed_record_external_contract_verification');
+    expect(externalMigration).toContain('A signed BIMED contract or an administrator-verified externally signed contract is required before staff provisioning.');
   });
 });
 
