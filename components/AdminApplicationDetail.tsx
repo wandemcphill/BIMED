@@ -60,7 +60,7 @@ type SecondInterview = {
 type ContractSignature = {
   id: string;
   role_slug: string;
-  status: 'issued' | 'signed';
+  status: 'issued' | 'signed' | 'revoked';
   signed_name: string | null;
   signed_at: string | null;
   issued_at: string;
@@ -146,6 +146,7 @@ export default function AdminApplicationDetail({
   const [externalContractVerification, setExternalContractVerification] = useState<ExternalContractVerification | null>(null);
   const [externalContractNote, setExternalContractNote] = useState('');
   const [recordingExternalContract, setRecordingExternalContract] = useState(false);
+  const [signatureMessage, setSignatureMessage] = useState('');
   const [issuingPack, setIssuingPack] = useState(false);
   const [packMessage, setPackMessage] = useState('');
   const [secondInterviews, setSecondInterviews] = useState<SecondInterview[]>([]);
@@ -440,8 +441,9 @@ export default function AdminApplicationDetail({
   }
 
   if (!authenticated || !payload) {
-  const onboardingPackSent = Boolean(payload.auditLog?.some((entry) => entry.event_type === 'onboarding_pack_sent'));
       return (
+  const onboardingPackSent = Boolean(payload.auditLog?.some((entry) => entry.event_type === 'onboarding_pack_sent'));
+
       <section className="card auth-card">
         <h1>Candidate record</h1>
         <p className="muted">Sign in to view the private candidate record.</p>
@@ -606,12 +608,12 @@ export default function AdminApplicationDetail({
             {signatures.map((signature) => (
               <article className="activity-item" key={signature.id}>
                 <div className="activity-heading">
-                  <strong>{signature.status === 'signed' ? 'Signed' : 'Awaiting signature'}</strong>
+                  <strong>{signature.status === 'signed' ? 'Signed' : signature.status === 'revoked' ? 'Superseded' : 'Awaiting signature'}</strong>
                   <span>{signature.status === 'signed' ? formatDate(signature.signed_at) : formatDate(signature.issued_at)}</span>
                 </div>
                 <p className="muted">
                   Role: {signature.role_slug}
-                  {signature.status === 'signed' ? ` - Signed as ${signature.signed_name}` : ' - Link sent to candidate'}
+                  {signature.status === 'signed' ? ` - Signed as ${signature.signed_name}` : signature.status === 'revoked' ? ' - Replaced by a newer onboarding-pack link' : ' - Link sent to candidate'}
                 </p>
               </article>
             ))}
@@ -631,10 +633,10 @@ export default function AdminApplicationDetail({
             {handbookSignatures.map((signature) => (
               <article className="activity-item" key={signature.id}>
                 <div className="activity-heading">
-                  <strong>{signature.status === 'signed' ? 'Signed' : 'Awaiting signature'}</strong>
+                  <strong>{signature.status === 'signed' ? 'Signed' : signature.status === 'revoked' ? 'Superseded' : 'Awaiting signature'}</strong>
                   <span>{signature.status === 'signed' ? formatDate(signature.signed_at) : formatDate(signature.issued_at)}</span>
                 </div>
-                <p className="muted">{signature.status === 'signed' ? `Signed as ${signature.signed_name}` : 'Link sent to candidate'}</p>
+                <p className="muted">{signature.status === 'signed' ? `Signed as ${signature.signed_name}` : signature.status === 'revoked' ? 'Replaced by a newer onboarding-pack link' : 'Link sent to candidate'}</p>
               </article>
             ))}
           </div>
@@ -653,12 +655,12 @@ export default function AdminApplicationDetail({
             {jobDescSignatures.map((signature) => (
               <article className="activity-item" key={signature.id}>
                 <div className="activity-heading">
-                  <strong>{signature.status === 'signed' ? 'Signed' : 'Awaiting signature'}</strong>
+                  <strong>{signature.status === 'signed' ? 'Signed' : signature.status === 'revoked' ? 'Superseded' : 'Awaiting signature'}</strong>
                   <span>{signature.status === 'signed' ? formatDate(signature.signed_at) : formatDate(signature.issued_at)}</span>
                 </div>
                 <p className="muted">
                   Role: {signature.role_slug}
-                  {signature.status === 'signed' ? ` - Signed as ${signature.signed_name}` : ' - Link sent to candidate'}
+                  {signature.status === 'signed' ? ` - Signed as ${signature.signed_name}` : signature.status === 'revoked' ? ' - Replaced by a newer onboarding-pack link' : ' - Link sent to candidate'}
                 </p>
               </article>
             ))}
