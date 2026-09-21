@@ -65,7 +65,22 @@ export async function createDocumentSignatureRequest(input: {
     return { record: data as ContractSignatureRecord, token, signUrl: documentSigningUrl(input.docType, token) };
   }
 
-  const { data, error } = await db()
+  const client = db();
+  const now = new Date().toISOString();
+  const { error: revokeError } = await client
+    .from('recruitment_contract_signatures')
+    .update({
+      status: 'revoked',
+      revoked_at: now,
+      revoked_reason: 'Replaced by a newer BIMED onboarding-pack signature request.',
+    })
+    .eq('application_id', input.applicationId)
+    .eq('doc_type', input.docType)
+    .eq('status', 'issued');
+
+  if (revokeError) throw new Error(revokeError.message);
+
+  const { data, error } = await client
     .from('recruitment_contract_signatures')
     .insert({
       application_id: input.applicationId,
