@@ -1,0 +1,2 @@
+create index if not exists recruitment_staff_onboarding_tasks_acknowledged_by_idx
+  on public.recruitment_staff_onboarding_tasks(acknowledged_by);
