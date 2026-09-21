@@ -1,0 +1,9 @@
+-- Historical migration ledger stub.
+--
+-- This migration is already recorded as applied in the shared BIMED/LAUREM
+-- Supabase project, but its original SQL is not part of this repository's
+-- canonical migration source.
+--
+-- The shared database schema is authoritative for this historical entry.
+-- This inert file exists only so the local migration ledger mirrors the
+-- production migration history and does not attempt to replay the entry.
