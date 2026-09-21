@@ -27,7 +27,7 @@ describe('onboarding readiness rules', () => {
       new Set(['identity_verified', 'qualification_evidence_verified', 'references_verified']),
     );
     expect(POST_ACCESS_CHECK_KEYS).toEqual(
-      new Set(['references_verified', 'right_to_work_verified', 'international_work_permission_verified']),
+      new Set(['right_to_work_verified', 'international_work_permission_verified']),
     );
   });
 });
