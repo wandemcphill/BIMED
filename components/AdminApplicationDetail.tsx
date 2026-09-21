@@ -67,6 +67,16 @@ type ContractSignature = {
   expires_at: string | null;
 };
 
+type ExternalContractVerification = {
+  id: string;
+  application_id: string;
+  role_slug: string;
+  source: 'email';
+  verified_by: string;
+  verified_at: string;
+  note: string;
+};
+
 type AuditLogEntry = {
   id: string;
   event_type: string;
@@ -133,6 +143,9 @@ export default function AdminApplicationDetail({
   const [adminEmail, setAdminEmail] = useState('');
   const [contractRoleSlug, setContractRoleSlug] = useState('');
   const [signatures, setSignatures] = useState<ContractSignature[]>([]);
+  const [externalContractVerification, setExternalContractVerification] = useState<ExternalContractVerification | null>(null);
+  const [externalContractNote, setExternalContractNote] = useState('');
+  const [recordingExternalContract, setRecordingExternalContract] = useState(false);
   const [sendingForSignature, setSendingForSignature] = useState(false);
   const [signatureMessage, setSignatureMessage] = useState('');
   const [issuingPack, setIssuingPack] = useState(false);
@@ -180,8 +193,12 @@ export default function AdminApplicationDetail({
   const loadSignatures = async () => {
     const response = await fetch(`/api/admin/applications/${applicationId}/contract-signature`);
     if (!response.ok) return;
-    const nextPayload = (await response.json()) as { signatures: ContractSignature[] };
+    const nextPayload = (await response.json()) as {
+      signatures: ContractSignature[];
+      externalVerification?: ExternalContractVerification | null;
+    };
     setSignatures(nextPayload.signatures || []);
+    setExternalContractVerification(nextPayload.externalVerification || null);
   };
 
   const loadHandbookSignatures = async () => {
@@ -300,6 +317,40 @@ export default function AdminApplicationDetail({
     }
 
     router.push('/admin');
+  };
+
+  const recordExternalContract = async () => {
+    const note = externalContractNote.trim();
+    if (!note) {
+      setSignatureMessage('Add a note confirming that the signed contract was received and checked by email.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Confirm that BIMED has received and reviewed a signed contract from the candidate outside the portal. The portal e-signature record will remain independent.'
+    );
+    if (!confirmed) return;
+
+    setRecordingExternalContract(true);
+    setSignatureMessage('');
+
+    const response = await fetch(`/api/admin/applications/${applicationId}/contract-signature/external`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role_slug: contractRoleSlug, note }),
+    });
+
+    const nextPayload = await response.json();
+    setRecordingExternalContract(false);
+
+    if (!response.ok) {
+      setSignatureMessage(nextPayload.error || 'Unable to record the external signed contract.');
+      return;
+    }
+
+    setExternalContractVerification(nextPayload.verification || null);
+    setExternalContractNote('');
+    setSignatureMessage('External signed contract recorded and verified. Staff portal provisioning can now use this contract evidence.');
   };
 
   const sendForSignature = async () => {
@@ -601,6 +652,36 @@ export default function AdminApplicationDetail({
           </button>
         </div>
         {signatureMessage && <div className="success" style={{ marginTop: 12 }}>{signatureMessage}</div>}
+
+        <div className="subcard" style={{ marginTop: 16 }}>
+          <h3 style={{ marginBottom: 6 }}>External signed contract</h3>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Use this when the candidate returns the signed contract by email. This records an administrator verification event and
+            does not pretend that the portal e-signature was completed.
+          </p>
+          {externalContractVerification ? (
+            <div className="notice">
+              <strong>Verified externally</strong>
+              <div className="muted" style={{ marginTop: 4 }}>
+                Verified by {externalContractVerification.verified_by} on {formatDate(externalContractVerification.verified_at)}.
+              </div>
+              <div style={{ marginTop: 6 }}>{externalContractVerification.note}</div>
+            </div>
+          ) : (
+            <>
+              <Field label="Verification note" full>
+                <textarea
+                  value={externalContractNote}
+                  onChange={(event) => setExternalContractNote(event.target.value)}
+                  placeholder="Example: Signed contract received by email on 21 Sep 2026 and checked against the issued healthcare-assistant contract."
+                />
+              </Field>
+              <button className="secondary" onClick={() => void recordExternalContract()} disabled={recordingExternalContract}>
+                {recordingExternalContract ? 'Recording...' : 'Record signed contract received by email'}
+              </button>
+            </>
+          )}
+        </div>
 
         {signatures.length > 0 && (
           <div className="activity-list" style={{ marginTop: 16 }}>
