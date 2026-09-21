@@ -67,10 +67,43 @@ export async function POST(request: NextRequest, context: RouteContext) {
       issuedBy: session.email,
     };
 
+    async function resolvePackDocument(docType: 'contract' | 'job_description' | 'handbook', roleSlug: string) {
+      const { data: latest, error: latestError } = await client
+        .from('recruitment_contract_signatures')
+        .select('*')
+        .eq('application_id', application.id)
+        .eq('doc_type', docType)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestError) throw latestError;
+
+      if (latest?.status === 'signed') {
+        return {
+          record: latest,
+          signUrl: null as string | null,
+          signed: true,
+        };
+      }
+
+      const result = await createDocumentSignatureRequest({
+        ...contractInfo,
+        docType,
+        roleSlug,
+      });
+
+      return {
+        record: result.record,
+        signUrl: result.signUrl,
+        signed: false,
+      };
+    }
+
     const [contractResult, jobDescResult, handbookResult] = await Promise.all([
-      createDocumentSignatureRequest({ ...contractInfo, docType: 'contract', roleSlug: expectedRoleSlug }),
-      createDocumentSignatureRequest({ ...contractInfo, docType: 'job_description', roleSlug: expectedRoleSlug }),
-      createDocumentSignatureRequest({ ...contractInfo, docType: 'handbook', roleSlug: '' }),
+      resolvePackDocument('contract', expectedRoleSlug),
+      resolvePackDocument('job_description', expectedRoleSlug),
+      resolvePackDocument('handbook', ''),
     ]);
 
     const international = application.living_in_ireland === 'No';
@@ -83,9 +116,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const email = await sendFullOnboardingPackEmail({
       application,
-      contractSignUrl: contractResult.signUrl,
-      jobDescriptionUrl: jobDescResult.signUrl,
-      handbookUrl: handbookResult.signUrl,
+      signingDocuments: [
+        { label: 'Review and sign your employment contract', url: contractResult.signUrl, signed: contractResult.signed },
+        { label: 'Review and sign your job description', url: jobDescResult.signUrl, signed: jobDescResult.signed },
+        { label: 'Review and sign the employee handbook', url: handbookResult.signUrl, signed: handbookResult.signed },
+      ],
       packetLinks,
       packId: contractResult.record.id,
     }, client);
