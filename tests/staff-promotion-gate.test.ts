@@ -99,3 +99,26 @@ describe('staff provisioning boundary', () => {
     expect(migration).toContain('insert into public.recruitment_staff(');
   });
 });
+
+
+describe('contract-first provisioning regression', () => {
+  it('does not retain the obsolete pre-access verification block in staff promotion', async () => {
+    const fs = await import('node:fs/promises');
+    const migration = await fs.readFile(
+      'supabase/migrations/20260921162326_bimed_staff_promotion_contract_boundary_20260921.sql',
+      'utf8',
+    );
+    expect(migration).not.toContain('PRE_ACCESS_VERIFICATION_BLOCKED');
+    expect(migration).toContain('SIGNED_CONTRACT_REQUIRED');
+  });
+
+  it('gates contract issuance and the full onboarding pack on pre-contract verification', async () => {
+    const fs = await import('node:fs/promises');
+    const contractRoute = await fs.readFile('app/api/admin/applications/[id]/contract-signature/route.ts', 'utf8');
+    const packRoute = await fs.readFile('app/api/admin/applications/[id]/onboarding-pack/route.ts', 'utf8');
+    expect(contractRoute).toContain('getPreContractReadiness');
+    expect(packRoute).toContain('getPreContractReadiness');
+    expect(contractRoute).toContain('Contract issuance is blocked until identity, qualification and references are verified or formally waived.');
+    expect(packRoute).toContain('Contract issuance is blocked until identity, qualification and references are verified or formally waived.');
+  });
+});
