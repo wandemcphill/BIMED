@@ -66,11 +66,24 @@ export async function createStaffFromApplication(
     .limit(1)
     .maybeSingle();
   if (signatureError) throw asStaffProvisioningError(signatureError, 'Unable to verify the signed employment contract.');
+
+  const { data: externalContract, error: externalContractError } = await client
+    .from('recruitment_external_contract_verifications')
+    .select('id, role_slug, source, verified_by, verified_at, note')
+    .eq('application_id', applicationId)
+    .maybeSingle();
+  if (externalContractError) {
+    throw asStaffProvisioningError(externalContractError, 'Unable to verify external contract evidence.');
+  }
+
   if (signedContract && signedContract.role_slug !== expectedRoleSlug) {
     throw new Error('The signed contract role does not match the candidate\'s applied role.');
   }
-  if (!signedContract) {
-    throw new Error('The employment contract must be signed before the candidate can be promoted to staff.');
+  if (externalContract && externalContract.role_slug !== expectedRoleSlug) {
+    throw new Error('The externally verified contract role does not match the candidate\'s applied role.');
+  }
+  if (!signedContract && !externalContract) {
+    throw new Error('A signed BIMED contract or an administrator-verified externally signed contract is required before the candidate can be promoted to staff.');
   }
 
   const { data: existing } = await client
