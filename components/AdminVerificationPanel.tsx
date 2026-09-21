@@ -21,10 +21,10 @@ type Props = {
 const PRE_CONTRACT_KEYS = new Set([
   'identity_verified',
   'qualification_evidence_verified',
+  'references_verified',
 ]);
 
 const POST_ACCESS_KEYS = new Set([
-  'references_verified',
   'right_to_work_verified',
   'international_work_permission_verified',
 ]);
@@ -82,7 +82,7 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
   }
 
   if (loading) {
-    return <section className="subcard"><h2>Post-access verification</h2><p className="muted">Loading verification controls...</p></section>;
+    return <section className="subcard"><h2>Recruitment verification</h2><p className="muted">Loading verification controls...</p></section>;
   }
 
   const preAccessItems = items.filter((item) => PRE_CONTRACT_KEYS.has(item.item_key));
@@ -111,7 +111,7 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
           <p className="muted" style={{ margin: '4px 0 0' }}>These checks must be completed or formally waived before the employment contract is issued for signature.</p>
         </div>
         {!preAccessItems.length ? (
-          <p className="muted">No pre-access verification checks are assigned to this candidate.</p>
+          <p className="muted">No pre-contract verification checks are assigned to this candidate.</p>
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             {preAccessItems.map((item) => (
