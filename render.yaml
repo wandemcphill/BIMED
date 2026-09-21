@@ -5,6 +5,7 @@ services:
     plan: starter
     autoDeployTrigger: commit
     buildCommand: npm ci --legacy-peer-deps && npm run build
+    preDeployCommand: npm run verify:release-schema
     startCommand: npm run start
     healthCheckPath: /api/health
     envVars:
