@@ -18,7 +18,7 @@ type Props = {
   applicationId: string;
 };
 
-const PRE_ACCESS_KEYS = new Set([
+const PRE_CONTRACT_KEYS = new Set([
   'identity_verified',
   'qualification_evidence_verified',
 ]);
@@ -85,7 +85,7 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
     return <section className="subcard"><h2>Post-access verification</h2><p className="muted">Loading verification controls...</p></section>;
   }
 
-  const preAccessItems = items.filter((item) => PRE_ACCESS_KEYS.has(item.item_key));
+  const preAccessItems = items.filter((item) => PRE_CONTRACT_KEYS.has(item.item_key));
   const postAccessItems = items.filter((item) => POST_ACCESS_KEYS.has(item.item_key));
 
   return (
@@ -94,9 +94,9 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
         <div>
           <h2 style={{ marginBottom: 6 }}>Onboarding verification</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Identity and qualification checks must be completed before staff portal access can be created. References, right-to-work
-            and international work-permission checks can remain pending after portal access while Recruitment, Immigration or HR
-            clears the evidence.
+            Identity, qualification and references must be verified before an employment contract is issued. Right-to-work and
+            international work-permission checks remain later controls that can continue through the employment and immigration
+            workflow.
           </p>
         </div>
         <span className="pill">ADMIN CONTROLLED</span>
@@ -107,8 +107,8 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
 
       <section style={{ marginTop: 14 }}>
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: '#0f766e' }}>PRE-ACCESS VERIFICATION</div>
-          <p className="muted" style={{ margin: '4px 0 0' }}>These checks must be completed or formally waived before the candidate can be moved to Onboarding and staff portal provisioning can occur.</p>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: '#0f766e' }}>PRE-CONTRACT VERIFICATION</div>
+          <p className="muted" style={{ margin: '4px 0 0' }}>These checks must be completed or formally waived before the employment contract is issued for signature.</p>
         </div>
         {!preAccessItems.length ? (
           <p className="muted">No pre-access verification checks are assigned to this candidate.</p>
