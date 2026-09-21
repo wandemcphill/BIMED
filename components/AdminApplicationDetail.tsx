@@ -297,13 +297,14 @@ export default function AdminApplicationDetail({
   };
 
   const issueOnboardingPack = async () => {
+    const resend = onboardingPackSent;
     setIssuingPack(true);
     setPackMessage('');
 
     const response = await fetch(`/api/admin/applications/${applicationId}/onboarding-pack`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role_slug: contractRoleSlug }),
+      body: JSON.stringify({ role_slug: contractRoleSlug, resend }),
     });
 
     const nextPayload = await response.json();
@@ -314,11 +315,20 @@ export default function AdminApplicationDetail({
       return;
     }
 
-    setPackMessage(
-      nextPayload.email?.status === 'sent'
-        ? 'Complete onboarding pack emailed. Any document already signed remains signed and is not re-issued.'
-        : 'Complete onboarding pack created, but the email could not be confirmed as sent. Check the candidate email delivery.'
-    );
+    const emailStatus = nextPayload.email?.status;
+    const emailMessage =
+      emailStatus === 'sent'
+        ? 'Complete onboarding pack email sent successfully. Any document already signed remains signed.'
+        : emailStatus === 'skipped'
+          ? nextPayload.email?.reason === 'duplicate'
+            ? 'This pack email was already sent. Use Resend complete onboarding pack to send a fresh copy.'
+            : nextPayload.email?.reason === 'not_configured'
+              ? 'Email sending is not configured on the server. The onboarding pack was created, but no email was sent.'
+              : 'The candidate email address failed validation, so the onboarding pack was created but not emailed.'
+          : emailStatus === 'failed'
+            ? `The onboarding pack was created, but email delivery failed: ${nextPayload.email?.reason || 'unknown provider error'}.`
+            : 'The onboarding pack was created, but the email delivery result was unavailable.';
+    setPackMessage(emailMessage);
     setStatus('Offer Issued');
     await loadSignatures();
   };
