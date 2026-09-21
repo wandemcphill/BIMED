@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:release-schema": "node scripts/verify-release-schema.mjs"
   },
   "engines": {
     "node": ">=22.0.0 <23.0.0"
