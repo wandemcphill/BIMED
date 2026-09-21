@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   const [{ data: shifts, error: shiftError }, { data: availableShifts, error: availableError }, { data: requests, error: requestError }, { data: leaveRequests, error: leaveError }] = await Promise.all([
     assignedQuery,
     availableQuery,
-    client.from('recruitment_shift_requests').select('*,shift:recruitment_workforce_shifts(*),requested_shift:recruitment_workforce_shifts!requested_shift_id(*)').eq('staff_id', session.staff_id).order('created_at', { ascending: false }).limit(200),
+    client.from('recruitment_shift_requests').select('*,shift:recruitment_workforce_shifts!recruitment_shift_requests_shift_id_fkey(*),requested_shift:recruitment_workforce_shifts!requested_shift_id(*)').eq('staff_id', session.staff_id).order('created_at', { ascending: false }).limit(200),
     leaveQuery,
   ]);
   if (shiftError || availableError || requestError || leaveError) return NextResponse.json({ error: 'Unable to load your rota.' }, { status: 500 });
