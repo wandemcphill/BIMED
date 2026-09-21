@@ -96,12 +96,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ signature: record, signUrl, email });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to create the signature request right now.';
     console.error(JSON.stringify({
       level: 'error',
       event: 'contract_signature.create_failed',
       application_id: applicationId,
-      reason: error instanceof Error ? error.message : 'unknown',
+      reason: message,
     }));
+    if (message.includes('PRE_CONTRACT_VERIFICATION_BLOCKED') || message.includes('CONTRACT_ISSUANCE_STATUS_BLOCKED')) {
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Unable to create the signature request right now.' }, { status: 500 });
   }
 }
