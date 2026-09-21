@@ -13,7 +13,7 @@ describe('BIMED accommodation billing lifecycle boundary', () => {
 
   it('provides service-role-only atomic billing reconciliation RPCs', async () => {
     const migration = await fs.readFile(
-      'supabase/migrations/20260920_accommodation_billing_lifecycle_hardening.sql',
+      'supabase/migrations/20260920103055_accommodation_billing_lifecycle_hardening_20260920.sql',
       'utf8',
     );
 

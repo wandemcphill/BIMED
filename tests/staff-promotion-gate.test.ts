@@ -87,7 +87,7 @@ describe('staff provisioning boundary', () => {
     const [route, migration] = await Promise.all([
       import('node:fs/promises').then((fs) => fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8')),
       import('node:fs/promises').then((fs) => fs.readFile(
-        'supabase/migrations/20260919zz_bimed_atomic_staff_promotion.sql',
+        'supabase/migrations/20260921130430_20260919zz_bimed_atomic_staff_promotion_reconcile.sql',
         'utf8',
       )),
     ]);
