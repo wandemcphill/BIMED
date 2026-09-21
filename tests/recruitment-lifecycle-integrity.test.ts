@@ -4,6 +4,7 @@ import {
   BIMED_STATUS_TRANSITIONS,
   localBimedTransitionAllowed,
   isBimedRecruitmentStatus,
+  getBimedStatusOptions,
 } from '@/lib/bimed-lifecycle';
 
 describe('BIMED recruitment lifecycle policy', () => {
@@ -22,6 +23,19 @@ describe('BIMED recruitment lifecycle policy', () => {
     expect(BIMED_STATUS_TRANSITIONS['Permit Processing']).toContain('Visa/Immigration Processing');
   });
 
+  it('exposes only lifecycle-reachable admin status options', () => {
+    expect(getBimedStatusOptions('Offer Issued')).toEqual([
+      'Offer Issued',
+      'Documents Awaiting',
+      'Onboarding',
+      'Rejected',
+      'Withdrawn',
+    ]);
+    expect(getBimedStatusOptions('Offer Issued')).not.toContain('Hired');
+    expect(getBimedStatusOptions('Onboarding')).toContain('Hired');
+    expect(getBimedStatusOptions('Hired')).toEqual(['Hired']);
+  });
+
   it('removes duplicate lifecycle logic from the legacy recruitment endpoint', async () => {
     const route = await fs.readFile('app/api/recruitment/applications/[id]/route.ts', 'utf8');
     expect(route).toContain("export { GET, PATCH, DELETE } from '@/app/api/admin/applications/[id]/route';");
@@ -31,7 +45,7 @@ describe('BIMED recruitment lifecycle policy', () => {
 
   it('uses a single atomic status transition RPC in the canonical admin route', async () => {
     const route = await fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8');
-    const migration = await fs.readFile('supabase/migrations/20260919_bimed_application_lifecycle_integrity.sql', 'utf8');
+    const migration = await fs.readFile('supabase/migrations/20260919220144_20260919_bimed_application_lifecycle_integrity.sql', 'utf8');
     expect(route).toContain('transitionBimedApplicationStatus');
     expect(route).toContain('localBimedTransitionAllowed');
     expect(migration).toContain('bimed_transition_application_status');

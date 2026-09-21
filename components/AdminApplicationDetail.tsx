@@ -3,9 +3,10 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { candidateSupportDocuments, recruitmentStatuses, isInternationalCandidate } from '@/lib/recruitment-config';
+import { candidateSupportDocuments, isInternationalCandidate } from '@/lib/recruitment-config';
 import { contractTemplates, guessContractRoleSlug } from '@/lib/contract-templates';
 import { FIRST_INTERVIEW_ALL_QUESTIONS, getSecondInterviewQuestions } from '@/lib/interview-questions';
+import { getBimedStatusOptions } from '@/lib/bimed-lifecycle';
 import AdminInterviewPanel from '@/components/AdminInterviewPanel';
 
 type ApplicationRecord = {
@@ -125,6 +126,7 @@ export default function AdminApplicationDetail({
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<'success' | 'error'>('success');
   const [payload, setPayload] = useState<ApplicationPayload | null>(null);
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
@@ -426,7 +428,11 @@ export default function AdminApplicationDetail({
       if (response.status === 401) {
         setAuthenticated(false);
       }
+      if (response.status === 409 && payload?.application.status) {
+        setStatus(payload.application.status);
+      }
 
+      setMessageTone('error');
       setMessage(nextPayload.error || 'Unable to update application.');
       return;
     }
@@ -454,6 +460,7 @@ export default function AdminApplicationDetail({
       emailNote = ' The record was saved, but the candidate status email could not be delivered. Check the server logs.';
     }
 
+    setMessageTone('success');
     setMessage(`Candidate record updated.${emailNote}`);
   };
 
@@ -539,7 +546,7 @@ export default function AdminApplicationDetail({
         <div className="grid">
           <Field label="Status">
             <select value={status} onChange={(event) => setStatus(event.target.value)}>
-              {recruitmentStatuses.map((statusValue) => (
+              {getBimedStatusOptions(application.status).map((statusValue) => (
                 <option key={statusValue}>{statusValue}</option>
               ))}
             </select>
@@ -560,7 +567,7 @@ export default function AdminApplicationDetail({
         <button className="primary" onClick={() => void saveChanges()}>
           Save changes
         </button>
-        {message && <div className="success" style={{ marginTop: 12 }}>{message}</div>}
+        {message && <div className={messageTone} style={{ marginTop: 12 }}>{message}</div>}
       </section>
 
       <section className="subcard">
