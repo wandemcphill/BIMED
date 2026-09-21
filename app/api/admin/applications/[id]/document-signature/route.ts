@@ -33,6 +33,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const session = await getAdminSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
 
+  return NextResponse.json(
+    { error: 'Standalone document signing requests are disabled. Use the complete onboarding pack so contract, job description and handbook are issued together.' },
+    { status: 409 },
+  );
+
   const rateLimit = await checkRateLimit({ key: 'admin-document-signature', limit: 30, windowMs: 60 * 60 * 1000, request });
   if (!rateLimit.allowed) {
     return NextResponse.json(
