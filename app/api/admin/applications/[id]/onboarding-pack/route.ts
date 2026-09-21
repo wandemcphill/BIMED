@@ -9,7 +9,6 @@ import { sendFullOnboardingPackEmail } from '@/lib/full-onboarding-pack';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
-import { isBimedRecruitmentStatus, localBimedTransitionAllowed } from '@/lib/bimed-lifecycle';
 import { getPreContractReadiness } from '@/lib/onboarding-readiness';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -36,8 +35,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .eq('id', applicationId).maybeSingle();
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+    const currentApplication = application;
 
-    const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
+    const expectedRoleSlug = recruitmentRoleSlug(currentApplication.role_applied);
     if (!expectedRoleSlug) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
     if (requestedRoleSlug !== expectedRoleSlug) return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
 
@@ -52,30 +52,90 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    if (application.status !== 'Offer Issued') {
-      if (!isBimedRecruitmentStatus(application.status) || !localBimedTransitionAllowed(application.status, 'Offer Issued')) {
-        return NextResponse.json({ error: `Transition from ${application.status} to Offer Issued is not permitted.` }, { status: 409 });
-      }
+    if (!['Submitted', 'Offer Issued', 'Onboarding', 'Hired'].includes(currentApplication.status)) {
+      return NextResponse.json(
+        { error: `The complete onboarding pack cannot be issued from ${currentApplication.status}.` },
+        { status: 409 },
+      );
     }
 
     const startDate = BIMED_DEFAULT_START_DATE_ISO;
     const contractInfo = {
-      applicationId: application.id,
-      employeeName: application.full_name,
-      employeeAddress: application.address,
+      applicationId: currentApplication.id,
+      employeeName: currentApplication.full_name,
+      employeeAddress: currentApplication.address,
       startDate,
       issuedBy: session.email,
     };
 
-    const [contractResult, jobDescResult, handbookResult] = await Promise.all([
-      createDocumentSignatureRequest({ ...contractInfo, docType: 'contract', roleSlug: expectedRoleSlug }),
-      createDocumentSignatureRequest({ ...contractInfo, docType: 'job_description', roleSlug: expectedRoleSlug }),
-      createDocumentSignatureRequest({ ...contractInfo, docType: 'handbook', roleSlug: '' }),
+    async function resolvePackDocument(docType: 'contract' | 'job_description' | 'handbook', roleSlug: string) {
+      if (docType === 'contract') {
+        const { data: externalVerification, error: externalVerificationError } = await client
+          .from('recruitment_external_contract_verifications')
+          .select('id, role_slug, verified_by, verified_at, note')
+          .eq('application_id', currentApplication.id)
+          .maybeSingle();
+
+        if (externalVerificationError) throw externalVerificationError;
+
+        if (externalVerification) {
+          return {
+            record: {
+              id: externalVerification.id,
+              application_id: currentApplication.id,
+              doc_type: 'contract',
+              role_slug: externalVerification.role_slug,
+              status: 'signed',
+              signed_name: currentApplication.full_name,
+              signed_at: externalVerification.verified_at,
+            },
+            signUrl: null as string | null,
+            signed: true,
+          };
+        }
+      }
+
+      const { data: latest, error: latestError } = await client
+        .from('recruitment_contract_signatures')
+        .select('*')
+        .eq('application_id', currentApplication.id)
+        .eq('doc_type', docType)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestError) throw latestError;
+
+      if (latest?.status === 'signed') {
+        return {
+          record: latest,
+          signUrl: null as string | null,
+          signed: true,
+        };
+      }
+
+      const result = await createDocumentSignatureRequest({
+        ...contractInfo,
+        docType,
+        roleSlug,
+      });
+
+      return {
+        record: result.record,
+        signUrl: result.signUrl,
+        signed: false,
+      };
+    }
+
+    const contractResult = await resolvePackDocument('contract', expectedRoleSlug);
+    const [jobDescResult, handbookResult] = await Promise.all([
+      resolvePackDocument('job_description', expectedRoleSlug),
+      resolvePackDocument('handbook', ''),
     ]);
 
-    const international = application.living_in_ireland === 'No';
+    const international = currentApplication.living_in_ireland === 'No';
     const packetEntries = packetList(international).filter((packet) => packet.onboardingEmail !== false);
-    const packetResults = await Promise.all(packetEntries.map((packet) => createPacketAccess(application.id, packet.slug, session.email)));
+    const packetResults = await Promise.all(packetEntries.map((packet) => createPacketAccess(currentApplication.id, packet.slug, session.email)));
     const packetLinks = packetResults.map((result) => ({
       label: packetEntries.find((packet) => packet.slug === result.record.packet_slug)?.title || 'Open BIMED document',
       url: result.url,
@@ -83,20 +143,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const email = await sendFullOnboardingPackEmail({
       application,
-      contractSignUrl: contractResult.signUrl,
-      jobDescriptionUrl: jobDescResult.signUrl,
-      handbookUrl: handbookResult.signUrl,
+      signingDocuments: [
+        { label: 'Review and sign your employment contract', url: contractResult.signUrl, signed: contractResult.signed },
+        { label: 'Review and sign your job description', url: jobDescResult.signUrl, signed: jobDescResult.signed },
+        { label: 'Review and sign the employee handbook', url: handbookResult.signUrl, signed: handbookResult.signed },
+      ],
       packetLinks,
       packId: contractResult.record.id,
     }, client);
 
-    const previousStatus = application.status;
+    const previousStatus = currentApplication.status;
     const transitionedApplication = previousStatus === 'Submitted'
       ? { ...application, status: 'Offer Issued' }
       : application;
 
     await recordRecruitmentAudit(client, {
-      applicationId: application.id,
+      applicationId: currentApplication.id,
       eventType: 'onboarding_pack_sent',
       actor: session.email,
       metadata: {

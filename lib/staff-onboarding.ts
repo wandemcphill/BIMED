@@ -29,8 +29,8 @@ function commonTasks(): TaskSeed[] {
     {
       task_key: 'signed_employment_contract',
       category: 'Employment',
-      title: 'Signed employment contract',
-      description: 'Review your signed BIMED employment contract and confirm that you have retained a copy for your records.',
+      title: 'Confirm signed employment contract',
+      description: 'Review the signed BIMED employment contract already completed during recruitment. Confirm that you have retained a copy for your records. No further signature is required.',
       required: true,
       acknowledgement_required: true,
       sort_order: 10,
@@ -39,8 +39,8 @@ function commonTasks(): TaskSeed[] {
     {
       task_key: 'employee_handbook',
       category: 'Handbook',
-      title: 'Employee handbook',
-      description: 'Read the current BIMED employee handbook and acknowledge that you have reviewed the workplace guidance.',
+      title: 'Acknowledge employee handbook',
+      description: 'Read the current BIMED employee handbook already issued during recruitment and acknowledge that you have reviewed the workplace guidance. No second signature is required.',
       required: true,
       acknowledgement_required: true,
       sort_order: 20,
@@ -49,8 +49,8 @@ function commonTasks(): TaskSeed[] {
     {
       task_key: 'role_job_description',
       category: 'Role',
-      title: 'Role and job description',
-      description: 'Review the current job description for your BIMED role and confirm that you understand the role expectations.',
+      title: 'Acknowledge role and job description',
+      description: 'Review the BIMED job description already issued during recruitment and confirm that you understand the role expectations. No second signature is required.',
       required: true,
       acknowledgement_required: true,
       sort_order: 30,
