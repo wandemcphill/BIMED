@@ -21,7 +21,7 @@ describe('BIMED permit lifecycle boundary', () => {
   });
 
   it('keeps the permit database transition boundary service-role only and reconciles eligibility', async () => {
-    const migration = await fs.readFile('supabase/migrations/20260920_permit_lifecycle_hardening.sql', 'utf8');
+    const migration = await fs.readFile('supabase/migrations/20260920102456_permit_lifecycle_hardening_20260920.sql', 'utf8');
 
     expect(migration).toContain('bimed_transition_staff_permit_status');
     expect(migration).toContain("v_work_authorised := case");
@@ -36,6 +36,6 @@ describe('BIMED permit lifecycle boundary', () => {
       fs.access('supabase/migrations/20260920_idempotent-arrival-transfer-dispatch.sql'),
     ).rejects.toThrow();
 
-    await fs.access('supabase/migrations/20260920_idempotent_arrival_transfer_dispatch.sql');
+    await fs.access('supabase/migrations/20260920100710_20260920_idempotent_arrival_transfer_dispatch.sql');
   });
 });

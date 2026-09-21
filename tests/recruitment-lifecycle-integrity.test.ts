@@ -31,7 +31,7 @@ describe('BIMED recruitment lifecycle policy', () => {
 
   it('uses a single atomic status transition RPC in the canonical admin route', async () => {
     const route = await fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8');
-    const migration = await fs.readFile('supabase/migrations/20260919_bimed_application_lifecycle_integrity.sql', 'utf8');
+    const migration = await fs.readFile('supabase/migrations/20260919220144_20260919_bimed_application_lifecycle_integrity.sql', 'utf8');
     expect(route).toContain('transitionBimedApplicationStatus');
     expect(route).toContain('localBimedTransitionAllowed');
     expect(migration).toContain('bimed_transition_application_status');
