@@ -211,6 +211,7 @@ export async function createStaffFromApplication(
 
   const now = new Date().toISOString();
 
+  try {
     const { error: postAccessError } = await client
       .from('recruitment_onboarding_checklist')
       .update({
