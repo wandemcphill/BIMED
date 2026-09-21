@@ -50,7 +50,6 @@ export const INTERNATIONAL_ONBOARDING_CHECKLIST: Omit<OnboardingChecklistItem, '
 
 export const PRE_ACCESS_CHECK_KEYS = new Set(['identity_verified', 'qualification_evidence_verified']);
 export const POST_ACCESS_CHECK_KEYS = new Set([
-  'references_verified',
   'right_to_work_verified',
   'international_work_permission_verified',
 ]);
