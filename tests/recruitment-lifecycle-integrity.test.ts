@@ -4,6 +4,7 @@ import {
   BIMED_STATUS_TRANSITIONS,
   localBimedTransitionAllowed,
   isBimedRecruitmentStatus,
+  getBimedStatusOptions,
 } from '@/lib/bimed-lifecycle';
 
 describe('BIMED recruitment lifecycle policy', () => {
@@ -20,6 +21,19 @@ describe('BIMED recruitment lifecycle policy', () => {
     expect(localBimedTransitionAllowed('Hired', 'Interview')).toBe(false);
     expect(localBimedTransitionAllowed('Rejected', 'Onboarding')).toBe(false);
     expect(BIMED_STATUS_TRANSITIONS['Permit Processing']).toContain('Visa/Immigration Processing');
+  });
+
+  it('exposes only lifecycle-reachable admin status options', () => {
+    expect(getBimedStatusOptions('Offer Issued')).toEqual([
+      'Offer Issued',
+      'Documents Awaiting',
+      'Onboarding',
+      'Rejected',
+      'Withdrawn',
+    ]);
+    expect(getBimedStatusOptions('Offer Issued')).not.toContain('Hired');
+    expect(getBimedStatusOptions('Onboarding')).toContain('Hired');
+    expect(getBimedStatusOptions('Hired')).toEqual(['Hired']);
   });
 
   it('removes duplicate lifecycle logic from the legacy recruitment endpoint', async () => {

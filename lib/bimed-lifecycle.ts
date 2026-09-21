@@ -50,6 +50,11 @@ export function localBimedTransitionAllowed(current: BimedRecruitmentStatus, nex
   return current === next || BIMED_STATUS_TRANSITIONS[current].includes(next);
 }
 
+export function getBimedStatusOptions(current: string): string[] {
+  if (!isBimedRecruitmentStatus(current)) return [current];
+  return [current, ...BIMED_STATUS_TRANSITIONS[current]];
+}
+
 export async function transitionBimedApplicationStatus(
   client: SupabaseClient,
   input: {
