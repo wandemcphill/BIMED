@@ -148,6 +148,7 @@ export default function AdminApplicationDetail({
   const [recordingExternalContract, setRecordingExternalContract] = useState(false);
   const [sendingForSignature, setSendingForSignature] = useState(false);
   const [signatureMessage, setSignatureMessage] = useState('');
+  const [signatureMessageTone, setSignatureMessageTone] = useState<'success' | 'error'>('success');
   const [issuingPack, setIssuingPack] = useState(false);
   const [packMessage, setPackMessage] = useState('');
   const [secondInterviews, setSecondInterviews] = useState<SecondInterview[]>([]);
@@ -355,6 +356,7 @@ export default function AdminApplicationDetail({
 
   const sendForSignature = async () => {
     setSendingForSignature(true);
+    setSignatureMessageTone('success');
     setSignatureMessage('');
 
     const response = await fetch(`/api/admin/applications/${applicationId}/contract-signature`, {
@@ -367,11 +369,13 @@ export default function AdminApplicationDetail({
     setSendingForSignature(false);
 
     if (!response.ok) {
+      setSignatureMessageTone('error');
       setSignatureMessage(nextPayload.error || 'Unable to send the contract for signature.');
       return;
     }
 
     const emailStatus = nextPayload.email?.status;
+    setSignatureMessageTone('success');
     setSignatureMessage(
       emailStatus === 'sent'
         ? 'Signing link emailed to the candidate.'
@@ -651,7 +655,7 @@ export default function AdminApplicationDetail({
             {sendingForSignature ? 'Sending...' : 'Send for e-signature'}
           </button>
         </div>
-        {signatureMessage && <div className="success" style={{ marginTop: 12 }}>{signatureMessage}</div>}
+        {signatureMessage && <div className={signatureMessageTone} style={{ marginTop: 12 }}>{signatureMessage}</div>}
 
         <div className="subcard" style={{ marginTop: 16 }}>
           <h3 style={{ marginBottom: 6 }}>External signed contract</h3>
