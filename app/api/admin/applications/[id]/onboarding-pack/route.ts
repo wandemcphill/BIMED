@@ -68,6 +68,32 @@ export async function POST(request: NextRequest, context: RouteContext) {
     };
 
     async function resolvePackDocument(docType: 'contract' | 'job_description' | 'handbook', roleSlug: string) {
+      if (docType === 'contract') {
+        const { data: externalVerification, error: externalVerificationError } = await client
+          .from('recruitment_external_contract_verifications')
+          .select('id, role_slug, verified_by, verified_at, note')
+          .eq('application_id', application.id)
+          .maybeSingle();
+
+        if (externalVerificationError) throw externalVerificationError;
+
+        if (externalVerification) {
+          return {
+            record: {
+              id: externalVerification.id,
+              application_id: application.id,
+              doc_type: 'contract',
+              role_slug: externalVerification.role_slug,
+              status: 'signed',
+              signed_name: application.full_name,
+              signed_at: externalVerification.verified_at,
+            },
+            signUrl: null as string | null,
+            signed: true,
+          };
+        }
+      }
+
       const { data: latest, error: latestError } = await client
         .from('recruitment_contract_signatures')
         .select('*')
