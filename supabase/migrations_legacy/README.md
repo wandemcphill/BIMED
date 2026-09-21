@@ -1,11 +1,7 @@
-# Supabase migration ledger
+# Legacy migration files
 
-This directory is the canonical ledger mirror for the shared BIMED/LAUREM Supabase project.
+These SQL files are historical repository migrations that do not have a matching entry in the current shared production migration ledger.
 
-Production migration history is shared across BIMED and LAUREM. Historical entries whose original SQL is owned by the other migration stream are represented here as inert ledger stubs. They are **not** a replacement for the source SQL of those systems.
+They are retained for auditability and source recovery, but they are intentionally **outside** `supabase/migrations/` so the active migration path cannot replay them accidentally.
 
-For migrations whose original BIMED SQL remains in this repository, the filename uses the exact production migration version and name recorded in `supabase_migrations.schema_migrations`.
-
-Legacy repository migration files that do not correspond to a production ledger entry are retained under `supabase/migrations_legacy/` for historical reference and are intentionally outside the active migration path.
-
-Do not manually edit `supabase_migrations.schema_migrations`. Future production migrations must be applied through the controlled migration workflow and the resulting production version/name must be reflected in this directory.
+Do not move files back into the active migration directory unless their production migration version and name have been verified against the shared Supabase migration history.
