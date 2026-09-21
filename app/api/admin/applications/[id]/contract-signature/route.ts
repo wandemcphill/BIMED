@@ -8,6 +8,7 @@ import { getContractTemplate } from '@/lib/contract-templates';
 import { createContractSignatureRequest, listContractSignaturesForApplication } from '@/lib/contract-signature';
 import { BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO, recruitmentRoleSlug } from '@/lib/bimed-role-policy';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
+import { getPreContractReadiness } from '@/lib/onboarding-readiness';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -58,6 +59,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json(
         { error: 'The contract role must match the candidate\'s applied role.' },
         { status: 400 },
+      );
+    }
+
+    const readiness = await getPreContractReadiness(client, application);
+    if (!readiness.ready) {
+      return NextResponse.json(
+        {
+          error: 'Contract issuance is blocked until identity, qualification and references are verified or formally waived.',
+          missing: readiness.missing,
+        },
+        { status: 409 },
       );
     }
 
