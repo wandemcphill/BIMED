@@ -18,6 +18,11 @@ type Props = {
   applicationId: string;
 };
 
+const PRE_ACCESS_KEYS = new Set([
+  'identity_verified',
+  'qualification_evidence_verified',
+]);
+
 const POST_ACCESS_KEYS = new Set([
   'references_verified',
   'right_to_work_verified',
@@ -49,7 +54,7 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
       setLoading(false);
       return;
     }
-    setItems((data.items || []).filter((item: VerificationItem) => POST_ACCESS_KEYS.has(item.item_key)));
+    setItems(data.items || []);
     setLoading(false);
   }
 
@@ -80,12 +85,19 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
     return <section className="subcard"><h2>Post-access verification</h2><p className="muted">Loading verification controls...</p></section>;
   }
 
+  const preAccessItems = items.filter((item) => PRE_ACCESS_KEYS.has(item.item_key));
+  const postAccessItems = items.filter((item) => POST_ACCESS_KEYS.has(item.item_key));
+
   return (
     <section className="subcard">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ marginBottom: 6 }}>Post-access verification</h2>
-          <p className="muted" style={{ marginTop: 0 }}>These checks can remain pending after staff portal access is issued. Recruitment, immigration or HR can update each one as evidence is cleared.</p>
+          <h2 style={{ marginBottom: 6 }}>Onboarding verification</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Identity and qualification checks must be completed before staff portal access can be created. References, right-to-work
+            and international work-permission checks can remain pending after portal access while Recruitment, Immigration or HR
+            clears the evidence.
+          </p>
         </div>
         <span className="pill">ADMIN CONTROLLED</span>
       </div>
@@ -93,13 +105,37 @@ export default function AdminVerificationPanel({ applicationId }: Props) {
       {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
       {message && <div className="success" style={{ marginTop: 12 }}>{message}</div>}
 
-      {!items.length && <p className="muted">No post-access verification checks are assigned to this candidate.</p>}
+      <section style={{ marginTop: 14 }}>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: '#0f766e' }}>PRE-ACCESS VERIFICATION</div>
+          <p className="muted" style={{ margin: '4px 0 0' }}>These checks must be completed or formally waived before the candidate can be moved to Onboarding and staff portal provisioning can occur.</p>
+        </div>
+        {!preAccessItems.length ? (
+          <p className="muted">No pre-access verification checks are assigned to this candidate.</p>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {preAccessItems.map((item) => (
+              <VerificationRow key={item.id} item={item} busy={savingKey === item.item_key} onSave={save} />
+            ))}
+          </div>
+        )}
+      </section>
 
-      <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
-        {items.map((item) => (
-          <VerificationRow key={item.id} item={item} busy={savingKey === item.item_key} onSave={save} />
-        ))}
-      </div>
+      <section style={{ marginTop: 22 }}>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: '#0f766e' }}>POST-ACCESS VERIFICATION</div>
+          <p className="muted" style={{ margin: '4px 0 0' }}>These checks can remain pending after staff portal access is issued and can be cleared as evidence becomes available.</p>
+        </div>
+        {!postAccessItems.length ? (
+          <p className="muted">No post-access verification checks are assigned to this candidate.</p>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {postAccessItems.map((item) => (
+              <VerificationRow key={item.id} item={item} busy={savingKey === item.item_key} onSave={save} />
+            ))}
+          </div>
+        )}
+      </section>
     </section>
   );
 }

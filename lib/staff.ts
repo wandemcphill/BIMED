@@ -15,6 +15,17 @@ export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
 export type StaffStatus = 'pre_arrival' | 'active' | 'on_leave' | 'suspended' | 'former';
 
+function asStaffProvisioningError(error: unknown, fallback: string): Error {
+  if (error instanceof Error) return error;
+  if (error && typeof error === 'object') {
+    const candidate = error as { message?: unknown; details?: unknown };
+    const message = typeof candidate.message === 'string' ? candidate.message.trim() : '';
+    const details = typeof candidate.details === 'string' ? candidate.details.trim() : '';
+    if (message) return new Error(details && details !== message ? message + ' — ' + details : message);
+  }
+  return new Error(fallback);
+}
+
 function defaultStartDate() {
   return BIMED_DEFAULT_START_DATE_ISO;
 }
@@ -56,7 +67,7 @@ export async function createStaffFromApplication(
     .order('signed_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (signatureError) throw signatureError;
+  if (signatureError) throw asStaffProvisioningError(signatureError, 'Unable to verify the signed employment contract.');
   if (signedContract && signedContract.role_slug !== expectedRoleSlug) {
     throw new Error('The signed contract role does not match the candidate\'s applied role.');
   }
@@ -85,7 +96,9 @@ export async function createStaffFromApplication(
         p_start_date: BIMED_DEFAULT_START_DATE_ISO,
         p_end_date: BIMED_DEFAULT_END_DATE_ISO,
       });
-      if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
+      if (promotionError || !promotedStaff) {
+        throw asStaffProvisioningError(promotionError, 'Unable to atomically promote the staff profile.');
+      }
       let provisioningWarning: string | null = null;
       try {
         await ensureBimedStaffOnboardingPackage(client, promotedStaff.id, application);
@@ -159,7 +172,9 @@ export async function createStaffFromApplication(
       p_start_date: effectiveStartDate,
       p_end_date: effectiveEndDate,
     });
-    if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
+    if (promotionError || !promotedStaff) {
+      throw asStaffProvisioningError(promotionError, 'Unable to atomically promote the staff profile.');
+    }
     staff = promotedStaff;
   } else {
     const result = await client
