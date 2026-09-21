@@ -18,6 +18,8 @@ export type ContractSignatureRecord = {
   issued_by: string;
   issued_at: string;
   expires_at: string | null;
+  revoked_at: string | null;
+  revoked_reason: string | null;
   created_at: string;
 };
 
@@ -103,7 +105,28 @@ export async function getContractSignatureByToken(token: string): Promise<Contra
     .maybeSingle();
 
   if (error || !data) return null;
-  return data as ContractSignatureRecord;
+
+  const signature = data as ContractSignatureRecord;
+  if (
+    signature.status === 'revoked'
+    && signature.doc_type === 'contract'
+    && signature.revoked_reason === 'Replaced by a newer BIMED contract-signature request.'
+  ) {
+    const { data: current, error: currentError } = await db()
+      .from('recruitment_contract_signatures')
+      .select('*')
+      .eq('application_id', signature.application_id)
+      .eq('doc_type', 'contract')
+      .eq('status', 'issued')
+      .order('issued_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!currentError && current) return current as ContractSignatureRecord;
+  }
+
+  return signature;
 }
 
 export async function listContractSignaturesForApplication(
