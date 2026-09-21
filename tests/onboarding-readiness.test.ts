@@ -22,8 +22,10 @@ describe('onboarding readiness rules', () => {
     expect(items).toHaveLength(5);
   });
 
-  it('keeps pre-access checks distinct from post-access checks', () => {
-    expect(PRE_ACCESS_CHECK_KEYS).toEqual(new Set(['identity_verified', 'qualification_evidence_verified']));
+  it('keeps pre-contract checks distinct from post-access checks', () => {
+    expect(PRE_CONTRACT_CHECK_KEYS).toEqual(
+      new Set(['identity_verified', 'qualification_evidence_verified', 'references_verified']),
+    );
     expect(POST_ACCESS_CHECK_KEYS).toEqual(
       new Set(['references_verified', 'right_to_work_verified', 'international_work_permission_verified']),
     );
