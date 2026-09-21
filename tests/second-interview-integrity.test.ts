@@ -5,7 +5,7 @@ describe('BIMED second interview integrity', () => {
   it('uses the atomic invitation RPC and maps duplicate-active invitations to a conflict', () => {
     const service = readFileSync('lib/second-interview.ts', 'utf8');
     const route = readFileSync('app/api/admin/applications/[id]/second-interview/route.ts', 'utf8');
-    const migration = readFileSync('supabase/migrations/20260919_atomic_second_interview_invitation.sql', 'utf8');
+    const migration = readFileSync('supabase/migrations/20260921103136_20260919_atomic_second_interview_invitation.sql', 'utf8');
 
     expect(service).toContain("rpc('bimed_create_second_interview_invitation'");
     expect(service).toContain('ACTIVE_SECOND_INTERVIEW_EXISTS');
