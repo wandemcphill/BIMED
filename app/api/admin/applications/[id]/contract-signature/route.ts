@@ -16,7 +16,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (!await getAdminSession(request)) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
   const { id: applicationId } = await context.params;
   const signatures = await listContractSignaturesForApplication(applicationId, 'contract');
-  return NextResponse.json({ signatures });
+  const { data: externalVerification } = await db()
+    .from('recruitment_external_contract_verifications')
+    .select('id, application_id, role_slug, source, verified_by, verified_at, note')
+    .eq('application_id', applicationId)
+    .maybeSingle();
+  return NextResponse.json({ signatures, externalVerification: externalVerification || null });
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
