@@ -45,13 +45,13 @@ describe('BIMED staff portal parity', () => {
     expect(profile).toContain(".eq('id', session.staff_id)");
   });
 
-  it('keeps the pre-access verification gate before staff creation and resets post-access checks', async () => {
+  it('uses the signed-contract boundary before staff creation and resets only post-access checks', async () => {
     const staff = await repoFile('lib/staff.ts');
-    expect(staff).toContain('getOnboardingReadiness');
-    expect(staff).toContain("if (!readiness.ready)");
-    expect(staff).toContain(".in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS))");
+    expect(staff).toContain('recruitment_external_contract_verifications');
+    expect(staff).toContain('A signed BIMED contract or an administrator-verified externally signed contract is required');
     expect(staff).toContain(".in('item_key', Array.from(POST_ACCESS_CHECK_KEYS))");
-    expect(staff).toContain("status: 'completed'");
     expect(staff).toContain("status: 'pending'");
+    expect(staff).not.toContain('getOnboardingReadiness');
+    expect(staff).not.toContain('PRE_ACCESS_CHECK_KEYS');
   });
 });
