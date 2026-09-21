@@ -6,10 +6,9 @@ describe('BIMED portal parity boundary', () => {
     const lifecycle = readFileSync('lib/staff.ts', 'utf8');
     const roles = readFileSync('lib/bimed-role-policy.ts', 'utf8');
     const readiness = readFileSync('lib/onboarding-readiness.ts', 'utf8');
-    expect(lifecycle).toContain('The employment contract must be signed before the candidate can be promoted to staff.');
-    expect(lifecycle).toContain('getOnboardingReadiness');
+    expect(lifecycle).toContain('A signed BIMED contract or an administrator-verified externally signed contract is required before the candidate can be promoted to staff.');
     expect(roles).toContain('CANONICAL_RECRUITMENT_ROLES');
-    expect(readiness).toContain('PRE_ACCESS_CHECK_KEYS');
+    expect(readiness).toContain('PRE_CONTRACT_CHECK_KEYS');
   });
 
   it('keeps BIMED free of extracted LAUREM implementation content', () => {

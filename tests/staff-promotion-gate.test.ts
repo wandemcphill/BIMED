@@ -34,10 +34,17 @@ function clientMock(signatureRow: unknown) {
     maybeSingle: vi.fn(async () => ({ data: null, error: null })),
   };
 
+  const externalContractQuery = {
+    select: vi.fn(() => externalContractQuery),
+    eq: vi.fn(() => externalContractQuery),
+    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+  };
+
   const client = {
     from: vi.fn((table: string) => {
       if (table === 'recruitment_applications') return applicationsQuery;
       if (table === 'recruitment_contract_signatures') return signedContractQuery;
+      if (table === 'recruitment_external_contract_verifications') return externalContractQuery;
       throw new Error(`unexpected table: ${table}`);
     }),
   } as any;
@@ -48,7 +55,7 @@ function clientMock(signatureRow: unknown) {
 describe('staff promotion contract gate', () => {
   it('rejects promotion when no signed contract exists', async () => {
     await expect(createStaffFromApplication(clientMock(null), 'app-1')).rejects.toThrow(
-      'The employment contract must be signed before the candidate can be promoted to staff.',
+      'A signed BIMED contract or an administrator-verified externally signed contract is required before the candidate can be promoted to staff.',
     );
   });
 
@@ -84,10 +91,14 @@ describe('staff provisioning boundary', () => {
   });
 
   it('routes lifecycle-linked staff creation through the atomic promotion RPC', async () => {
-    const [route, migration] = await Promise.all([
+    const [route, migration, externalMigration] = await Promise.all([
       import('node:fs/promises').then((fs) => fs.readFile('app/api/admin/applications/[id]/route.ts', 'utf8')),
       import('node:fs/promises').then((fs) => fs.readFile(
         'supabase/migrations/20260921130430_20260919zz_bimed_atomic_staff_promotion_reconcile.sql',
+        'utf8',
+      )),
+      import('node:fs/promises').then((fs) => fs.readFile(
+        'supabase/migrations/20260921162947_bimed_external_contract_verification_20260921.sql',
         'utf8',
       )),
     ]);
@@ -97,5 +108,31 @@ describe('staff provisioning boundary', () => {
     expect(migration).toContain('bimed_promote_application_to_staff');
     expect(migration).toContain('perform public.bimed_transition_application_status(');
     expect(migration).toContain('insert into public.recruitment_staff(');
+    expect(externalMigration).toContain('recruitment_external_contract_verifications');
+    expect(externalMigration).toContain('bimed_record_external_contract_verification');
+    expect(externalMigration).toContain('A signed BIMED contract or an administrator-verified externally signed contract is required before staff provisioning.');
+  });
+});
+
+
+describe('contract-first provisioning regression', () => {
+  it('does not retain the obsolete pre-access verification block in staff promotion', async () => {
+    const fs = await import('node:fs/promises');
+    const migration = await fs.readFile(
+      'supabase/migrations/20260921162326_bimed_staff_promotion_contract_boundary_20260921.sql',
+      'utf8',
+    );
+    expect(migration).not.toContain('PRE_ACCESS_VERIFICATION_BLOCKED');
+    expect(migration).toContain('SIGNED_CONTRACT_REQUIRED');
+  });
+
+  it('gates contract issuance and the full onboarding pack on pre-contract verification', async () => {
+    const fs = await import('node:fs/promises');
+    const contractRoute = await fs.readFile('app/api/admin/applications/[id]/contract-signature/route.ts', 'utf8');
+    const packRoute = await fs.readFile('app/api/admin/applications/[id]/onboarding-pack/route.ts', 'utf8');
+    expect(contractRoute).toContain('getPreContractReadiness');
+    expect(packRoute).toContain('getPreContractReadiness');
+    expect(contractRoute).toContain('Contract issuance is blocked until identity, qualification and references are verified or formally waived.');
+    expect(packRoute).toContain('Contract issuance is blocked until identity, qualification and references are verified or formally waived.');
   });
 });

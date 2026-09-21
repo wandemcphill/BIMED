@@ -18,19 +18,19 @@ export const ONBOARDING_CHECKLIST_BASE: Omit<OnboardingChecklistItem, 'status' |
   {
     item_key: 'identity_verified',
     title: 'Identity verified',
-    description: 'Passport or other identity evidence has been reviewed and verified before staff portal access is issued.',
+    description: 'Passport or other identity evidence has been reviewed and verified before an employment contract is issued.',
     required: true,
   },
   {
     item_key: 'qualification_evidence_verified',
     title: 'Qualification evidence verified',
-    description: 'Required qualification and training evidence has been reviewed for the applied role before staff portal access is issued.',
+    description: 'Required qualification and training evidence has been reviewed for the applied role before an employment contract is issued.',
     required: true,
   },
   {
     item_key: 'references_verified',
     title: 'References verified',
-    description: 'Required professional or employment references remain a BIMED-controlled post-access verification check.',
+    description: 'Required professional or employment references have been checked before an employment contract is issued.',
     required: true,
   },
   {
@@ -48,9 +48,8 @@ export const INTERNATIONAL_ONBOARDING_CHECKLIST: Omit<OnboardingChecklistItem, '
   required: true,
 };
 
-export const PRE_ACCESS_CHECK_KEYS = new Set(['identity_verified', 'qualification_evidence_verified']);
+export const PRE_CONTRACT_CHECK_KEYS = new Set(['identity_verified', 'qualification_evidence_verified', 'references_verified']);
 export const POST_ACCESS_CHECK_KEYS = new Set([
-  'references_verified',
   'right_to_work_verified',
   'international_work_permission_verified',
 ]);
@@ -74,11 +73,11 @@ export async function ensureOnboardingChecklist(
 
   const { error } = await client
     .from('recruitment_onboarding_checklist')
-    .upsert(rows, { onConflict: 'application_id,item_key', ignoreDuplicates: true });
+    .upsert(rows, { onConflict: 'application_id,item_key' });
   if (error) throw error;
 }
 
-export async function getOnboardingReadiness(
+export async function getPreContractReadiness(
   client: SupabaseClient,
   application: { id: string; living_in_ireland?: string | null },
 ) {
@@ -91,11 +90,19 @@ export async function getOnboardingReadiness(
   if (error) throw error;
 
   const items = (data || []) as OnboardingChecklistItem[];
-  const preAccessRequired = items.filter((item) => item.required && PRE_ACCESS_CHECK_KEYS.has(item.item_key));
-  const incomplete = preAccessRequired.filter((item) => item.status !== 'completed' && item.status !== 'waived');
+  const preContractRequired = items.filter((item) => item.required && PRE_CONTRACT_CHECK_KEYS.has(item.item_key));
+  const incomplete = preContractRequired.filter((item) => item.status !== 'completed' && item.status !== 'waived');
   return {
     ready: incomplete.length === 0,
     items,
     missing: incomplete.map((item) => ({ item_key: item.item_key, title: item.title })),
   };
+}
+
+
+export async function getOnboardingReadiness(
+  client: SupabaseClient,
+  application: { id: string; living_in_ireland?: string | null },
+) {
+  return getPreContractReadiness(client, application);
 }

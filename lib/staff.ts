@@ -4,9 +4,7 @@ import { activationExpiresAt, createActivationToken, hashActivationToken } from 
 import { BIMED_DEFAULT_END_DATE_ISO, BIMED_DEFAULT_START_DATE_ISO, recruitmentRoleSlug } from './bimed-role-policy';
 import {
   ensureOnboardingChecklist,
-  getOnboardingReadiness,
   POST_ACCESS_CHECK_KEYS,
-  PRE_ACCESS_CHECK_KEYS,
 } from './onboarding-readiness';
 import { generateBimedPortalEmail } from './staff-email';
 import { ensureBimedStaffOnboardingPackage } from './staff-onboarding';
@@ -14,6 +12,17 @@ import { ensureBimedStaffOnboardingPackage } from './staff-onboarding';
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
 export type StaffStatus = 'pre_arrival' | 'active' | 'on_leave' | 'suspended' | 'former';
+
+function asStaffProvisioningError(error: unknown, fallback: string): Error {
+  if (error instanceof Error) return error;
+  if (error && typeof error === 'object') {
+    const candidate = error as { message?: unknown; details?: unknown };
+    const message = typeof candidate.message === 'string' ? candidate.message.trim() : '';
+    const details = typeof candidate.details === 'string' ? candidate.details.trim() : '';
+    if (message) return new Error(details && details !== message ? message + ' — ' + details : message);
+  }
+  return new Error(fallback);
+}
 
 function defaultStartDate() {
   return BIMED_DEFAULT_START_DATE_ISO;
@@ -56,12 +65,25 @@ export async function createStaffFromApplication(
     .order('signed_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (signatureError) throw signatureError;
+  if (signatureError) throw asStaffProvisioningError(signatureError, 'Unable to verify the signed employment contract.');
+
+  const { data: externalContract, error: externalContractError } = await client
+    .from('recruitment_external_contract_verifications')
+    .select('id, role_slug, source, verified_by, verified_at, note')
+    .eq('application_id', applicationId)
+    .maybeSingle();
+  if (externalContractError) {
+    throw asStaffProvisioningError(externalContractError, 'Unable to verify external contract evidence.');
+  }
+
   if (signedContract && signedContract.role_slug !== expectedRoleSlug) {
     throw new Error('The signed contract role does not match the candidate\'s applied role.');
   }
-  if (!signedContract) {
-    throw new Error('The employment contract must be signed before the candidate can be promoted to staff.');
+  if (externalContract && externalContract.role_slug !== expectedRoleSlug) {
+    throw new Error('The externally verified contract role does not match the candidate\'s applied role.');
+  }
+  if (!signedContract && !externalContract) {
+    throw new Error('A signed BIMED contract or an administrator-verified externally signed contract is required before the candidate can be promoted to staff.');
   }
 
   const { data: existing } = await client
@@ -85,7 +107,9 @@ export async function createStaffFromApplication(
         p_start_date: BIMED_DEFAULT_START_DATE_ISO,
         p_end_date: BIMED_DEFAULT_END_DATE_ISO,
       });
-      if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
+      if (promotionError || !promotedStaff) {
+        throw asStaffProvisioningError(promotionError, 'Unable to atomically promote the staff profile.');
+      }
       let provisioningWarning: string | null = null;
       try {
         await ensureBimedStaffOnboardingPackage(client, promotedStaff.id, application);
@@ -127,14 +151,6 @@ export async function createStaffFromApplication(
     return { staff: existing, activationToken: null as string | null, provisioningWarning: null };
   }
 
-  if (!options?.lifecycle) {
-    const readiness = await getOnboardingReadiness(client, application);
-    if (!readiness.ready) {
-      const missing = readiness.missing.map((item) => item.title).join(', ');
-      throw new Error(`Pre-access verification is not complete. Complete the following before staff creation: ${missing}`);
-    }
-  }
-
   const activationToken = createActivationToken();
   const effectiveStartDate = defaultStartDate();
   const effectiveEndDate = BIMED_DEFAULT_END_DATE_ISO;
@@ -159,7 +175,9 @@ export async function createStaffFromApplication(
       p_start_date: effectiveStartDate,
       p_end_date: effectiveEndDate,
     });
-    if (promotionError || !promotedStaff) throw promotionError || new Error('Unable to atomically promote the staff profile.');
+    if (promotionError || !promotedStaff) {
+      throw asStaffProvisioningError(promotionError, 'Unable to atomically promote the staff profile.');
+    }
     staff = promotedStaff;
   } else {
     const result = await client
@@ -207,19 +225,6 @@ export async function createStaffFromApplication(
   const now = new Date().toISOString();
 
   try {
-    const { error: preAccessError } = await client
-      .from('recruitment_onboarding_checklist')
-      .update({
-        status: 'completed',
-        completed_at: now,
-        completed_by: 'BIMED recruitment verification',
-        notes: 'Pre-access evidence verified before staff portal access was issued.',
-        updated_at: now,
-      })
-      .eq('application_id', application.id)
-      .in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS));
-    if (preAccessError) throw preAccessError;
-
     const { error: postAccessError } = await client
       .from('recruitment_onboarding_checklist')
       .update({
