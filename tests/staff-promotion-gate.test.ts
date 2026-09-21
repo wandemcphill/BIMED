@@ -126,13 +126,13 @@ describe('contract-first provisioning regression', () => {
     expect(migration).toContain('SIGNED_CONTRACT_REQUIRED');
   });
 
-  it('gates contract issuance and the full onboarding pack on pre-contract verification', async () => {
+  it('keeps contract issuance and the complete onboarding pack behind pre-contract verification', async () => {
     const fs = await import('node:fs/promises');
     const contractRoute = await fs.readFile('app/api/admin/applications/[id]/contract-signature/route.ts', 'utf8');
     const packRoute = await fs.readFile('app/api/admin/applications/[id]/onboarding-pack/route.ts', 'utf8');
-    expect(contractRoute).toContain('getPreContractReadiness');
+    expect(contractRoute).toContain('Standalone contract signing requests are disabled.');
     expect(packRoute).toContain('getPreContractReadiness');
-    expect(contractRoute).toContain('Contract issuance is blocked until identity, qualification and references are verified or formally waived.');
     expect(packRoute).toContain('Contract issuance is blocked until identity, qualification and references are verified or formally waived.');
+    expect(packRoute).toContain("['Submitted', 'Offer Issued', 'Onboarding', 'Hired']");
   });
 });
