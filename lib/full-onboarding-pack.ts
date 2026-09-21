@@ -15,6 +15,7 @@ export async function sendFullOnboardingPackEmail(input: {
   signingDocuments: SigningDocument[];
   packetLinks: Link[];
   packId: string;
+  deliveryKey?: string;
 }, client?: SupabaseClient | null): Promise<SendResult> {
   const signingLinks: Link[] = input.signingDocuments
     .filter((document) => !document.signed && Boolean(document.url))
@@ -46,7 +47,7 @@ export async function sendFullOnboardingPackEmail(input: {
     to: input.application.email,
     content: { subject, html, text },
     emailType: 'onboarding_pack',
-    dedupeKey: `onboarding_pack:${input.packId}`,
+    dedupeKey: input.deliveryKey || `onboarding_pack:${input.packId}`,
     applicationId: input.application.id,
     client,
     replyTo: recruitmentContacts.ireland,

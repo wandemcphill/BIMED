@@ -22,6 +22,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const bodyResult = await readJsonBody(request, MAX_JSON_BYTES.admin);
   if (!bodyResult.ok) return NextResponse.json({ error: bodyResult.error }, { status: 400 });
   const requestedRoleSlug = (bodyResult.data as Record<string, unknown>).role_slug;
+  const resend = (bodyResult.data as Record<string, unknown>).resend === true;
   if (typeof requestedRoleSlug !== 'string' || !getContractTemplate(requestedRoleSlug)) {
     return NextResponse.json({ error: 'A valid role_slug is required.' }, { status: 400 });
   }
@@ -150,6 +151,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       ],
       packetLinks,
       packId: contractResult.record.id,
+      deliveryKey: resend ? `onboarding_pack_resend:${currentApplication.id}:${crypto.randomUUID()}` : undefined,
     }, client);
 
     const previousStatus = currentApplication.status;
