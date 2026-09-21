@@ -34,10 +34,17 @@ function clientMock(signatureRow: unknown) {
     maybeSingle: vi.fn(async () => ({ data: null, error: null })),
   };
 
+  const externalContractQuery = {
+    select: vi.fn(() => externalContractQuery),
+    eq: vi.fn(() => externalContractQuery),
+    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+  };
+
   const client = {
     from: vi.fn((table: string) => {
       if (table === 'recruitment_applications') return applicationsQuery;
       if (table === 'recruitment_contract_signatures') return signedContractQuery;
+      if (table === 'recruitment_external_contract_verifications') return externalContractQuery;
       throw new Error(`unexpected table: ${table}`);
     }),
   } as any;
@@ -48,7 +55,7 @@ function clientMock(signatureRow: unknown) {
 describe('staff promotion contract gate', () => {
   it('rejects promotion when no signed contract exists', async () => {
     await expect(createStaffFromApplication(clientMock(null), 'app-1')).rejects.toThrow(
-      'The employment contract must be signed before the candidate can be promoted to staff.',
+      'A signed BIMED contract or an administrator-verified externally signed contract is required before the candidate can be promoted to staff.',
     );
   });
 
