@@ -9,7 +9,7 @@ import { sendFullOnboardingPackEmail } from '@/lib/full-onboarding-pack';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
-import { BimedLifecycleError, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
+import { isBimedRecruitmentStatus, localBimedTransitionAllowed } from '@/lib/bimed-lifecycle';
 import { getPreContractReadiness } from '@/lib/onboarding-readiness';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -91,22 +91,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }, client);
 
     const previousStatus = application.status;
-    let transitionedApplication = application;
-    if (previousStatus !== 'Offer Issued') {
-      try {
-        transitionedApplication = await transitionBimedApplicationStatus(client, {
-          applicationId,
-          toStatus: 'Offer Issued',
-          actor: session.email,
-          note: 'Full employment and onboarding pack issued.',
-        });
-      } catch (error) {
-        if (error instanceof BimedLifecycleError) {
-          return NextResponse.json({ error: error.message }, { status: error.code === 'APPLICATION_NOT_FOUND' ? 404 : 409 });
-        }
-        throw error;
-      }
-    }
+    const transitionedApplication = previousStatus === 'Submitted'
+      ? { ...application, status: 'Offer Issued' }
+      : application;
 
     await recordRecruitmentAudit(client, {
       applicationId: application.id,
