@@ -10,6 +10,7 @@ import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 import { BimedLifecycleError, isBimedRecruitmentStatus, localBimedTransitionAllowed, transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
+import { getPreContractReadiness } from '@/lib/onboarding-readiness';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -39,6 +40,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
     if (!expectedRoleSlug) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
     if (requestedRoleSlug !== expectedRoleSlug) return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
+
+    const readiness = await getPreContractReadiness(client, application);
+    if (!readiness.ready) {
+      return NextResponse.json(
+        {
+          error: 'Contract issuance is blocked until identity, qualification and references are verified or formally waived.',
+          missing: readiness.missing,
+        },
+        { status: 409 },
+      );
+    }
 
     if (application.status !== 'Offer Issued') {
       if (!isBimedRecruitmentStatus(application.status) || !localBimedTransitionAllowed(application.status, 'Offer Issued')) {
