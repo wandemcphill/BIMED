@@ -211,20 +211,6 @@ export async function createStaffFromApplication(
 
   const now = new Date().toISOString();
 
-  try {
-    const { error: preAccessError } = await client
-      .from('recruitment_onboarding_checklist')
-      .update({
-        status: 'completed',
-        completed_at: now,
-        completed_by: 'BIMED recruitment verification',
-        notes: 'Pre-access evidence verified before staff portal access was issued.',
-        updated_at: now,
-      })
-      .eq('application_id', application.id)
-      .in('item_key', Array.from(PRE_ACCESS_CHECK_KEYS));
-    if (preAccessError) throw preAccessError;
-
     const { error: postAccessError } = await client
       .from('recruitment_onboarding_checklist')
       .update({
