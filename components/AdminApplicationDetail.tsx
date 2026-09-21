@@ -622,7 +622,7 @@ export default function AdminApplicationDetail({
       </section>
 
       <section className="subcard">
-        <h2>Handbook e-signature</h2>
+        <h2>Handbook signing status</h2>
         <p className="muted">The employee handbook is part of the complete onboarding pack and is signed once with the contract and job description.</p>
         <div className="notice">
           <strong>Included in onboarding pack</strong>
@@ -644,7 +644,7 @@ export default function AdminApplicationDetail({
       </section>
 
       <section className="subcard">
-        <h2>Job description e-signature</h2>
+        <h2>Job description signing status</h2>
         <p className="muted">The {contractRoleSlug ? contractTemplates.find((t) => t.roleSlug === contractRoleSlug)?.roleLabel : 'role'} job description is part of the complete onboarding pack and is signed once with the contract and handbook.</p>
         <div className="notice">
           <strong>Included in onboarding pack</strong>
