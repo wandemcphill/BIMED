@@ -4,9 +4,7 @@ import { activationExpiresAt, createActivationToken, hashActivationToken } from 
 import { BIMED_DEFAULT_END_DATE_ISO, BIMED_DEFAULT_START_DATE_ISO, recruitmentRoleSlug } from './bimed-role-policy';
 import {
   ensureOnboardingChecklist,
-  getOnboardingReadiness,
   POST_ACCESS_CHECK_KEYS,
-  PRE_ACCESS_CHECK_KEYS,
 } from './onboarding-readiness';
 import { generateBimedPortalEmail } from './staff-email';
 import { ensureBimedStaffOnboardingPackage } from './staff-onboarding';
@@ -138,14 +136,6 @@ export async function createStaffFromApplication(
 
     await ensureBimedStaffOnboardingPackage(client, existing.id, application);
     return { staff: existing, activationToken: null as string | null, provisioningWarning: null };
-  }
-
-  if (!options?.lifecycle) {
-    const readiness = await getOnboardingReadiness(client, application);
-    if (!readiness.ready) {
-      const missing = readiness.missing.map((item) => item.title).join(', ');
-      throw new Error(`Pre-access verification is not complete. Complete the following before staff creation: ${missing}`);
-    }
   }
 
   const activationToken = createActivationToken();
