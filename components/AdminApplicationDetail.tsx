@@ -442,8 +442,6 @@ export default function AdminApplicationDetail({
 
   if (!authenticated || !payload) {
       return (
-  const onboardingPackSent = Boolean(payload.auditLog?.some((entry) => entry.event_type === 'onboarding_pack_sent'));
-
       <section className="card auth-card">
         <h1>Candidate record</h1>
         <p className="muted">Sign in to view the private candidate record.</p>
@@ -481,6 +479,8 @@ export default function AdminApplicationDetail({
       </section>
     );
   }
+
+  const onboardingPackSent = Boolean(payload.auditLog?.some((entry) => entry.event_type === 'onboarding_pack_sent'));
 
   const application = payload.application;
   const international = isInternationalCandidate(application);
