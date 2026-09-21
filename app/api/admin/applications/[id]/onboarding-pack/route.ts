@@ -9,7 +9,6 @@ import { sendFullOnboardingPackEmail } from '@/lib/full-onboarding-pack';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
-import { isBimedRecruitmentStatus, localBimedTransitionAllowed } from '@/lib/bimed-lifecycle';
 import { getPreContractReadiness } from '@/lib/onboarding-readiness';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -52,10 +51,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    if (application.status !== 'Offer Issued') {
-      if (!isBimedRecruitmentStatus(application.status) || !localBimedTransitionAllowed(application.status, 'Offer Issued')) {
-        return NextResponse.json({ error: `Transition from ${application.status} to Offer Issued is not permitted.` }, { status: 409 });
-      }
+    if (!['Submitted', 'Offer Issued', 'Onboarding', 'Hired'].includes(application.status)) {
+      return NextResponse.json(
+        { error: `The complete onboarding pack cannot be issued from ${application.status}.` },
+        { status: 409 },
+      );
     }
 
     const startDate = BIMED_DEFAULT_START_DATE_ISO;
@@ -100,8 +100,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       };
     }
 
-    const [contractResult, jobDescResult, handbookResult] = await Promise.all([
-      resolvePackDocument('contract', expectedRoleSlug),
+    const contractResult = await resolvePackDocument('contract', expectedRoleSlug);
+    const [jobDescResult, handbookResult] = await Promise.all([
       resolvePackDocument('job_description', expectedRoleSlug),
       resolvePackDocument('handbook', ''),
     ]);
