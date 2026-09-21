@@ -35,8 +35,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .eq('id', applicationId).maybeSingle();
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+    const currentApplication = application;
 
-    const expectedRoleSlug = recruitmentRoleSlug(application.role_applied);
+    const expectedRoleSlug = recruitmentRoleSlug(currentApplication.role_applied);
     if (!expectedRoleSlug) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
     if (requestedRoleSlug !== expectedRoleSlug) return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
 
@@ -51,18 +52,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    if (!['Submitted', 'Offer Issued', 'Onboarding', 'Hired'].includes(application.status)) {
+    if (!['Submitted', 'Offer Issued', 'Onboarding', 'Hired'].includes(currentApplication.status)) {
       return NextResponse.json(
-        { error: `The complete onboarding pack cannot be issued from ${application.status}.` },
+        { error: `The complete onboarding pack cannot be issued from ${currentApplication.status}.` },
         { status: 409 },
       );
     }
 
     const startDate = BIMED_DEFAULT_START_DATE_ISO;
     const contractInfo = {
-      applicationId: application.id,
-      employeeName: application.full_name,
-      employeeAddress: application.address,
+      applicationId: currentApplication.id,
+      employeeName: currentApplication.full_name,
+      employeeAddress: currentApplication.address,
       startDate,
       issuedBy: session.email,
     };
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         const { data: externalVerification, error: externalVerificationError } = await client
           .from('recruitment_external_contract_verifications')
           .select('id, role_slug, verified_by, verified_at, note')
-          .eq('application_id', application.id)
+          .eq('application_id', currentApplication.id)
           .maybeSingle();
 
         if (externalVerificationError) throw externalVerificationError;
@@ -81,11 +82,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
           return {
             record: {
               id: externalVerification.id,
-              application_id: application.id,
+              application_id: currentApplication.id,
               doc_type: 'contract',
               role_slug: externalVerification.role_slug,
               status: 'signed',
-              signed_name: application.full_name,
+              signed_name: currentApplication.full_name,
               signed_at: externalVerification.verified_at,
             },
             signUrl: null as string | null,
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const { data: latest, error: latestError } = await client
         .from('recruitment_contract_signatures')
         .select('*')
-        .eq('application_id', application.id)
+        .eq('application_id', currentApplication.id)
         .eq('doc_type', docType)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -132,9 +133,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       resolvePackDocument('handbook', ''),
     ]);
 
-    const international = application.living_in_ireland === 'No';
+    const international = currentApplication.living_in_ireland === 'No';
     const packetEntries = packetList(international).filter((packet) => packet.onboardingEmail !== false);
-    const packetResults = await Promise.all(packetEntries.map((packet) => createPacketAccess(application.id, packet.slug, session.email)));
+    const packetResults = await Promise.all(packetEntries.map((packet) => createPacketAccess(currentApplication.id, packet.slug, session.email)));
     const packetLinks = packetResults.map((result) => ({
       label: packetEntries.find((packet) => packet.slug === result.record.packet_slug)?.title || 'Open BIMED document',
       url: result.url,
@@ -151,13 +152,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       packId: contractResult.record.id,
     }, client);
 
-    const previousStatus = application.status;
+    const previousStatus = currentApplication.status;
     const transitionedApplication = previousStatus === 'Submitted'
       ? { ...application, status: 'Offer Issued' }
       : application;
 
     await recordRecruitmentAudit(client, {
-      applicationId: application.id,
+      applicationId: currentApplication.id,
       eventType: 'onboarding_pack_sent',
       actor: session.email,
       metadata: {
