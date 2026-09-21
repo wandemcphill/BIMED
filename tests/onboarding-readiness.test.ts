@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   onboardingChecklistForApplication,
-  PRE_ACCESS_CHECK_KEYS,
+  PRE_CONTRACT_CHECK_KEYS,
   POST_ACCESS_CHECK_KEYS,
 } from '@/lib/onboarding-readiness';
 
