@@ -67,7 +67,22 @@ export async function POST(request: NextRequest) {
     if (body.action === 'restrict_portal') {
       if (!body.staffId) return NextResponse.json({ error: 'staffId is required.' }, { status: 400 });
       const { data: target } = await client.from('recruitment_staff').select('id,full_name,email,application_id,status,portal_restriction_reason').eq('id', body.staffId).maybeSingle(); if (!target) return NextResponse.json({ error: 'Staff member not found.' }, { status: 404 }); if (!target.application_id) return NextResponse.json({ error: 'Portal restriction for this workflow is limited to recruitment-linked new recruits.' }, { status: 400 });
-      const message = `Your BIMED Staff Portal access has been temporarily restricted because the required €4,000 accommodation contribution has not been paid in accordance with the overseas-hire accommodation process. Your employment contract remains on record, and your BIMED identity, recruitment information and other records have been retained. This restriction can be removed by BIMED once the accommodation payment requirement has been resolved. Please contact BIMED through the contact details previously provided if you need clarification.`;
+      const { data: permitCase } = await client
+        .from('recruitment_staff_permit_cases')
+        .select('accommodation_plan,accommodation_amount_eur,accommodation_period_months')
+        .eq('staff_id', target.id)
+        .maybeSingle();
+      const accommodationAmount = Number(permitCase?.accommodation_amount_eur || 0);
+      const accommodationPeriod = Number(permitCase?.accommodation_period_months || 0);
+      const accommodationPlanLabel =
+        accommodationAmount === 1250 && accommodationPeriod === 1
+          ? '€1,250 for 1 month'
+          : accommodationAmount === 4000 && accommodationPeriod === 3
+            ? '€4,000 for 3 months'
+            : accommodationAmount > 0
+              ? `€${accommodationAmount.toLocaleString('en-IE')} for ${accommodationPeriod || 'the agreed'} month${accommodationPeriod === 1 ? '' : 's'}`
+              : 'the agreed accommodation plan';
+      const message = `Your BIMED Staff Portal access has been temporarily restricted because the accommodation contribution under your agreed accommodation plan has not been resolved. BIMED accommodation arrangements are €4,000 for 3 months or €1,250 for 1 month, depending on the approved plan. Your recorded plan is ${accommodationPlanLabel}. Your employment contract remains on record, and your BIMED identity, recruitment information and other records have been retained. This restriction can be removed by BIMED once the accommodation payment requirement has been resolved. Please contact BIMED through the contact details previously provided if you need clarification.`;
       try { await restrictRecruitmentStaffPortal(client, target.id, session.email, message); } catch (error) { const messageError = error instanceof Error ? error.message : 'Unable to restrict portal access.'; if (messageError.includes('STAFF_ALREADY_SUSPENDED')) return NextResponse.json({ error: 'This recruit is already suspended. Use the Reactivate Staff Portal action if the accommodation restriction has been resolved.' }, { status: 409 }); if (messageError.includes('STAFF_NOT_RECRUITMENT_LINKED')) return NextResponse.json({ error: 'Portal restriction for this workflow is limited to recruitment-linked new recruits.' }, { status: 400 }); return NextResponse.json({ error: 'Unable to atomically restrict portal access and record the audit action.' }, { status: 500 }); }
       const { data } = await client.from('recruitment_staff').select('*').eq('id', target.id).single(); return NextResponse.json({ staff: data, message });
     }
