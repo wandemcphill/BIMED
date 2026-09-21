@@ -18,3 +18,19 @@ describe('BIMED atomic staff activation', () => {
     expect(migration).toContain('staff_account_activated');
   });
 });
+
+
+describe('staff activation audit contract', () => {
+  it('supplies the mandatory audit action field', async () => {
+    const fs = await import('node:fs/promises');
+    const migration = await fs.readFile(
+      'supabase/migrations/20260921211500_20260921_bimed_staff_activation_audit_action_fix.sql',
+      'utf8',
+    );
+
+    expect(migration).toContain('insert into public.recruitment_staff_audit_log(');
+    expect(migration).toContain('    action,');
+    expect(migration).toContain("    'staff_account_activated',");
+    expect(migration).toContain("    'staff_account_activated',");
+  });
+});
