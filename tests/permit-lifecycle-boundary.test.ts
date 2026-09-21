@@ -33,7 +33,7 @@ describe('BIMED permit lifecycle boundary', () => {
 
   it('does not keep the duplicate hyphenated arrival-dispatch migration', async () => {
     await expect(
-      fs.access('supabase/migrations/20260920100710_20260920_idempotent_arrival_transfer_dispatch.sql'),
+      fs.access('supabase/migrations/20260920_idempotent-arrival-transfer-dispatch.sql'),
     ).rejects.toThrow();
 
     await fs.access('supabase/migrations/20260920100710_20260920_idempotent_arrival_transfer_dispatch.sql');
