@@ -146,9 +146,6 @@ export default function AdminApplicationDetail({
   const [externalContractVerification, setExternalContractVerification] = useState<ExternalContractVerification | null>(null);
   const [externalContractNote, setExternalContractNote] = useState('');
   const [recordingExternalContract, setRecordingExternalContract] = useState(false);
-  const [sendingForSignature, setSendingForSignature] = useState(false);
-  const [signatureMessage, setSignatureMessage] = useState('');
-  const [signatureMessageTone, setSignatureMessageTone] = useState<'success' | 'error'>('success');
   const [issuingPack, setIssuingPack] = useState(false);
   const [packMessage, setPackMessage] = useState('');
   const [secondInterviews, setSecondInterviews] = useState<SecondInterview[]>([]);
@@ -157,11 +154,7 @@ export default function AdminApplicationDetail({
   const [secondInterviewMessage, setSecondInterviewMessage] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [handbookSignatures, setHandbookSignatures] = useState<ContractSignature[]>([]);
-  const [sendingHandbook, setSendingHandbook] = useState(false);
-  const [handbookMessage, setHandbookMessage] = useState('');
   const [jobDescSignatures, setJobDescSignatures] = useState<ContractSignature[]>([]);
-  const [sendingJobDesc, setSendingJobDesc] = useState(false);
-  const [jobDescMessage, setJobDescMessage] = useState('');
 
   const loadApplication = async () => {
     const response = await fetch(`/api/admin/applications/${applicationId}`);
@@ -214,58 +207,6 @@ export default function AdminApplicationDetail({
     if (!response.ok) return;
     const nextPayload = (await response.json()) as { signatures: ContractSignature[] };
     setJobDescSignatures(nextPayload.signatures || []);
-  };
-
-  const sendHandbookForSignature = async () => {
-    setSendingHandbook(true);
-    setHandbookMessage('');
-
-    const response = await fetch(`/api/admin/applications/${applicationId}/document-signature`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ doc_type: 'handbook' }),
-    });
-
-    const nextPayload = await response.json();
-    setSendingHandbook(false);
-
-    if (!response.ok) {
-      setHandbookMessage(nextPayload.error || 'Unable to send the handbook for signature.');
-      return;
-    }
-
-    setHandbookMessage(
-      nextPayload.email?.status === 'sent'
-        ? 'Signing link emailed to the candidate.'
-        : 'Signing link created, but the email could not be confirmed as sent. Check the candidate email delivery.'
-    );
-    await loadHandbookSignatures();
-  };
-
-  const sendJobDescriptionForSignature = async () => {
-    setSendingJobDesc(true);
-    setJobDescMessage('');
-
-    const response = await fetch(`/api/admin/applications/${applicationId}/document-signature`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ doc_type: 'job_description', role_slug: contractRoleSlug }),
-    });
-
-    const nextPayload = await response.json();
-    setSendingJobDesc(false);
-
-    if (!response.ok) {
-      setJobDescMessage(nextPayload.error || 'Unable to send the job description for signature.');
-      return;
-    }
-
-    setJobDescMessage(
-      nextPayload.email?.status === 'sent'
-        ? 'Signing link emailed to the candidate.'
-        : 'Signing link created, but the email could not be confirmed as sent. Check the candidate email delivery.'
-    );
-    await loadJobDescSignatures();
   };
 
   const loadSecondInterviews = async () => {
@@ -354,36 +295,6 @@ export default function AdminApplicationDetail({
     setSignatureMessage('External signed contract recorded and verified. Staff portal provisioning can now use this contract evidence.');
   };
 
-  const sendForSignature = async () => {
-    setSendingForSignature(true);
-    setSignatureMessageTone('success');
-    setSignatureMessage('');
-
-    const response = await fetch(`/api/admin/applications/${applicationId}/contract-signature`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role_slug: contractRoleSlug }),
-    });
-
-    const nextPayload = await response.json();
-    setSendingForSignature(false);
-
-    if (!response.ok) {
-      setSignatureMessageTone('error');
-      setSignatureMessage(nextPayload.error || 'Unable to send the contract for signature.');
-      return;
-    }
-
-    const emailStatus = nextPayload.email?.status;
-    setSignatureMessageTone('success');
-    setSignatureMessage(
-      emailStatus === 'sent'
-        ? 'Signing link emailed to the candidate.'
-        : 'Signing link created, but the email could not be confirmed as sent. Check the candidate email delivery.'
-    );
-    await loadSignatures();
-  };
-
   const issueOnboardingPack = async () => {
     setIssuingPack(true);
     setPackMessage('');
@@ -404,8 +315,8 @@ export default function AdminApplicationDetail({
 
     setPackMessage(
       nextPayload.email?.status === 'sent'
-        ? 'Onboarding pack emailed to the candidate (contract signing link, job description and handbook).'
-        : 'Onboarding pack created, but the email could not be confirmed as sent. Check the candidate email delivery.'
+        ? 'Complete onboarding pack emailed. Any document already signed remains signed and is not re-issued.'
+        : 'Complete onboarding pack created, but the email could not be confirmed as sent. Check the candidate email delivery.'
     );
     setStatus('Offer Issued');
     await loadSignatures();
@@ -529,6 +440,7 @@ export default function AdminApplicationDetail({
   }
 
   if (!authenticated || !payload) {
+  const onboardingPackSent = Boolean(payload.auditLog?.some((entry) => entry.event_type === 'onboarding_pack_sent'));
       return (
       <section className="card auth-card">
         <h1>Candidate record</h1>
@@ -651,11 +563,13 @@ export default function AdminApplicationDetail({
           >
             Open pre-filled contract
           </a>
-          <button className="secondary" onClick={() => void sendForSignature()} disabled={sendingForSignature}>
-            {sendingForSignature ? 'Sending...' : 'Send for e-signature'}
-          </button>
+          <div className="notice" style={{ flex: 1 }}>
+            <strong>Signing is managed through the complete onboarding pack.</strong>
+            <div className="muted" style={{ marginTop: 4 }}>
+              Contract, job description and handbook are issued together and signed once. Use the onboarding pack below rather than issuing the contract separately.
+            </div>
+          </div>
         </div>
-        {signatureMessage && <div className={signatureMessageTone} style={{ marginTop: 12 }}>{signatureMessage}</div>}
 
         <div className="subcard" style={{ marginTop: 16 }}>
           <h3 style={{ marginBottom: 6 }}>External signed contract</h3>
@@ -707,11 +621,11 @@ export default function AdminApplicationDetail({
 
       <section className="subcard">
         <h2>Handbook e-signature</h2>
-        <p className="muted">Sends the employee handbook for the candidate to review and sign online.</p>
-        <button className="secondary" onClick={() => void sendHandbookForSignature()} disabled={sendingHandbook}>
-          {sendingHandbook ? 'Sending...' : 'Send handbook for e-signature'}
-        </button>
-        {handbookMessage && <div className="success" style={{ marginTop: 12 }}>{handbookMessage}</div>}
+        <p className="muted">The employee handbook is part of the complete onboarding pack and is signed once with the contract and job description.</p>
+        <div className="notice">
+          <strong>Included in onboarding pack</strong>
+          <div className="muted" style={{ marginTop: 4 }}>Do not issue a separate handbook signing request.</div>
+        </div>
         {handbookSignatures.length > 0 && (
           <div className="activity-list" style={{ marginTop: 16 }}>
             {handbookSignatures.map((signature) => (
@@ -729,11 +643,11 @@ export default function AdminApplicationDetail({
 
       <section className="subcard">
         <h2>Job description e-signature</h2>
-        <p className="muted">Sends the {contractRoleSlug ? contractTemplates.find((t) => t.roleSlug === contractRoleSlug)?.roleLabel : 'role'} job description for the candidate to review and sign online. Uses the role selected above under &quot;Generate contract&quot;.</p>
-        <button className="secondary" onClick={() => void sendJobDescriptionForSignature()} disabled={sendingJobDesc}>
-          {sendingJobDesc ? 'Sending...' : 'Send job description for e-signature'}
-        </button>
-        {jobDescMessage && <div className="success" style={{ marginTop: 12 }}>{jobDescMessage}</div>}
+        <p className="muted">The {contractRoleSlug ? contractTemplates.find((t) => t.roleSlug === contractRoleSlug)?.roleLabel : 'role'} job description is part of the complete onboarding pack and is signed once with the contract and handbook.</p>
+        <div className="notice">
+          <strong>Included in onboarding pack</strong>
+          <div className="muted" style={{ marginTop: 4 }}>Do not issue a separate job-description signing request.</div>
+        </div>
         {jobDescSignatures.length > 0 && (
           <div className="activity-list" style={{ marginTop: 16 }}>
             {jobDescSignatures.map((signature) => (
@@ -755,11 +669,11 @@ export default function AdminApplicationDetail({
       <section className="subcard">
         <h2>Issue onboarding pack</h2>
         <p className="muted">
-          Emails the candidate sign-online links for their contract, job description and the employee handbook in one message,
-          and marks the application &quot;Offer Issued&quot;.
+          Sends the complete pre-employment signing set in one message: employment contract, job description and employee handbook.
+          Already-signed documents are retained and are not re-issued. Remaining onboarding materials are review, completion or acknowledgement items.
         </p>
         <button className="primary" onClick={() => void issueOnboardingPack()} disabled={issuingPack}>
-          {issuingPack ? 'Sending...' : 'Send onboarding pack to candidate'}
+          {issuingPack ? 'Sending...' : onboardingPackSent ? 'Resend complete onboarding pack' : 'Send complete onboarding pack'}
         </button>
         {packMessage && <div className="success" style={{ marginTop: 12 }}>{packMessage}</div>}
       </section>
