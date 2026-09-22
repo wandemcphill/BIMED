@@ -117,7 +117,7 @@ function deriveCurrentSelection(application: any, permit: any) {
 
 function buildChoiceCatalog(roleValue: string | null | undefined) {
   const options: any[] = [];
-  for (const plan of ['three_months_4000', 'one_month_1250', 'one_month_shared_625'] as const) {
+  for (const plan of ['three_months_4000', 'three_months_shared_2000', 'one_month_1250', 'one_month_shared_625'] as const) {
     for (const route of ['candidate_or_agency', 'bimed_legal_team'] as const) {
       try { options.push(getAccommodationSelection(plan, route, roleValue)); } catch { /* Unsupported role is handled by the acknowledgement endpoint. */ }
     }
