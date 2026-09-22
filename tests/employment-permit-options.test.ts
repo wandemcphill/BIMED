@@ -23,6 +23,13 @@ describe('employment permit and accommodation selection policy', () => {
     expect(selection.permit_duration_months).toBe(24);
   });
 
+  it('builds the three-month shared plan at half of the €4,000 arrangement', () => {
+    const selection = getAccommodationSelection('three_months_shared_2000', 'bimed_legal_team', 'Healthcare Assistant');
+    expect(selection.accommodation_amount_eur).toBe(2000);
+    expect(selection.accommodation_period_months).toBe(3);
+    expect(selection.accommodation_summary).toContain('half of the €4,000 total arrangement');
+  });
+
   it('builds the €1,250 one-month selection with route-dependent refund triggers', () => {
     const employerRoute = getAccommodationSelection('one_month_1250', 'bimed_legal_team', 'Support Worker');
     const selfRoute = getAccommodationSelection('one_month_1250', 'candidate_or_agency', 'Support Worker');

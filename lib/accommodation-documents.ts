@@ -39,6 +39,11 @@ function selectionForInvoice(invoice: any): any {
 }
 
 function termsForSelection(selection: any): string[] {
+  const shared = selection.shared === true || selection.accommodation_plan === 'three_months_shared_2000' || selection.accommodation_plan === 'one_month_shared_625';
+  const period = Number(selection.accommodation_period_months || 3);
+  const amount = Number(selection.accommodation_amount_eur || 0);
+  const totalArrangement = Number(selection.total_amount_eur || (shared ? amount * 2 : amount));
+
   if (selection.terms_version === '2026-09-14-v1' || selection.legacy === true && selection.accommodation_plan === 'three_months_4000') {
     return [
       'The €4,000 payment covers BIMED-arranged accommodation for the initial 3-month probationary period.',
@@ -51,24 +56,26 @@ function termsForSelection(selection: any): string[] {
   }
 
   const terms = [
-    `The €${Number(selection.accommodation_amount_eur).toLocaleString('en-IE')} payment covers ${selection.accommodation_period_months === 1 ? 'BIMED-arranged accommodation for the first month' : `BIMED-arranged accommodation for the initial ${selection.accommodation_period_months}-month probationary period`}.`,
-    selection.accommodation_plan === 'one_month_1250'
+    shared
+      ? `This invoice charges €${amount.toLocaleString('en-IE')} for the candidate's 50% share of a total shared accommodation arrangement of €${totalArrangement.toLocaleString('en-IE')} for ${period === 1 ? 'the first month' : 'the initial three-month probationary period'}.`
+      : `The €${amount.toLocaleString('en-IE')} payment covers BIMED-arranged accommodation for ${period === 1 ? 'the first month' : `the initial ${period}-month probationary period`}.`,
+    period === 1
       ? 'During the first month, the employee completes training, onboarding and shadow shifting with BIMED. After the one-month arrangement expires, the employee arranges and pays for their own accommodation in Ireland.'
       : 'The three-month arrangement covers the initial probationary period and related onboarding transition.',
     'The accommodation payment is separate from employment permit and visa decisions. It does not guarantee permit approval, visa approval, right to work, entry to Ireland or continued employment.',
   ];
 
   if (selection.accommodation_refund_trigger === 'successful_three_month_probation') {
-    terms.push(`Where the qualifying trigger is successful completion of the three-month probationary period, the €${Number(selection.accommodation_amount_eur).toLocaleString('en-IE')} refund is returned in 4 weekly instalments in accordance with the accommodation terms.`);
+    terms.push(`Where the qualifying trigger is successful completion of the three-month probationary period, the €${amount.toLocaleString('en-IE')} refund is returned in 4 weekly instalments in accordance with the accommodation terms.`);
   } else {
-    terms.push(`Where the permit route is candidate or recruitment-agency paid, the €${Number(selection.accommodation_amount_eur).toLocaleString('en-IE')} refund trigger is expiry of the one-month accommodation arrangement. Refund processing and payment mechanics are governed by the applicable accommodation terms and evidence requirements.`);
+    terms.push(`Where the permit route is candidate or recruitment-agency paid, the €${amount.toLocaleString('en-IE')} refund trigger is expiry of the one-month accommodation arrangement. Refund processing and payment mechanics are governed by the applicable accommodation terms and evidence requirements.`);
   }
 
   terms.push(
     selection.permit_submission_route === 'bimed_legal_team'
       ? 'BIMED legal team submits and pays the employment permit application on behalf of the candidate. The permit fee is not recovered through salary deduction or repayment.'
       : 'The candidate or recruitment agency submits and pays the employment permit application directly.',
-    `The planned employment permit application fee for the recorded route is €${Number(selection.permit_fee_eur || 1000).toLocaleString('en-IE')}. Irish immigration registration is normally €300 where a registration fee applies, subject to current ISD rules and exemptions.` ,
+    `The planned employment permit application fee for the recorded route is €${Number(selection.permit_fee_eur || 1000).toLocaleString('en-IE')}. Irish immigration registration is normally €300 where a registration fee applies, subject to current ISD rules and exemptions.`,
     'The invoice, payment evidence and receipt should be retained by the employee as part of their employment and accommodation records.',
   );
 
@@ -141,17 +148,22 @@ function documentStyles() {
 }
 
 function arrangementPanel(selection: any) {
-  const route = selection.permit_submission_route ? permitSubmissionLabel(selection.permit_submission_route) : 'Permit route not recorded on this legacy acknowledgement';
+  const route = selection.permit_submission_route ? permitSubmissionLabel(selection.permit_submission_route) : 'Permit route not recorded on this acknowledgement';
   const permitType = selection.permit_type ? permitTypeLabel(selection.permit_type) : 'To be confirmed by BIMED';
+  const shared = selection.shared === true || selection.accommodation_plan === 'three_months_shared_2000' || selection.accommodation_plan === 'one_month_shared_625';
+  const totalArrangement = Number(selection.total_amount_eur || (shared ? Number(selection.share_amount_eur || selection.accommodation_amount_eur || 0) * 2 : selection.accommodation_amount_eur || 0));
   return `<section class="section"><h2>Arrangement & permit route</h2><div class="detail-grid">
     <div class="detail-row"><span>Accommodation</span><strong>${e(accommodationPlanLabel(selection.accommodation_plan))}</strong></div>
     <div class="detail-row"><span>Accommodation period</span><strong>${e(selection.accommodation_period_months)} month${Number(selection.accommodation_period_months) === 1 ? '' : 's'}</strong></div>
+    ${shared ? `<div class="detail-row"><span>Shared arrangement</span><strong>50% share · Total €${totalArrangement.toLocaleString('en-IE', { minimumFractionDigits: 2 })}</strong></div>
+    <div class="detail-row"><span>Share reference</span><strong>${e(selection.share_reference || '—')}</strong></div>
+    <div class="detail-row"><span>Accommodation partner</span><strong>${e(selection.share_role === 'partner' ? selection.primary_name || selection.primary_bimed_id || 'Primary BIMED candidate' : selection.partner_name || selection.partner_bimed_id || 'Linked BIMED candidate')}</strong></div>` : ''}
     <div class="detail-row"><span>Refund trigger</span><strong>${e(selection.accommodation_refund_trigger === 'one_month_accommodation_expiry' ? 'One-month accommodation expiry' : 'Successful three-month probation')}</strong></div>
     <div class="detail-row"><span>Permit type</span><strong>${e(permitType)}</strong></div>
     <div class="detail-row"><span>Permit submission</span><strong>${e(route)}</strong></div>
     <div class="detail-row"><span>Permit fee</span><strong>€${Number(selection.permit_fee_eur || 1000).toLocaleString('en-IE', { minimumFractionDigits: 2 })}</strong></div>
     <div class="detail-row"><span>Planned initial duration</span><strong>${e(selection.permit_duration_months || 24)} months</strong></div>
-    <div class="detail-row"><span>Flights & airport pickup</span><strong>Available under both accommodation plans</strong></div>
+    <div class="detail-row"><span>Flights & airport pickup</span><strong>Available under all accommodation plans</strong></div>
   </div></section>`;
 }
 

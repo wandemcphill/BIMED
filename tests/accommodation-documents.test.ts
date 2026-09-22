@@ -61,4 +61,49 @@ describe('accommodation invoice payment details', () => {
     expect(html).not.toContain('€4,000 payment covers BIMED-arranged accommodation');
   });
 
+  it('shows the shared arrangement reference and half-share on the invoice document', () => {
+    const html = invoiceHtml({
+      invoice: {
+        invoice_number: 'BIMED-ACC-SHARED-TEST',
+        public_token: 'shared-token',
+        status: 'issued',
+        amount_eur: 2000,
+        currency: 'EUR',
+        description: 'BIMED-arranged shared accommodation for the initial three-month probationary period — your 50% share',
+        bill_to_name: 'Ada Shared',
+        bill_to_email: 'ada@example.com',
+        payment_account_snapshot: {},
+        arrangement_snapshot: {
+          shared: true,
+          accommodation_plan: 'three_months_shared_2000',
+          accommodation_amount_eur: 2000,
+          accommodation_period_months: 3,
+          total_amount_eur: 4000,
+          share_amount_eur: 2000,
+          share_reference: 'BIMED-SHARE-TEST1234',
+          share_role: 'primary',
+          partner_bimed_id: 'BH-002000',
+          partner_name: 'Partner Candidate',
+          partner_email: 'partner@example.com',
+          accommodation_refund_trigger: 'successful_three_month_probation',
+          permit_submission_route: 'bimed_legal_team',
+          permit_type: 'general_employment_permit',
+          permit_fee_eur: 1000,
+          permit_duration_months: 24,
+          terms_version: '2026-09-17-v2',
+        },
+        issue_date: '2026-09-22',
+        issued_at: '2026-09-22T15:00:00.000Z',
+        due_date: '2026-09-29',
+      },
+      staff: { full_name: 'Ada Shared', email: 'ada@example.com', bimed_id: 'BH-001999' },
+      publicUrl: 'https://recruitment.bimedhealthcare.com/invoices/accommodation/shared-token',
+    });
+
+    expect(html).toContain('50% share');
+    expect(html).toContain('BIMED-SHARE-TEST1234');
+    expect(html).toContain('€4,000.00');
+    expect(html).toContain('Partner Candidate');
+  });
+
 });

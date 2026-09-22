@@ -117,7 +117,7 @@ function deriveCurrentSelection(application: any, permit: any) {
 
 function buildChoiceCatalog(roleValue: string | null | undefined) {
   const options: any[] = [];
-  for (const plan of ['three_months_4000', 'one_month_1250', 'one_month_shared_625'] as const) {
+  for (const plan of ['three_months_4000', 'three_months_shared_2000', 'one_month_1250', 'one_month_shared_625'] as const) {
     for (const route of ['candidate_or_agency', 'bimed_legal_team'] as const) {
       try { options.push(getAccommodationSelection(plan, route, roleValue)); } catch { /* Unsupported role is handled by the acknowledgement endpoint. */ }
     }
@@ -477,6 +477,213 @@ export async function POST(request: NextRequest) {
       invoiceUrl: invoicePublicUrl,
       changed: true,
     }, { status: 200 });
+  }
+
+  if (action === 'acknowledge_shared_accommodation') {
+    if (body?.acknowledged !== true) {
+      return NextResponse.json({ error: 'Please confirm the shared accommodation terms before continuing.' }, { status: 400 });
+    }
+    const sharedPlans = new Set(['three_months_shared_2000', 'one_month_shared_625']);
+    if (!sharedPlans.has(body?.accommodation_plan)) {
+      return NextResponse.json({ error: 'Select a shared accommodation plan first.' }, { status: 400 });
+    }
+    if (!body?.partner_identifier || typeof body.partner_identifier !== 'string') {
+      return NextResponse.json({ error: 'Enter the BIMED ID or BIMED email of the candidate you will share accommodation with.' }, { status: 400 });
+    }
+    if (currentInvoice || permit.accommodation_terms_acknowledged_at) {
+      return NextResponse.json({ error: 'Your accommodation selection has already been recorded. Use the shared-plan linking option if your existing record is a legacy shared arrangement.' }, { status: 409 });
+    }
+
+    let selection;
+    try {
+      selection = validateAccommodationSelection({
+        plan: body.accommodation_plan,
+        route: body.permit_submission_route,
+        roleValue: application?.role_applied,
+      });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'INVALID_ACCOMMODATION_SELECTION';
+      const messages: Record<string, string> = {
+        INVALID_ACCOMMODATION_PLAN: 'Select a shared accommodation plan.',
+        INVALID_PERMIT_SUBMISSION_ROUTE: 'Select who will submit and pay the employment permit application.',
+        UNSUPPORTED_RECRUITMENT_ROLE: 'Your recruitment role is not currently configured for an employment-permit route.',
+      };
+      return NextResponse.json({ error: messages[code] || 'The shared accommodation and permit selections could not be validated.' }, { status: 400 });
+    }
+
+    let result: any;
+    try {
+      result = await client.rpc('bimed_acknowledge_shared_accommodation_options', {
+        p_staff_id: staff.id,
+        p_actor: session.email,
+        p_terms_version: ACCOMMODATION_OPTIONS_TERMS_VERSION,
+        p_accommodation_plan: selection.accommodation_plan,
+        p_permit_submission_route: selection.permit_submission_route,
+        p_permit_type: selection.permit_type,
+        p_permit_fee_eur: selection.permit_fee_eur,
+        p_permit_duration_months: selection.permit_duration_months,
+        p_selection_snapshot: selection,
+        p_partner_identifier: body.partner_identifier.trim(),
+        p_primary_invoice_number: makeInvoiceNumber(),
+        p_primary_public_token: makePublicToken(),
+        p_partner_invoice_number: makeInvoiceNumber(),
+        p_partner_public_token: makePublicToken(),
+        p_due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      });
+      if (result.error || !result.data) throw result.error || new Error('Unable to create the shared accommodation arrangement.');
+    } catch (error) {
+      const reason = error instanceof Error
+        ? error.message
+        : error && typeof error === 'object'
+          ? JSON.stringify(error)
+          : String(error);
+      const mapped: Record<string, { message: string; status: number }> = {
+        SHARED_PARTNER_NOT_FOUND: { message: 'No BIMED candidate was found for that BIMED ID or BIMED email.', status: 404 },
+        SHARED_PARTNER_CANNOT_BE_SELF: { message: 'You cannot select yourself as the accommodation-sharing candidate.', status: 400 },
+        SHARED_PARTNER_ALREADY_HAS_ACCOMMODATION: { message: 'That candidate already has an accommodation arrangement or invoice and cannot be added to this shared plan.', status: 409 },
+        SHARED_PARTNER_ALREADY_SHARED: { message: 'That candidate is already linked to another active shared accommodation arrangement.', status: 409 },
+        SHARED_PARTNER_NOT_ELIGIBLE: { message: 'That candidate is not currently eligible for a shared accommodation arrangement.', status: 409 },
+        SHARED_PARTNER_PERMIT_CASE_NOT_FOUND: { message: 'That candidate does not yet have an employment-permit case and cannot be added to the shared plan.', status: 409 },
+        SHARED_ACCOMMODATION_SELECTION_NOT_AVAILABLE: { message: 'Your accommodation selection is already in progress or has advanced too far to start a shared arrangement.', status: 409 },
+      };
+      const handled = mapped[reason];
+      console.error(JSON.stringify({ level: 'error', event: 'shared_accommodation_acknowledgement_atomic_failed', staff_id: staff.id, reason }));
+      return NextResponse.json({ error: handled?.message || 'Unable to create the shared accommodation arrangement. No partial arrangement was saved.' }, { status: handled?.status || 500 });
+    }
+
+    const primaryInvoiceRow = (await client.from('recruitment_accommodation_invoices').select('*').eq('id', result.data.primary_invoice_id).single()).data;
+    const partnerContext = await getPermitContext(result.data.partner_staff_id);
+
+    if (!primaryInvoiceRow || !partnerContext.staff || !partnerContext.application || !partnerContext.permit || !partnerContext.invoice) {
+      return NextResponse.json({ error: 'The shared accommodation records were created but could not be loaded for invoice issuance. BIMED has been notified.' }, { status: 500 });
+    }
+
+    let primaryIssuance: any;
+    let partnerIssuance: any;
+    try {
+      primaryIssuance = await issueAccommodationInvoice({
+        client,
+        invoice: primaryInvoiceRow,
+        staff,
+        application,
+        permit,
+        actor: session.email,
+        automatic: true,
+      });
+      partnerIssuance = await issueAccommodationInvoice({
+        client,
+        invoice: partnerContext.invoice,
+        staff: partnerContext.staff,
+        application: partnerContext.application,
+        permit: partnerContext.permit,
+        actor: session.email,
+        automatic: true,
+      });
+
+      await createStaffNotification(client, {
+        staffId: partnerContext.staff.id,
+        category: 'billing',
+        title: 'Shared accommodation arrangement linked',
+        body: `${staff.full_name} (${staff.bimed_id}) selected you as the BIMED candidate sharing accommodation with them. Your invoice is €${Number(partnerIssuance.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR, which is your half of the shared accommodation arrangement. The arrangement reference is ${result.data.share_reference}.`,
+        actionUrl: partnerIssuance.publicUrl ? `/invoices/accommodation/${partnerIssuance.invoice.public_token}` : '/staff/permit',
+      });
+    } catch (error) {
+      console.error(JSON.stringify({ level: 'error', event: 'shared_accommodation_invoice_issue_failed', primary_staff_id: staff.id, partner_staff_id: result.data.partner_staff_id, reason: error instanceof Error ? error.message : String(error) }));
+      return NextResponse.json({ error: 'The shared arrangement was saved, but one or more invoices could not be issued automatically. BIMED will review the billing records.' }, { status: 502 });
+    }
+
+    const { data: updatedPermit } = await client.from('recruitment_staff_permit_cases').select('*').eq('id', permit.id).single();
+    return NextResponse.json({
+      permit: updatedPermit || permit,
+      invoice: { id: primaryIssuance.invoice.id, invoice_number: primaryIssuance.invoice.invoice_number, status: primaryIssuance.invoice.status },
+      invoiceUrl: primaryIssuance.publicUrl,
+      shared: true,
+      shareReference: result.data.share_reference,
+      partner: { staffId: result.data.partner_staff_id, invoiceNumber: partnerIssuance.invoice.invoice_number, amountEur: partnerIssuance.invoice.amount_eur },
+    }, { status: 201 });
+  }
+
+  if (action === 'link_existing_shared_accommodation_partner') {
+    if (permit.cancellation_requested_at || permit.cancellation_finalized_at) {
+      return NextResponse.json({ error: 'The shared accommodation arrangement cannot be linked while the sponsorship cancellation workflow is active or finalised.' }, { status: 409 });
+    }
+    if (!['three_months_shared_2000','one_month_shared_625'].includes(permit.accommodation_plan)
+      || (permit.accommodation_share_role && permit.accommodation_share_role !== 'primary')) {
+      return NextResponse.json({ error: 'This accommodation record is not a shared plan that can be linked.' }, { status: 409 });
+    }
+    if (permit.accommodation_share_id) {
+      return NextResponse.json({ error: 'A sharing partner is already linked to this accommodation arrangement.' }, { status: 409 });
+    }
+    if (!body?.partner_identifier || typeof body.partner_identifier !== 'string') {
+      return NextResponse.json({ error: 'Enter the BIMED ID or BIMED email of the candidate you will share accommodation with.' }, { status: 400 });
+    }
+
+    let result: any;
+    try {
+      result = await client.rpc('bimed_link_existing_shared_accommodation_partner', {
+        p_staff_id: staff.id,
+        p_actor: session.email,
+        p_partner_identifier: body.partner_identifier.trim(),
+        p_partner_invoice_number: makeInvoiceNumber(),
+        p_partner_public_token: makePublicToken(),
+        p_due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      });
+      if (result.error || !result.data) throw result.error || new Error('Unable to link the shared accommodation partner.');
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      const mapped: Record<string, { message: string; status: number }> = {
+        SHARED_PARTNER_NOT_FOUND: { message: 'No BIMED candidate was found for that BIMED ID or BIMED email.', status: 404 },
+        SHARED_PARTNER_CANNOT_BE_SELF: { message: 'You cannot select yourself as the accommodation-sharing candidate.', status: 400 },
+        SHARED_PARTNER_ALREADY_HAS_ACCOMMODATION: { message: 'That candidate already has an accommodation arrangement or invoice.', status: 409 },
+        SHARED_PARTNER_ALREADY_SHARED: { message: 'That candidate is already linked to another shared accommodation arrangement.', status: 409 },
+      };
+      const handled = mapped[reason];
+      return NextResponse.json({ error: handled?.message || 'Unable to link the shared accommodation partner. No partial link was saved.' }, { status: handled?.status || 500 });
+    }
+
+    const partnerContext = await getPermitContext(result.data.partner_staff_id);
+    if (!partnerContext.staff || !partnerContext.application || !partnerContext.permit || !partnerContext.invoice) {
+      return NextResponse.json({ error: 'The partner record was linked but the partner invoice could not be loaded.' }, { status: 500 });
+    }
+
+    try {
+      const partnerIssuance = await issueAccommodationInvoice({
+        client,
+        invoice: partnerContext.invoice,
+        staff: partnerContext.staff,
+        application: partnerContext.application,
+        permit: partnerContext.permit,
+        actor: session.email,
+        automatic: true,
+      });
+      await createStaffNotification(client, {
+        staffId: partnerContext.staff.id,
+        category: 'billing',
+        title: 'Shared accommodation invoice issued',
+        body: `${staff.full_name} (${staff.bimed_id}) linked you to their shared accommodation arrangement. Your invoice is €${Number(partnerIssuance.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR.`,
+        actionUrl: partnerIssuance.publicUrl ? `/invoices/accommodation/${partnerIssuance.invoice.public_token}` : '/staff/permit',
+      });
+      return NextResponse.json({ ok: true, shared: true, shareReference: result.data.share_reference, partnerInvoiceNumber: partnerIssuance.invoice.invoice_number }, { status: 201 });
+    } catch (error) {
+      console.error(JSON.stringify({ level: 'error', event: 'shared_partner_invoice_issue_failed', staff_id: partnerContext.staff.id, reason: error instanceof Error ? error.message : String(error) }));
+      return NextResponse.json({ error: 'The partner was linked, but BIMED could not issue their invoice automatically. BIMED will review the billing record.' }, { status: 502 });
+    }
+  }
+
+  if (action === 'acknowledge_shared_accommodation_partner') {
+    try {
+      const result = await client.rpc('bimed_acknowledge_shared_accommodation_partner', {
+        p_staff_id: staff.id,
+        p_actor: session.email,
+        p_terms_version: ACCOMMODATION_OPTIONS_TERMS_VERSION,
+      });
+      if (result.error || !result.data) throw result.error || new Error('Unable to acknowledge the shared accommodation arrangement.');
+      const { data: updatedPermit } = await client.from('recruitment_staff_permit_cases').select('*').eq('id', permit.id).single();
+      return NextResponse.json({ ok: true, permit: updatedPermit || permit }, { status: 200 });
+    } catch (error) {
+      console.error(JSON.stringify({ level: 'error', event: 'shared_partner_acknowledgement_failed', staff_id: staff.id, reason: error instanceof Error ? error.message : String(error) }));
+      return NextResponse.json({ error: 'Unable to acknowledge the shared accommodation arrangement.' }, { status: 500 });
+    }
   }
 
   if (action === 'acknowledge_accommodation') {
