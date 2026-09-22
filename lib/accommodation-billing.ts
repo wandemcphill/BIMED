@@ -93,11 +93,26 @@ function signatureBlock(dateValue: unknown, label: string) {
   </section>`;
 }
 
-function termsSection() {
+function termsSection(invoice?: any) {
+  const snapshot = invoice?.arrangement_snapshot || {};
+  const plan = snapshot.accommodation_plan || null;
+  const amount = Number(invoice?.amount_eur || snapshot.accommodation_amount_eur || ACCOMMODATION_AMOUNT_EUR);
+  const periodMonths = Number(snapshot.accommodation_period_months || ACCOMMODATION_PERIOD_MONTHS);
+  const refundTrigger = snapshot.accommodation_refund_trigger || 'successful_three_month_probation';
+  const shared = plan === 'one_month_shared_625';
+  const terms = [
+    `The €${amount.toLocaleString('en-IE')} payment covers BIMED-arranged ${shared ? 'shared ' : ''}accommodation for ${periodMonths === 1 ? 'the first month' : 'the initial three-month probationary period'}.`,
+    'The payment is a condition of the BIMED overseas-hire accommodation arrangement and is separate from the employment permit and visa decisions made by the relevant authorities.',
+    'Payment of the accommodation amount does not guarantee an employment permit, visa, right to work, entry to Ireland or continued employment, and it does not replace any financial evidence or other documentation an authority may require.',
+    refundTrigger === 'one_month_accommodation_expiry'
+      ? `The agreed €${amount.toLocaleString('en-IE')} refund is processed when the one-month accommodation arrangement expires, in accordance with the applicable accommodation terms.`
+      : `Where the employee completes the probationary period successfully, the agreed €${amount.toLocaleString('en-IE')} refund is returned in ${Number(snapshot.accommodation_refund_installments || ACCOMMODATION_REFUND_INSTALLMENTS)} weekly instalments in accordance with the accommodation terms.`,
+    'The invoice, payment evidence and receipt should be retained by the employee as part of their employment and accommodation records.',
+  ];
   return `<section class="terms-section">
     <div class="section-kicker">TERMS & CONDITIONS · VERSION ${e(ACCOMMODATION_TERMS_VERSION)}</div>
     <h2>Accommodation arrangement terms</h2>
-    <ol>${ACCOMMODATION_TERMS.map((term) => `<li>${e(term)}</li>`).join('')}</ol>
+    <ol>${terms.map((term) => `<li>${e(term)}</li>`).join('')}</ol>
   </section>`;
 }
 
@@ -179,11 +194,11 @@ export function invoiceHtml(input: { invoice: any; staff: any; account?: any; pu
       <div class="rule"></div>
       <div class="meta-grid">
         <div class="panel"><div class="kicker">BILLED TO</div><strong>${e(input.invoice.bill_to_name || input.staff.full_name)}</strong><p>${e(input.invoice.bill_to_email || input.staff.email || '')}</p><p>BIMED ID: ${e(input.staff.bimed_id || '')}</p></div>
-        <div class="panel"><div class="kicker">ARRANGEMENT</div><strong>€${Number(input.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong><p>Initial BIMED-arranged accommodation for ${ACCOMMODATION_PERIOD_MONTHS} months, covering the probationary period.</p></div>
+        <div class="panel"><div class="kicker">ARRANGEMENT</div><strong>€${Number(input.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong><p>Initial BIMED-arranged ${input.invoice.arrangement_snapshot?.accommodation_plan === 'one_month_shared_625' ? 'shared ' : ''}accommodation for ${Number(input.invoice.arrangement_snapshot?.accommodation_period_months || ACCOMMODATION_PERIOD_MONTHS) === 1 ? 'the first month' : 'the probationary period'}.</p></div>
       </div>
       <div class="summary"><table><thead><tr><th>Description</th><th>Amount</th></tr></thead><tbody><tr><td>${e(input.invoice.description)}</td><td>€${Number(input.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })}</td></tr></tbody><tfoot><tr class="total"><td>TOTAL DUE</td><td>€${Number(input.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })}</td></tr></tfoot></table></div>
       <section class="payment"><h2>Payment details</h2><div class="payment-grid">${accountRows.map(([label, value]) => `<div class="payment-row"><span>${e(label)}</span><strong>${e(value)}</strong></div>`).join('')}</div></section>
-      ${termsSection()}
+      ${termsSection(input.invoice)}
       <div class="notice"><strong>Important:</strong> This accommodation arrangement is separate from the employment permit and visa decisions made by the relevant authorities. Payment does not guarantee permit approval, visa approval, entry to Ireland, right to work or continued employment.</div>
       ${signatureBlock(input.invoice.issued_at || input.invoice.issue_date, 'Authorised by')}
       <a class="button" href="${e(input.publicUrl)}">Open invoice online</a>
