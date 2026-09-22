@@ -62,7 +62,6 @@ describe('accommodation invoice payment details', () => {
   });
 
   it('shows the shared arrangement reference and half-share on the invoice document', () => {
-    const { invoiceHtml } = require('@/lib/accommodation-documents');
     const html = invoiceHtml({
       invoice: {
         invoice_number: 'BIMED-ACC-SHARED-TEST',
