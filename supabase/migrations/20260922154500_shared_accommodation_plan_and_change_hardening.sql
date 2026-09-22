@@ -481,6 +481,3 @@ grant execute on function public.bimed_change_staff_accommodation_selection(
 ) to service_role;
 
 commit;
-
-
-commit;
