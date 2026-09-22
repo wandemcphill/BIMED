@@ -82,7 +82,7 @@ export default function StaffPermitPage() {
   const currentSharedTotal = isSharedAccommodationPlan(currentPlan as any) ? sharedAccommodationTotalEur(currentPlan as any) : null;
   const displayedPlans = useMemo(() => sharedPartner ? [currentPlan] as const : changePlanMode ? availablePlans.filter((plan) => !isSharedAccommodationPlan(plan)) : availablePlans, [availablePlans, changePlanMode, sharedPartner, currentPlan]);
   const canChangeAccommodation = Boolean(termsAcknowledged && permit?.permit_submission_route && invoice && ['draft', 'issued'].includes(invoice.status) && !permit?.requested_at && permit?.status === 'not_started' && !permit?.cancellation_requested_at && !permit?.cancellation_finalized_at);
-  const changePlanDisabled = !selectedPlan || !acknowledged || selectedPlan === permit?.accommodation_plan;
+  const changePlanDisabled = !selectedPlan || !acknowledged || selectedPlan === permit.accommodation_plan;
 
   async function acknowledgeAccommodation() {
     if (!selectedPlan || !selectedRoute) { setError('Choose an accommodation plan and a permit submission route first.'); return; }
