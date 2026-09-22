@@ -125,6 +125,53 @@ function buildChoiceCatalog(roleValue: string | null | undefined) {
   return options;
 }
 
+async function getSharedBillingRecovery(client: any, permit: any) {
+  if (!permit?.accommodation_share_id) return null;
+  const { data: share } = await client
+    .from('recruitment_accommodation_shares')
+    .select('id,share_reference,status,primary_staff_id,partner_staff_id')
+    .eq('id', permit.accommodation_share_id)
+    .maybeSingle();
+  if (!share) return null;
+
+  const { data: permits } = await client
+    .from('recruitment_staff_permit_cases')
+    .select('id,staff_id')
+    .in('id', [share.primary_staff_id, share.partner_staff_id]);
+  if (!permits?.length) return null;
+
+  const { data: invoices } = await client
+    .from('recruitment_accommodation_invoices')
+    .select('id,permit_case_id,invoice_number,status,amount_eur')
+    .in('permit_case_id', permits.map((item: any) => item.id));
+
+  const invoiceByPermit = Object.fromEntries((invoices || []).map((item: any) => [item.permit_case_id, item]));
+  const primaryPermit = permits.find((item: any) => item.staff_id === share.primary_staff_id);
+  const partnerPermit = permits.find((item: any) => item.staff_id === share.partner_staff_id);
+  const primaryInvoice = primaryPermit ? invoiceByPermit[primaryPermit.id] || null : null;
+  const partnerInvoice = partnerPermit ? invoiceByPermit[partnerPermit.id] || null : null;
+
+  return {
+    shareReference: share.share_reference,
+    shareStatus: share.status,
+    primaryInvoice: primaryInvoice ? {
+      invoiceNumber: primaryInvoice.invoice_number,
+      status: primaryInvoice.status,
+      amountEur: primaryInvoice.amount_eur,
+    } : null,
+    partnerInvoice: partnerInvoice ? {
+      invoiceNumber: partnerInvoice.invoice_number,
+      status: partnerInvoice.status,
+      amountEur: partnerInvoice.amount_eur,
+    } : null,
+    needsRecovery: Boolean(
+      !primaryInvoice ||
+      !partnerInvoice ||
+      [primaryInvoice.status, partnerInvoice.status].some((status) => !['issued', 'paid'].includes(status)),
+    ),
+  };
+}
+
 export async function GET(request: NextRequest) {
   const session = await getStaffSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
@@ -145,6 +192,7 @@ export async function GET(request: NextRequest) {
     invoice: invoice ? { id: invoice.id, invoice_number: invoice.invoice_number, public_token: invoice.public_token, status: invoice.status, issue_date: invoice.issue_date, due_date: invoice.due_date, amount_eur: invoice.amount_eur } : null,
     invoiceUrl: invoice ? `${appUrl()}/invoices/accommodation/${invoice.public_token}` : null,
     accommodationReady: isAccommodationReady(invoice),
+    sharedBillingRecovery: await getSharedBillingRecovery(client, permit),
   });
 }
 
@@ -327,6 +375,94 @@ export async function POST(request: NextRequest) {
         { status: handled?.status || 500 },
       );
     }
+  }
+
+
+  if (action === 'retry_shared_accommodation_invoice_issuance') {
+    if (permit.cancellation_requested_at || permit.cancellation_finalized_at) {
+      return NextResponse.json({ error: 'Shared accommodation invoice recovery is unavailable while sponsorship cancellation is active or finalised.' }, { status: 409 });
+    }
+
+    const recovery = await getSharedBillingRecovery(client, permit);
+    if (!recovery || recovery.shareStatus !== 'active' || !recovery.primaryInvoice || !recovery.partnerInvoice) {
+      return NextResponse.json({ error: 'No recoverable shared accommodation invoice pair was found.' }, { status: 409 });
+    }
+    if (!recovery.needsRecovery) {
+      return NextResponse.json({ ok: true, recovered: false, message: 'Both shared accommodation invoices are already issued.' }, { status: 200 });
+    }
+
+    const { data: share } = await client
+      .from('recruitment_accommodation_shares')
+      .select('id,primary_staff_id,partner_staff_id')
+      .eq('id', permit.accommodation_share_id)
+      .maybeSingle();
+    if (!share) return NextResponse.json({ error: 'The shared accommodation relationship could not be loaded.' }, { status: 404 });
+
+    const contexts = await Promise.all([
+      getPermitContext(share.primary_staff_id),
+      getPermitContext(share.partner_staff_id),
+    ]);
+
+    if (contexts.some((context) => !context.staff || !context.application || !context.permit || !context.invoice)) {
+      return NextResponse.json({ error: 'The shared accommodation records are incomplete. BIMED needs to review the billing relationship.' }, { status: 500 });
+    }
+
+    const results: any[] = [];
+    const failures: any[] = [];
+
+    for (const context of contexts) {
+      try {
+        const issuance = await issueAccommodationInvoice({
+          client,
+          invoice: context.invoice,
+          staff: context.staff,
+          application: context.application,
+          permit: context.permit,
+          actor: session.email,
+          automatic: true,
+        });
+        results.push({
+          staffId: context.staff.id,
+          bimedId: context.staff.bimed_id,
+          invoiceNumber: issuance.invoice.invoice_number,
+          status: issuance.invoice.status,
+          alreadyIssued: issuance.alreadyIssued === true,
+        });
+      } catch (error) {
+        failures.push({
+          staffId: context.staff.id,
+          bimedId: context.staff.bimed_id,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const finalRecovery = await getSharedBillingRecovery(client, permit);
+    if (failures.length) {
+      await createStaffNotification(client, {
+        staffId: staff.id,
+        category: 'billing',
+        title: 'Shared accommodation billing recovery still pending',
+        body: 'One or more shared accommodation invoices still needs billing recovery. The existing invoice records were preserved.',
+        actionUrl: '/staff/permit',
+      });
+      return NextResponse.json({
+        ok: false,
+        recovered: false,
+        partial: true,
+        results,
+        failures,
+        sharedBillingRecovery: finalRecovery,
+        error: 'BIMED could not issue every shared accommodation invoice yet. The arrangement is preserved and can be retried without creating duplicate invoices.',
+      }, { status: 502 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      recovered: true,
+      results,
+      sharedBillingRecovery: finalRecovery,
+    }, { status: 200 });
   }
 
   if (permit.cancellation_requested_at
@@ -588,8 +724,16 @@ export async function POST(request: NextRequest) {
         actionUrl: partnerIssuance.publicUrl ? `/invoices/accommodation/${partnerIssuance.invoice.public_token}` : '/staff/permit',
       });
     } catch (error) {
-      console.error(JSON.stringify({ level: 'error', event: 'shared_accommodation_invoice_issue_failed', primary_staff_id: staff.id, partner_staff_id: result.data.partner_staff_id, reason: error instanceof Error ? error.message : String(error) }));
-      return NextResponse.json({ error: 'The shared arrangement was saved, but one or more invoices could not be issued automatically. BIMED will review the billing records.' }, { status: 502 });
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error(JSON.stringify({ level: 'error', event: 'shared_accommodation_invoice_issue_failed', primary_staff_id: staff.id, partner_staff_id: result.data.partner_staff_id, reason }));
+      await createStaffNotification(client, {
+        staffId: staff.id,
+        category: 'billing',
+        title: 'Shared accommodation billing needs recovery',
+        body: 'The shared accommodation arrangement was saved, but one or more invoices could not be issued automatically. The arrangement is preserved and can be retried without creating duplicate invoices.',
+        actionUrl: '/staff/permit',
+      });
+      return NextResponse.json({ error: 'The shared arrangement was saved, but one or more invoices could not be issued automatically. The arrangement is preserved and can be retried without creating duplicate invoices.', recoveryAvailable: true }, { status: 502 });
     }
 
     const { data: updatedPermit } = await client.from('recruitment_staff_permit_cases').select('*').eq('id', permit.id).single();
@@ -665,8 +809,16 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ ok: true, shared: true, shareReference: result.data.share_reference, partnerInvoiceNumber: partnerIssuance.invoice.invoice_number }, { status: 201 });
     } catch (error) {
-      console.error(JSON.stringify({ level: 'error', event: 'shared_partner_invoice_issue_failed', staff_id: partnerContext.staff.id, reason: error instanceof Error ? error.message : String(error) }));
-      return NextResponse.json({ error: 'The partner was linked, but BIMED could not issue their invoice automatically. BIMED will review the billing record.' }, { status: 502 });
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error(JSON.stringify({ level: 'error', event: 'shared_partner_invoice_issue_failed', staff_id: partnerContext.staff.id, reason }));
+      await createStaffNotification(client, {
+        staffId: staff.id,
+        category: 'billing',
+        title: 'Shared partner invoice needs recovery',
+        body: 'The sharing partner was linked successfully, but the partner invoice could not be issued automatically. The arrangement is preserved and can be retried without creating a duplicate invoice.',
+        actionUrl: '/staff/permit',
+      });
+      return NextResponse.json({ error: 'The partner was linked, but BIMED could not issue their invoice automatically. The arrangement is preserved and can be retried without creating a duplicate invoice.', recoveryAvailable: true }, { status: 502 });
     }
   }
 
