@@ -110,11 +110,13 @@ begin
     raise exception 'SHARED_ACCOMMODATION_SELECTION_NOT_AVAILABLE';
   end if;
 
-  if p_permit_type <> case
-    when lower(trim(v_primary_application.role_applied)) = 'physiotherapist' then 'critical_skills_employment_permit'
-    when lower(trim(v_primary_application.role_applied)) in ('healthcare assistant','senior support worker','support worker') then 'general_employment_permit'
-    else null
-  end then
+  if p_permit_type <> (
+    case
+      when lower(trim(v_primary_application.role_applied)) = 'physiotherapist' then 'critical_skills_employment_permit'
+      when lower(trim(v_primary_application.role_applied)) in ('healthcare assistant','senior support worker','support worker') then 'general_employment_permit'
+      else null
+    end
+  ) then
     raise exception 'PERMIT_TYPE_MUST_MATCH_ROLE';
   end if;
 
