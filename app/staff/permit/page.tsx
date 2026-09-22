@@ -248,6 +248,7 @@ export default function StaffPermitPage() {
   if (!permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}>Loading employment permit workspace…</main>;
 
   const currentPlan = selectedPlan || permit.accommodation_plan || 'three_months_4000';
+
   const routeReady = Boolean(permit.permit_submission_route || selectedRoute);
   const currentRoute = (permit.permit_submission_route || selectedRoute || null) as AccommodationOption['permit_submission_route'] | null;
   const displayOption = selectedOption || options.find((option) => option.accommodation_plan === currentPlan && option.permit_submission_route === currentRoute) || null;
