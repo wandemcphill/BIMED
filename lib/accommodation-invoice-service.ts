@@ -88,17 +88,23 @@ export async function issueAccommodationInvoice(input: {
   const publicUrl = `${appUrl()}/invoices/accommodation/${updatedInvoice.public_token}`;
   const candidateEmail = application?.email || staff.email;
   const recipients = Array.from(new Set([candidateEmail, 'overseas@bimedhealthcare.com', 'manager@bimedhealthcare.com'].filter(Boolean)));
+  const shared = updatedInvoice.arrangement_snapshot?.shared === true;
+  const otherCandidateName = updatedInvoice.arrangement_snapshot?.share_role === 'partner'
+    ? updatedInvoice.arrangement_snapshot?.primary_name
+    : updatedInvoice.arrangement_snapshot?.partner_name;
+  const sharedReference = updatedInvoice.arrangement_snapshot?.share_reference;
+  const totalArrangement = Number(updatedInvoice.arrangement_snapshot?.total_amount_eur || updatedInvoice.amount_eur * (shared ? 2 : 1));
 
   let emailSent = true;
   try {
     await sendAccommodationEmail({
       to: recipients,
-      subject: `BIMED accommodation invoice ${updatedInvoice.invoice_number} is ready`,
+      subject: shared ? `BIMED shared accommodation invoice ${updatedInvoice.invoice_number} is ready` : `BIMED accommodation invoice ${updatedInvoice.invoice_number} is ready`,
       html: `<div style="font-family:Arial,sans-serif;color:#172b4d">
-        <h2>Your BIMED accommodation invoice is ready</h2>
+        <h2>${shared ? 'Your BIMED shared accommodation invoice is ready' : 'Your BIMED accommodation invoice is ready'}</h2>
         <p>Hello ${staff.full_name},</p>
-        <p>Your accommodation invoice <strong>${updatedInvoice.invoice_number}</strong> has been issued.</p>
-        <p>Please open the invoice in the BIMED Staff Portal to review the accommodation terms, amount due, and the official payment details.</p>
+        <p>${shared ? `Your shared accommodation arrangement is linked to <strong>${otherCandidateName || 'another BIMED candidate'}</strong>. Shared arrangement reference: <strong>${sharedReference || '—'}</strong>. Total accommodation arrangement: <strong>€${totalArrangement.toLocaleString('en-IE', { minimumFractionDigits: 2 })}</strong>. Your invoice is your <strong>50% share</strong>.` : ''}</p><p>Your accommodation invoice <strong>${updatedInvoice.invoice_number}</strong> for <strong>€${Number(updatedInvoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong> has been issued.</p>
+        <p>Please open the invoice in the BIMED Staff Portal to review the accommodation terms, your share, amount due, and the official payment details.</p>
         <p><a href="${publicUrl}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f766e;color:#fff;text-decoration:none;font-weight:800">Open accommodation invoice</a></p>
         <p style="font-size:12px;color:#627d98">For security and accuracy, the bank account and payment instructions are displayed on the portal invoice itself rather than repeated in this email.</p>
       </div>`,
