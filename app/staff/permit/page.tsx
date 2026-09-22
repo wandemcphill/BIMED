@@ -253,7 +253,11 @@ export default function StaffPermitPage() {
   const currentRoute = (permit.permit_submission_route || selectedRoute || null) as AccommodationOption['permit_submission_route'] | null;
   const displayOption = selectedOption || options.find((option) => option.accommodation_plan === currentPlan && option.permit_submission_route === currentRoute) || null;
   const selectedPlanOption = selectedPlan ? options.find((option) => option.accommodation_plan === selectedPlan && option.permit_submission_route === currentRoute) || options.find((option) => option.accommodation_plan === selectedPlan) || null : null;
-  const acknowledgementAmount = changePlanMode && selectedPlanOption ? Number(selectedPlanOption.accommodation_amount_eur) : Number(permit.accommodation_amount_eur || displayOption?.accommodation_amount_eur || 0);
+  const acknowledgementAmount = selectedPlanOption && !termsAcknowledged
+    ? Number(selectedPlanOption.accommodation_amount_eur)
+    : changePlanMode && selectedPlanOption
+      ? Number(selectedPlanOption.accommodation_amount_eur)
+      : Number(permit.accommodation_amount_eur || displayOption?.accommodation_amount_eur || 0);
   const currentShareSnapshot = permit?.accommodation_selection_snapshot || {};
   const permitTypeLabel = displayOption?.permit_type_label || (permit.permit_type === 'critical_skills_employment_permit' ? 'Critical Skills Employment Permit (CSEP)' : permit.permit_type === 'general_employment_permit' ? 'General Employment Permit (GEP)' : 'BIMED to derive from your role');
   const checklist = getPermitChecklist(role || permit.role || null, currentRoute);
@@ -375,7 +379,7 @@ export default function StaffPermitPage() {
           {termsAcknowledged ? <div style={{ marginTop: 10, color: '#166534', fontWeight: 800 }}>Shared accommodation terms acknowledged.</div> : <><p style={{ margin: '10px 0' }}>Your invoice has already been issued for your share. Review the shared accommodation terms, then acknowledge them to continue your Staff Portal journey.</p><button disabled={busy} onClick={() => void acknowledgeSharedPartner()} style={{ ...button, width: '100%', maxWidth: 620 }}>{busy ? 'Acknowledging…' : 'Acknowledge shared accommodation'}</button></>}
           {invoice && invoiceUrl && ['issued','paid'].includes(invoice.status) && <a href={invoiceUrl} target='_blank' rel='noreferrer' style={{ ...secondary, display: 'inline-block', marginTop: 12 }}>Open your shared accommodation invoice</a>}
         </div> : !termsAcknowledged ? <>
-          <p style={{ lineHeight: 1.7 }}>Choose the accommodation plan and permit submission route before BIMED issues your invoice.</p>
+          <p style={{ lineHeight: 1.7 }}>Choose the accommodation plan and permit submission route before BIMED issues your invoice. The amount shown here always matches the plan currently selected above.</p>
           {isSharedAccommodationPlan(selectedPlan as any) && <div style={{ margin: '12px 0', padding: 14, borderRadius: 12, background: '#fff7ed', border: '1px solid #fed7aa', color: '#7c2d12', lineHeight: 1.65 }}>
             <strong>Shared accommodation</strong>
             <div style={{ marginTop: 5 }}>Your invoice will be half of the selected arrangement: <strong>€{currentSharedTotal ? (currentSharedTotal / 2).toLocaleString('en-IE', { minimumFractionDigits: 2 }) : '—'} EUR</strong>. Your sharing candidate will receive their own linked invoice for the same amount.</div>
