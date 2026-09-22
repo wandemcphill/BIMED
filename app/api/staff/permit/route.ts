@@ -688,6 +688,9 @@ export async function POST(request: NextRequest) {
 
   if (action === 'acknowledge_accommodation') {
     if (body?.acknowledged !== true) return NextResponse.json({ error: 'Please confirm that you understand and accept the selected accommodation, payment, refund and permit-route terms before continuing.' }, { status: 400 });
+    if (body?.accommodation_plan === 'three_months_shared_2000' || body?.accommodation_plan === 'one_month_shared_625') {
+      return NextResponse.json({ error: 'Shared accommodation plans must use the dedicated shared-accommodation workflow with a verified two-person accommodation partner.' }, { status: 400 });
+    }
     if (currentInvoice && !permit.accommodation_terms_acknowledged_at) return NextResponse.json({ error: 'An accommodation invoice already exists for this case. BIMED should review the case before another acknowledgement is recorded.' }, { status: 409 });
     if (permit.accommodation_terms_acknowledged_at) return NextResponse.json({ permit, invoice: currentInvoice, already_acknowledged: true }, { status: 200 });
 
