@@ -588,18 +588,7 @@ export async function POST(request: NextRequest) {
         actionUrl: partnerIssuance.publicUrl ? `/invoices/accommodation/${partnerIssuance.invoice.public_token}` : '/staff/permit',
       });
 
-      await sendAccommodationEmail({
-        to: [partnerContext.application.email || partnerContext.staff.email],
-        subject: `BIMED shared accommodation invoice ${partnerIssuance.invoice.invoice_number}`,
-        html: `<div style="font-family:Arial,sans-serif;color:#172b4d">
-          <h2>Shared accommodation arrangement</h2>
-          <p>Hello ${partnerContext.staff.full_name},</p>
-          <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) selected you as the BIMED candidate sharing their accommodation.</p>
-          <p>Your share is <strong>€${Number(partnerIssuance.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong>. The shared arrangement reference is <strong>${result.data.share_reference}</strong>.</p>
-          <p>Your invoice is ready in the Staff Portal:</p>
-          <p><a href="${partnerIssuance.publicUrl}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f766e;color:#fff;text-decoration:none;font-weight:800">Open your shared accommodation invoice</a></p>
-        </div>`,
-      });
+;
     } catch (error) {
       console.error(JSON.stringify({ level: 'error', event: 'shared_accommodation_invoice_issue_failed', primary_staff_id: staff.id, partner_staff_id: result.data.partner_staff_id, reason: error instanceof Error ? error.message : String(error) }));
       return NextResponse.json({ error: 'The shared arrangement was saved, but one or more invoices could not be issued automatically. BIMED will review the billing records.' }, { status: 502 });
@@ -676,17 +665,7 @@ export async function POST(request: NextRequest) {
         actionUrl: partnerIssuance.publicUrl ? `/invoices/accommodation/${partnerIssuance.invoice.public_token}` : '/staff/permit',
       });
       try {
-        await sendAccommodationEmail({
-          to: [partnerContext.application.email || partnerContext.staff.email],
-          subject: `BIMED shared accommodation invoice ${partnerIssuance.invoice.invoice_number}`,
-          html: `<div style="font-family:Arial,sans-serif;color:#172b4d">
-            <h2>Shared accommodation arrangement</h2>
-            <p>Hello ${partnerContext.staff.full_name},</p>
-            <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) linked you to their shared accommodation arrangement.</p>
-            <p>Your share is <strong>€${Number(partnerIssuance.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong>.</p>
-            <p><a href="${partnerIssuance.publicUrl}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f766e;color:#fff;text-decoration:none;font-weight:800">Open your shared accommodation invoice</a></p>
-          </div>`,
-        });
+;
       } catch (emailError) {
         console.error(JSON.stringify({ level: 'error', event: 'shared_partner_notification_email_failed', staff_id: partnerContext.staff.id, reason: emailError instanceof Error ? emailError.message : String(emailError) }));
       }
