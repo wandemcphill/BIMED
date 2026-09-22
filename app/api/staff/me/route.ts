@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getStaffSession } from '@/lib/staff-auth';
-import {
-  createStaffAudit,
-  normalizeResidentialProfile,
-  STAFF_PHOTO_BUCKET,
-  hashOneTimePhotoName,
-} from '@/lib/staff';
+import { createStaffAudit, STAFF_PHOTO_BUCKET, hashOneTimePhotoName } from '@/lib/staff';
+import { normalizeResidentialProfile } from '@/lib/residential-profile';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
