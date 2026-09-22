@@ -71,6 +71,7 @@ export default function StaffPermitPage() {
   }
   useEffect(() => { void load(); }, []);
 
+  const currentPlan = selectedPlan || permit?.accommodation_plan || 'three_months_4000';
   const availablePlans = useMemo(() => ['three_months_4000', 'three_months_shared_2000', 'one_month_1250', 'one_month_shared_625'] as const, []);
   const selectedOption = useMemo(() => options.find((option) => option.accommodation_plan === selectedPlan && option.permit_submission_route === selectedRoute) || null, [options, selectedPlan, selectedRoute]);
   const termsAcknowledged = Boolean(permit?.accommodation_terms_acknowledged_at);
@@ -247,7 +248,6 @@ export default function StaffPermitPage() {
   if (error && !permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}><h1>Employment permit & sponsorship</h1><p style={{ color: '#9b2c2c' }}>{error}</p><button onClick={() => router.push('/staff')} style={button}>Back to Staff Portal</button></main>;
   if (!permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}>Loading employment permit workspace…</main>;
 
-  const currentPlan = selectedPlan || permit.accommodation_plan || 'three_months_4000';
 
   const routeReady = Boolean(permit.permit_submission_route || selectedRoute);
   const currentRoute = (permit.permit_submission_route || selectedRoute || null) as AccommodationOption['permit_submission_route'] | null;
