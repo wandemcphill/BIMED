@@ -82,7 +82,6 @@ export default function StaffPermitPage() {
   const currentSharedTotal = isSharedAccommodationPlan(currentPlan as any) ? sharedAccommodationTotalEur(currentPlan as any) : null;
   const displayedPlans = useMemo(() => sharedPartner ? [currentPlan] as const : changePlanMode ? availablePlans.filter((plan) => !isSharedAccommodationPlan(plan)) : availablePlans, [availablePlans, changePlanMode, sharedPartner, currentPlan]);
   const canChangeAccommodation = Boolean(termsAcknowledged && permit?.permit_submission_route && invoice && ['draft', 'issued'].includes(invoice.status) && !permit?.requested_at && permit?.status === 'not_started' && !permit?.cancellation_requested_at && !permit?.cancellation_finalized_at);
-  const changePlanDisabled = !selectedPlan || !acknowledged || selectedPlan === permit.accommodation_plan;
 
   async function acknowledgeAccommodation() {
     if (!selectedPlan || !selectedRoute) { setError('Choose an accommodation plan and a permit submission route first.'); return; }
@@ -248,6 +247,8 @@ export default function StaffPermitPage() {
 
   if (error && !permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}><h1>Employment permit & sponsorship</h1><p style={{ color: '#9b2c2c' }}>{error}</p><button onClick={() => router.push('/staff')} style={button}>Back to Staff Portal</button></main>;
   if (!permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}>Loading employment permit workspace…</main>;
+
+  const changePlanDisabled = !selectedPlan || !acknowledged || selectedPlan === permit.accommodation_plan;
 
 
   const routeReady = Boolean(permit.permit_submission_route || selectedRoute);
