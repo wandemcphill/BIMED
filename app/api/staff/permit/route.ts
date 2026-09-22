@@ -175,7 +175,7 @@ async function getSharedBillingRecovery(client: any, permit: any) {
 export async function GET(request: NextRequest) {
   const session = await getStaffSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
-  const { staff, permit, application, invoice } = await getPermitContext(session.staff_id);
+  const { client, staff, permit, application, invoice } = await getPermitContext(session.staff_id);
   if (!staff) return NextResponse.json({ error: 'Staff record not found.' }, { status: 404 });
   if (!staff.application_id || staff.status !== 'pre_arrival') return NextResponse.json({ error: 'The overseas permit workspace is only available to overseas recruitment-linked staff.' }, { status: 403 });
   if (!permit) return NextResponse.json({ error: 'Permit case has not been initialized.' }, { status: 404 });
