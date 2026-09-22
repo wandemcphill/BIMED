@@ -19,6 +19,8 @@ describe('BIMED accommodation plan change flow', () => {
     expect(page).toContain('Change accommodation plan');
     expect(page).toContain('€4,000 for 3 months');
     expect(page).toContain('€1,250 for 1 month');
+    expect(page).toContain('€625 shared plan for 1 month');
+    expect(page).toContain("!selectedPlan || !acknowledged || selectedPlan === permit.accommodation_plan");
     expect(page).toContain("permit?.permit_submission_route");
     expect(page).toContain("['draft', 'issued'].includes(invoice.status)");
     expect(page).toContain('Your existing unpaid invoice will be superseded and a new invoice will be issued');
@@ -32,6 +34,8 @@ describe('BIMED accommodation plan change flow', () => {
 
     expect(migration).toContain('bimed_change_staff_accommodation_selection');
     expect(migration).toContain("v_invoice.status not in ('draft','issued')");
+    expect(migration).toContain("one_month_shared_625");
+    expect(migration).toContain('INVALID_SHARED_ACCOMMODATION_SELECTION');
     expect(migration).toContain('v_invoice.paid_at is not null');
     expect(migration).toContain('v_invoice.payment_reported_at is not null');
     expect(migration).toContain("v_permit.status <> 'not_started'");
