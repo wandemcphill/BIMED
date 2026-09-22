@@ -110,6 +110,7 @@ export function getAccommodationSelection(
   const permitType = derivePermitType(roleValue);
   if (!permitType) throw new Error('UNSUPPORTED_RECRUITMENT_ROLE');
 
+  const isShared = isSharedAccommodationPlan(plan);
   const isShortStay = plan === 'one_month_1250' || plan === 'one_month_shared_625';
   const isSharedShortStay = plan === 'one_month_shared_625';
   const employerRoute = route === 'bimed_legal_team';
