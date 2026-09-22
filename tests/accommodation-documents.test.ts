@@ -29,4 +29,36 @@ describe('accommodation invoice payment details', () => {
     expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.account_number);
     expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.sort_code);
   });
+  it('renders the selected one-month shared €625 terms instead of the legacy €4,000 terms', async () => {
+    const { invoiceHtml } = await import('@/lib/accommodation-billing');
+    const html = invoiceHtml({
+      invoice: {
+        invoice_number: 'BIMED-ACC-2026-SHARED',
+        public_token: 'shared-token',
+        status: 'issued',
+        amount_eur: 625,
+        currency: 'EUR',
+        description: 'BIMED-arranged shared accommodation for the first month',
+        bill_to_name: 'Ghizlan Azzouzi',
+        bill_to_email: 'ghizlan.azzouzi@bimedhealthcare.com',
+        payment_account_snapshot: {},
+        arrangement_snapshot: {
+          accommodation_plan: 'one_month_shared_625',
+          accommodation_amount_eur: 625,
+          accommodation_period_months: 1,
+          accommodation_refund_installments: 4,
+          accommodation_refund_trigger: 'successful_three_month_probation',
+        },
+        issue_date: '2026-09-22',
+        issued_at: '2026-09-22T14:00:00.000Z',
+        due_date: '2026-09-29',
+      },
+      staff: { full_name: 'Ghizlan Azzouzi', email: 'ghizlan.azzouzi@bimedhealthcare.com', bimed_id: 'BH-001030' },
+      publicUrl: 'https://recruitment.bimedhealthcare.com/invoices/accommodation/shared-token',
+    });
+
+    expect(html).toContain('€625 payment covers BIMED-arranged shared accommodation');
+    expect(html).not.toContain('€4,000 payment covers BIMED-arranged accommodation');
+  });
+
 });
