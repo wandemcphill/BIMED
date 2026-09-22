@@ -442,5 +442,6 @@ export default function StaffPermitPage() {
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e5eaf0', borderRadius: 16, padding: 'clamp(16px,3vw,20px)', boxShadow: '0 8px 28px rgba(15,23,42,.04)' };
 const button: React.CSSProperties = { marginTop: 14, padding: '12px 15px', border: 0, borderRadius: 9, background: '#0f766e', color: '#fff', fontWeight: 900 };
 const secondary: React.CSSProperties = { padding: '9px 12px', border: '1px solid #d9e2ec', borderRadius: 9, background: '#fff', fontWeight: 800, textDecoration: 'none', color: '#334e68' };
+const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '11px 12px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#102a43', fontSize: 15, outline: 'none' };
 const muted: React.CSSProperties = { color: '#627d98', lineHeight: 1.55 };
 function Info({ label, value }: { label: string; value: unknown }) { return <div style={{ padding: '8px 0', borderBottom: '1px solid #edf2f7', minWidth: 0 }}><div style={{ fontSize: 12, color: '#627d98' }}>{label}</div><div style={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{String(value ?? '—')}</div></div>; }
