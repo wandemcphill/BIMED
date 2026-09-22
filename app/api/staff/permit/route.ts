@@ -117,7 +117,7 @@ function deriveCurrentSelection(application: any, permit: any) {
 
 function buildChoiceCatalog(roleValue: string | null | undefined) {
   const options: any[] = [];
-  for (const plan of ['three_months_4000', 'one_month_1250'] as const) {
+  for (const plan of ['three_months_4000', 'one_month_1250', 'one_month_shared_625'] as const) {
     for (const route of ['candidate_or_agency', 'bimed_legal_team'] as const) {
       try { options.push(getAccommodationSelection(plan, route, roleValue)); } catch { /* Unsupported role is handled by the acknowledgement endpoint. */ }
     }
@@ -396,9 +396,11 @@ export async function POST(request: NextRequest) {
         p_invoice_number: makeInvoiceNumber(),
         p_public_token: makePublicToken(),
         p_due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-        p_invoice_description: selection.accommodation_plan === 'one_month_1250'
-          ? 'BIMED-arranged accommodation for the first month, including training, onboarding and shadow shifts'
-          : 'BIMED-arranged accommodation for the initial three-month probationary period',
+        p_invoice_description: selection.accommodation_plan === 'three_months_4000'
+          ? 'BIMED-arranged accommodation for the initial three-month probationary period'
+          : selection.accommodation_plan === 'one_month_shared_625'
+            ? 'BIMED-arranged shared accommodation for the first month, including training, onboarding and shadow shifts'
+            : 'BIMED-arranged accommodation for the first month, including training, onboarding and shadow shifts',
         p_invoice_notes: selection.refund_trigger === 'one_month_accommodation_expiry'
           ? `Refund trigger: the one-month accommodation arrangement expires. Refund processing follows the applicable accommodation terms. Employment permit fee: €${selection.permit_fee_eur.toFixed(2)}. ${permitSubmissionLabel(selection.permit_submission_route)}.`
           : `Refund trigger: successful three-month probationary period; refund in ${selection.accommodation_refund_installments} weekly instalments under the accommodation terms. Employment permit fee: €${selection.permit_fee_eur.toFixed(2)}. ${permitSubmissionLabel(selection.permit_submission_route)}.`,
@@ -512,9 +514,11 @@ export async function POST(request: NextRequest) {
         p_permit_fee_eur: selection.permit_fee_eur,
         p_selection_snapshot: selection,
         p_bill_to_email: application?.email || '',
-        p_invoice_description: selection.accommodation_plan === 'one_month_1250'
-          ? 'BIMED-arranged accommodation for the first month, including training, onboarding and shadow shifts'
-          : 'BIMED-arranged accommodation for the initial three-month probationary period',
+        p_invoice_description: selection.accommodation_plan === 'three_months_4000'
+          ? 'BIMED-arranged accommodation for the initial three-month probationary period'
+          : selection.accommodation_plan === 'one_month_shared_625'
+            ? 'BIMED-arranged shared accommodation for the first month, including training, onboarding and shadow shifts'
+            : 'BIMED-arranged accommodation for the first month, including training, onboarding and shadow shifts',
         p_invoice_notes: selection.refund_trigger === 'one_month_accommodation_expiry'
           ? `Refund trigger: the one-month accommodation arrangement expires. Refund processing follows the applicable accommodation terms. Employment permit fee: €${selection.permit_fee_eur.toFixed(2)}. ${permitSubmissionLabel(selection.permit_submission_route)}.`
           : `Refund trigger: successful three-month probationary period; refund in ${selection.accommodation_refund_installments} weekly instalments under the accommodation terms. Employment permit fee: €${selection.permit_fee_eur.toFixed(2)}. ${permitSubmissionLabel(selection.permit_submission_route)}.`,
