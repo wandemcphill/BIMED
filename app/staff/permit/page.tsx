@@ -51,6 +51,7 @@ export default function StaffPermitPage() {
   const [legacyRouteNeeded, setLegacyRouteNeeded] = useState(false);
   const [changePlanMode, setChangePlanMode] = useState(false);
   const [partnerIdentifier, setPartnerIdentifier] = useState('');
+  const [sharedBillingRecovery, setSharedBillingRecovery] = useState<any>(null);
 
   async function load() {
     const response = await fetch('/api/staff/permit', { cache: 'no-store' });
@@ -65,6 +66,7 @@ export default function StaffPermitPage() {
     setOptions(data.accommodationOptions || []);
     setRole(data.role || '');
     setLegacyRouteNeeded(Boolean(data.needsLegacyPermitRouteSelection));
+    setSharedBillingRecovery(data.sharedBillingRecovery || null);
     const existing = data.accommodationSelection;
     if (existing?.accommodation_plan) setSelectedPlan(existing.accommodation_plan);
     if (existing?.permit_submission_route) setSelectedRoute(existing.permit_submission_route);
@@ -108,7 +110,10 @@ export default function StaffPermitPage() {
       if (!response.ok) throw new Error(data.error || 'Unable to record your acknowledgement.');
       setPartnerIdentifier('');
       await load();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to record your acknowledgement.'); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to record your acknowledgement.');
+      await load();
+    }
     finally { setBusy(false); }
   }
 
@@ -156,6 +161,27 @@ export default function StaffPermitPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to link the accommodation-sharing candidate.');
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retrySharedInvoiceIssuance() {
+    setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/staff/permit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'retry_shared_accommodation_invoice_issuance' }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to recover shared accommodation invoices.');
+      setSharedBillingRecovery(data.sharedBillingRecovery || null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to recover shared accommodation invoices.');
+      await load();
     } finally {
       setBusy(false);
     }
@@ -273,6 +299,23 @@ export default function StaffPermitPage() {
       <div style={{ marginTop: 16 }}><div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.3, color: '#0f766e' }}>OVERSEAS EMPLOYMENT</div><h1 style={{ margin: '4px 0', fontSize: 'clamp(30px,6vw,44px)', lineHeight: 1.08 }}>Employment permit & sponsorship</h1><p style={{ color: '#627d98', fontSize: 'clamp(16px,2.5vw,20px)', lineHeight: 1.6 }}>Choose the accommodation plan that applies to you and choose who will submit and pay the employment permit application. Once you confirm the package, BIMED issues the accommodation invoice immediately so you can review the terms and payment details. BIMED derives the permit type from your recruitment role. Final permit eligibility and decisions remain with the relevant Irish authorities.</p></div>
       <div style={{ ...card, marginTop: 18, borderColor: permit.work_authorised ? '#a7f3d0' : '#fde68a', background: permit.work_authorised ? '#ecfdf5' : '#fffbeb' }}><strong>{permit.work_authorised ? 'Work authorisation confirmed' : 'Work is not yet authorised'}</strong><p style={{ margin: '6px 0 0', color: '#627d98', lineHeight: 1.65 }}>{permit.work_authorised ? 'Your shift eligibility can be enabled by BIMED subject to normal rota requirements.' : 'You may use the Staff Portal for onboarding and immigration preparation, but you must not take shifts until BIMED confirms that you have the required permission to work in Ireland.'}</p></div>
       {error && <div style={{ ...card, marginTop: 14, color: '#9b2c2c' }}>{error}</div>}
+
+      {sharedBillingRecovery?.needsRecovery && !cancellationFinalized && (
+        <section style={{ ...card, marginTop: 14, borderColor: '#f59e0b', background: '#fffbeb' }}>
+          <div style={{ display: 'inline-flex', padding: '5px 9px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontWeight: 900, fontSize: 12 }}>BILLING RECOVERY</div>
+          <h2 style={{ margin: '10px 0 8px', color: '#92400e' }}>Shared accommodation invoice recovery</h2>
+          <p style={{ margin: 0, color: '#7c2d12', lineHeight: 1.65 }}>
+            The shared accommodation arrangement is already saved. One or more of the two linked invoices still needs to be issued. The existing invoice record will be reused, so retrying will not create a duplicate invoice.
+          </p>
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            <Info label='Primary invoice' value={sharedBillingRecovery.primaryInvoice ? `${sharedBillingRecovery.primaryInvoice.invoiceNumber} · ${sharedBillingRecovery.primaryInvoice.status}` : 'Missing'} />
+            <Info label='Partner invoice' value={sharedBillingRecovery.partnerInvoice ? `${sharedBillingRecovery.partnerInvoice.invoiceNumber} · ${sharedBillingRecovery.partnerInvoice.status}` : 'Missing'} />
+          </div>
+          <button type='button' disabled={busy} onClick={() => void retrySharedInvoiceIssuance()} style={{ ...button, width: '100%', maxWidth: 720 }}>
+            {busy ? 'Recovering invoices…' : 'Retry shared invoice issuance'}
+          </button>
+        </section>
+      )}
 
       {cancellationPending && cancellationDeadline && (
         <section style={{ ...card, marginTop: 18, borderColor: '#fb923c', background: '#fff7ed' }}>
