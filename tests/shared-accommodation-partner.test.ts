@@ -58,6 +58,18 @@ describe('BIMED shared accommodation partner flow', () => {
     expect(migration).toContain("where accommodation_plan = 'one_month_shared_625'");
   });
 
+
+  it('provides an idempotent candidate-facing recovery path when one shared invoice fails to issue', async () => {
+    const route = await fs.readFile('app/api/staff/permit/route.ts', 'utf8');
+    const page = await fs.readFile('app/staff/permit/page.tsx', 'utf8');
+    expect(route).toContain("if (action === 'retry_shared_accommodation_invoice_issuance')");
+    expect(route).toContain('without creating duplicate invoices');
+    expect(route).toContain('alreadyIssued: issuance.alreadyIssued === true');
+    expect(page).toContain('Retry shared invoice issuance');
+    expect(page).toContain('BILLING RECOVERY');
+    expect(page).toContain('sharedBillingRecovery?.needsRecovery');
+  });
+
   it('locks shared invitees to the arrangement they were assigned', async () => {
     const page = await fs.readFile('app/staff/permit/page.tsx', 'utf8');
     expect(page).toContain('const sharedPartner = permit?.accommodation_share_role === \'partner\'');
