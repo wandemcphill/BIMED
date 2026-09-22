@@ -64,16 +64,29 @@ export default function StaffPermitPage() {
     setRole(data.role || '');
     setLegacyRouteNeeded(Boolean(data.needsLegacyPermitRouteSelection));
     const existing = data.accommodationSelection;
-    if (existing?.accommodation_plan) setSelectedPlan(existing.accommodation_plan);
-    if (existing?.permit_submission_route) setSelectedRoute(existing.permit_submission_route);
+    setSelectedPlan(existing?.accommodation_plan || '');
+    setSelectedRoute(existing?.permit_submission_route || '');
   }
   useEffect(() => { void load(); }, []);
 
   const availablePlans = useMemo(() => ['three_months_4000', 'one_month_1250'] as const, []);
   const selectedOption = useMemo(() => options.find((option) => option.accommodation_plan === selectedPlan && option.permit_submission_route === selectedRoute) || null, [options, selectedPlan, selectedRoute]);
   const termsAcknowledged = Boolean(permit?.accommodation_terms_acknowledged_at);
-  const selectionLocked = Boolean(permit?.permit_submission_route && termsAcknowledged);
-  const planLocked = Boolean(termsAcknowledged && permit?.accommodation_plan);
+  const accommodationCanBeChanged = Boolean(
+    termsAcknowledged &&
+    invoice &&
+    ['draft', 'issued'].includes(invoice.status)
+  );
+  const selectionLocked = Boolean(
+    permit?.permit_submission_route &&
+    termsAcknowledged &&
+    !accommodationCanBeChanged
+  );
+  const planLocked = Boolean(
+    termsAcknowledged &&
+    permit?.accommodation_plan &&
+    !accommodationCanBeChanged
+  );
 
   async function acknowledgeAccommodation() {
     if (!selectedPlan || !selectedRoute) { setError('Choose an accommodation plan and a permit submission route first.'); return; }
@@ -86,6 +99,30 @@ export default function StaffPermitPage() {
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to record your acknowledgement.'); }
     finally { setBusy(false); }
+  }
+
+  async function changeAccommodationPlan() {
+    const confirmed = window.confirm(
+      'Change accommodation plan?\\n\\nBIMED will void the current unpaid accommodation invoice and reopen the accommodation selection so you can choose the other available plan. No payment will be recorded by this action.'
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/staff/permit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'reset_accommodation_selection' }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to reopen accommodation selection.');
+      setAcknowledged(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to reopen accommodation selection.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function selectLegacyRoute() {
@@ -157,7 +194,7 @@ export default function StaffPermitPage() {
   if (error && !permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}><h1>Employment permit & sponsorship</h1><p style={{ color: '#9b2c2c' }}>{error}</p><button onClick={() => router.push('/staff')} style={button}>Back to Staff Portal</button></main>;
   if (!permit) return <main style={{ padding: 40, fontFamily: 'system-ui' }}>Loading employment permit workspace…</main>;
 
-  const currentPlan = selectedPlan || permit.accommodation_plan || 'three_months_4000';
+  const currentPlan = selectedPlan || permit.accommodation_plan || '';
   const routeReady = Boolean(permit.permit_submission_route || selectedRoute);
   const currentRoute = (permit.permit_submission_route || selectedRoute || null) as AccommodationOption['permit_submission_route'] | null;
   const displayOption = selectedOption || options.find((option) => option.accommodation_plan === currentPlan && option.permit_submission_route === currentRoute) || null;
@@ -260,7 +297,19 @@ export default function StaffPermitPage() {
 
       {displayOption && <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>Selected arrangement</h2><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,280px),1fr))', gap: 12 }}><Info label='Accommodation' value={displayOption.accommodation_plan_label} /><Info label='Permit route' value={displayOption.permit_submission_label} /><Info label='Permit type' value={displayOption.permit_type_label} /><Info label='Refund trigger' value={displayOption.accommodation_refund_trigger === 'one_month_accommodation_expiry' ? 'One-month accommodation expiry' : 'Successful three-month probation'} /><Info label='Permit fee payer' value={displayOption.permit_fee_payer === 'bimed' ? 'BIMED' : 'Candidate / agency'} /><Info label='Flights + airport pickup' value='Available under both plans' /></div>{displayOption.accommodation_plan === 'one_month_1250' && <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: '#ecfdf5', color: '#166534', lineHeight: 1.65 }}>For the €1,250 plan, the refund trigger depends on the permit route. BIMED-paid/employer-executed permit route: refund after successful three-month probation, in four weekly instalments. Candidate/agency-paid permit route: refund when the one-month accommodation arrangement expires, with processing governed by the applicable accommodation terms.</div>}</section>}
 
-      <section style={{ ...card, marginTop: 18 }}><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}><div><div style={{ display: 'inline-flex', padding: '5px 9px', borderRadius: 999, background: '#fee2e2', color: '#991b1b', fontWeight: 900, fontSize: 12 }}>{termsAcknowledged ? 'SELECTION RECORDED' : 'ACKNOWLEDGEMENT REQUIRED'}</div><h2 style={{ margin: '10px 0 8px' }}>Accommodation acknowledgement</h2></div><div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><div style={{ fontSize: 22, fontWeight: 900, color: '#0f766e' }}>€{Number(permit.accommodation_amount_eur || displayOption?.accommodation_amount_eur || 0).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</div><div style={{ marginTop: 3, fontSize: 13, fontWeight: 800, color: '#627d98' }}>≈ £{accommodationGbpEquivalent(Number(permit.accommodation_amount_eur || displayOption?.accommodation_amount_eur || 0)).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP</div></div></div>{!termsAcknowledged ? <><p style={{ lineHeight: 1.7 }}>You must select both the accommodation plan and the permit submission route before BIMED can issue the invoice.</p><label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: '#334e68', lineHeight: 1.6 }}><input type='checkbox' checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} style={{ marginTop: 5, flexShrink: 0 }} /><span>I understand the selected accommodation arrangement, the applicable refund trigger, who will submit and pay the employment permit, the permit fee, and that immigration/permit approvals remain subject to the relevant authorities.</span></label><button disabled={busy || !selectedOption || !acknowledged} onClick={() => void acknowledgeAccommodation()} style={{ ...button, width: '100%', maxWidth: 720, opacity: busy || !selectedOption || !acknowledged ? 0.55 : 1 }}>{busy ? 'Recording…' : 'Confirm selections and issue accommodation invoice'}</button></> : legacyRouteNeeded ? <><p style={{ lineHeight: 1.7 }}>This is a legacy €4,000 / 3-month acknowledgement created before the permit-route choice was added. Your accommodation plan remains unchanged. Select who will submit and pay the employment permit so BIMED can continue the permit workflow.</p><button disabled={busy || !selectedRoute} onClick={() => void selectLegacyRoute()} style={{ ...button, width: '100%', maxWidth: 620, opacity: busy || !selectedRoute ? 0.55 : 1 }}>{busy ? 'Saving…' : 'Save permit submission route'}</button></> : <div style={{ marginTop: 14, padding: 16, borderRadius: 12, background: '#ecfdf5', color: '#166534' }}><strong>Accommodation terms and selections recorded</strong><div style={{ marginTop: 5, lineHeight: 1.6 }}>Your plan and permit route are snapshotted. They cannot be changed from the Staff Portal after invoice issuance. {accommodationReady ? 'The invoice has been issued and your next workflows are unlocked.' : 'The invoice will be issued immediately after confirmation. Your permit/travel workflows remain locked until the invoice is issued.'}</div>{invoice && invoiceUrl && ['issued','paid'].includes(invoice.status) ? <a href={invoiceUrl} target='_blank' rel='noreferrer' style={{ ...secondary, display: 'inline-block', marginTop: 12 }}>Open accommodation invoice</a> : <div style={{ marginTop: 10, color: '#627d98' }}>Your invoice has not yet been issued. Refresh shortly if you have just confirmed the package, or contact BIMED.</div>}</div>}</section>
+      <section style={{ ...card, marginTop: 18 }}><div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}><div><div style={{ display: 'inline-flex', padding: '5px 9px', borderRadius: 999, background: '#fee2e2', color: '#991b1b', fontWeight: 900, fontSize: 12 }}>{termsAcknowledged ? 'SELECTION RECORDED' : 'ACKNOWLEDGEMENT REQUIRED'}</div><h2 style={{ margin: '10px 0 8px' }}>Accommodation acknowledgement</h2></div><div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><div style={{ fontSize: 22, fontWeight: 900, color: '#0f766e' }}>€{Number(permit.accommodation_amount_eur || displayOption?.accommodation_amount_eur || 0).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</div><div style={{ marginTop: 3, fontSize: 13, fontWeight: 800, color: '#627d98' }}>≈ £{accommodationGbpEquivalent(Number(permit.accommodation_amount_eur || displayOption?.accommodation_amount_eur || 0)).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP</div></div></div>{!termsAcknowledged ? <><p style={{ lineHeight: 1.7 }}>You must select both the accommodation plan and the permit submission route before BIMED can issue the invoice.</p><label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: '#334e68', lineHeight: 1.6 }}><input type='checkbox' checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} style={{ marginTop: 5, flexShrink: 0 }} /><span>I understand the selected accommodation arrangement, the applicable refund trigger, who will submit and pay the employment permit, the permit fee, and that immigration/permit approvals remain subject to the relevant authorities.</span></label><button disabled={busy || !selectedOption || !acknowledged} onClick={() => void acknowledgeAccommodation()} style={{ ...button, width: '100%', maxWidth: 720, opacity: busy || !selectedOption || !acknowledged ? 0.55 : 1 }}>{busy ? 'Recording…' : 'Confirm selections and issue accommodation invoice'}</button></> : legacyRouteNeeded ? <><p style={{ lineHeight: 1.7 }}>This is a legacy €4,000 / 3-month acknowledgement created before the permit-route choice was added. Your accommodation plan remains unchanged. Select who will submit and pay the employment permit so BIMED can continue the permit workflow.</p><button disabled={busy || !selectedRoute} onClick={() => void selectLegacyRoute()} style={{ ...button, width: '100%', maxWidth: 620, opacity: busy || !selectedRoute ? 0.55 : 1 }}>{busy ? 'Saving…' : 'Save permit submission route'}</button></> : <div style={{ marginTop: 14, padding: 16, borderRadius: 12, background: '#ecfdf5', color: '#166534' }}>
+        <strong>Accommodation terms and selections recorded</strong>
+        <div style={{ marginTop: 5, lineHeight: 1.6 }}>
+          {accommodationCanBeChanged
+            ? 'Your current accommodation plan has been recorded, but you may still change it before payment is recorded. Changing the plan will void the current unpaid invoice and reopen the two plan choices.'
+            : 'Your plan and permit route are locked for this invoice.'}
+          {accommodationReady ? ' The invoice has been issued and your next workflows are unlocked.' : ' The invoice will be issued immediately after confirmation. Your permit/travel workflows remain locked until the invoice is issued.'}
+        </div>
+        {invoice && invoiceUrl && ['issued','paid'].includes(invoice.status) ? <a href={invoiceUrl} target='_blank' rel='noreferrer' style={{ ...secondary, display: 'inline-block', marginTop: 12 }}>Open accommodation invoice</a> : <div style={{ marginTop: 10, color: '#627d98' }}>Your invoice has not yet been issued. Refresh shortly if you have just confirmed the package, or contact BIMED.</div>}
+        {accommodationCanBeChanged && <button type='button' disabled={busy} onClick={() => void changeAccommodationPlan()} style={{ ...secondary, display: 'inline-block', marginTop: 12, marginLeft: 10 }}>
+          {busy ? 'Reopening…' : 'Change accommodation plan'}
+        </button>}
+      </div>}</section>
 
       <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>Travel to Ireland</h2><p style={{ color: '#627d98', lineHeight: 1.65 }}>BIMED provides relocation flights and Dublin Airport pickup under both accommodation plans. Once the accommodation invoice has been issued, your virtual flight-planning workspace can unlock. BIMED pays for the actual economy flight and arranges the airport pickup after immigration clearance. You do not buy the flight yourself.</p><button type='button' disabled={!accommodationReady} onClick={() => router.push('/staff/travel')} style={{ ...button, width: '100%', maxWidth: 520, opacity: accommodationReady ? 1 : .55, cursor: accommodationReady ? 'pointer' : 'not-allowed' }}>Open Dublin flight planning</button>{!accommodationReady && <div style={{ marginTop: 8, color: '#854d0e', fontSize: 13 }}>Flight planning unlocks after BIMED issues the accommodation invoice.</div>}</section>
 
