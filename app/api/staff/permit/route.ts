@@ -587,8 +587,6 @@ export async function POST(request: NextRequest) {
         body: `${staff.full_name} (${staff.bimed_id}) selected you as the BIMED candidate sharing accommodation with them. Your invoice is €${Number(partnerIssuance.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR, which is your half of the shared accommodation arrangement. The arrangement reference is ${result.data.share_reference}.`,
         actionUrl: partnerIssuance.publicUrl ? `/invoices/accommodation/${partnerIssuance.invoice.public_token}` : '/staff/permit',
       });
-
-;
     } catch (error) {
       console.error(JSON.stringify({ level: 'error', event: 'shared_accommodation_invoice_issue_failed', primary_staff_id: staff.id, partner_staff_id: result.data.partner_staff_id, reason: error instanceof Error ? error.message : String(error) }));
       return NextResponse.json({ error: 'The shared arrangement was saved, but one or more invoices could not be issued automatically. BIMED will review the billing records.' }, { status: 502 });
@@ -609,7 +607,8 @@ export async function POST(request: NextRequest) {
     if (permit.cancellation_requested_at || permit.cancellation_finalized_at) {
       return NextResponse.json({ error: 'The shared accommodation arrangement cannot be linked while the sponsorship cancellation workflow is active or finalised.' }, { status: 409 });
     }
-    if (!permit.accommodation_share_role || permit.accommodation_share_role !== 'primary' && !['three_months_shared_2000','one_month_shared_625'].includes(permit.accommodation_plan)) {
+    if (!['three_months_shared_2000','one_month_shared_625'].includes(permit.accommodation_plan)
+      || (permit.accommodation_share_role && permit.accommodation_share_role !== 'primary')) {
       return NextResponse.json({ error: 'This accommodation record is not a shared plan that can be linked.' }, { status: 409 });
     }
     if (permit.accommodation_share_id) {
@@ -664,11 +663,6 @@ export async function POST(request: NextRequest) {
         body: `${staff.full_name} (${staff.bimed_id}) linked you to their shared accommodation arrangement. Your invoice is €${Number(partnerIssuance.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR.`,
         actionUrl: partnerIssuance.publicUrl ? `/invoices/accommodation/${partnerIssuance.invoice.public_token}` : '/staff/permit',
       });
-      try {
-;
-      } catch (emailError) {
-        console.error(JSON.stringify({ level: 'error', event: 'shared_partner_notification_email_failed', staff_id: partnerContext.staff.id, reason: emailError instanceof Error ? emailError.message : String(emailError) }));
-      }
       return NextResponse.json({ ok: true, shared: true, shareReference: result.data.share_reference, partnerInvoiceNumber: partnerIssuance.invoice.invoice_number }, { status: 201 });
     } catch (error) {
       console.error(JSON.stringify({ level: 'error', event: 'shared_partner_invoice_issue_failed', staff_id: partnerContext.staff.id, reason: error instanceof Error ? error.message : String(error) }));
