@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeResidentialProfile } from '@/lib/staff';
+import { normalizeResidentialProfile } from '@/lib/residential-profile';
 
 describe('recruitment residential profile normalization', () => {
   it('replaces a stale trailing Ireland suffix for an international recruit', () => {
