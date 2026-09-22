@@ -32,6 +32,16 @@ describe('employment permit and accommodation selection policy', () => {
     expect(selfRoute.accommodation_amount_eur).toBe(1250);
   });
 
+  it('builds the €625 one-month shared selection with route-dependent refund triggers', () => {
+    const employerRoute = getAccommodationSelection('one_month_shared_625', 'bimed_legal_team', 'Support Worker');
+    const selfRoute = getAccommodationSelection('one_month_shared_625', 'candidate_or_agency', 'Support Worker');
+    expect(employerRoute.accommodation_refund_trigger).toBe('successful_three_month_probation');
+    expect(employerRoute.accommodation_amount_eur).toBe(625);
+    expect(employerRoute.accommodation_period_months).toBe(1);
+    expect(selfRoute.accommodation_refund_trigger).toBe('one_month_accommodation_expiry');
+    expect(selfRoute.accommodation_amount_eur).toBe(625);
+  });
+
   it('rejects invalid plan or route values', () => {
     expect(() => validateAccommodationSelection({ plan: '€999', route: 'bimed_legal_team', roleValue: 'Support Worker' })).toThrow('INVALID_ACCOMMODATION_PLAN');
     expect(() => validateAccommodationSelection({ plan: 'one_month_1250', route: 'someone_else', roleValue: 'Support Worker' })).toThrow('INVALID_PERMIT_SUBMISSION_ROUTE');
