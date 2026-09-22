@@ -75,7 +75,7 @@ export default function StaffPermitPage() {
   const termsAcknowledged = Boolean(permit?.accommodation_terms_acknowledged_at);
   const selectionLocked = Boolean(permit?.permit_submission_route && termsAcknowledged);
   const planLocked = Boolean(termsAcknowledged && permit?.accommodation_plan) && !changePlanMode;
-  const canChangeAccommodation = Boolean(termsAcknowledged && invoice && ['draft', 'issued'].includes(invoice.status) && !permit?.requested_at && permit?.status === 'not_started' && !permit?.cancellation_requested_at && !permit?.cancellation_finalized_at);
+  const canChangeAccommodation = Boolean(termsAcknowledged && permit?.permit_submission_route && invoice && ['draft', 'issued'].includes(invoice.status) && !permit?.requested_at && permit?.status === 'not_started' && !permit?.cancellation_requested_at && !permit?.cancellation_finalized_at);
 
   async function acknowledgeAccommodation() {
     if (!selectedPlan || !selectedRoute) { setError('Choose an accommodation plan and a permit submission route first.'); return; }
