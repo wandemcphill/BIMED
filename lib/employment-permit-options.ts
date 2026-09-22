@@ -20,7 +20,7 @@ export function accommodationGbpEquivalent(amountEur: number): number {
   return Math.round(Number(amountEur || 0) * ACCOMMODATION_EUR_TO_GBP_RATE * 100) / 100;
 }
 
-export const ACCOMMODATION_PLANS = ['three_months_4000', 'one_month_1250'] as const;
+export const ACCOMMODATION_PLANS = ['three_months_4000', 'one_month_1250', 'one_month_shared_625'] as const;
 export type AccommodationPlan = (typeof ACCOMMODATION_PLANS)[number];
 
 export const PERMIT_SUBMISSION_ROUTES = ['candidate_or_agency', 'bimed_legal_team'] as const;
@@ -78,9 +78,13 @@ export function permitSubmissionLabel(route: PermitSubmissionRoute): string {
 }
 
 export function accommodationPlanLabel(plan: AccommodationPlan): string {
-  return plan === 'three_months_4000'
-    ? `€4,000 EUR · ≈ £${accommodationGbpEquivalent(4000).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP · 3-month accommodation`
-    : `€1,250 EUR · ≈ £${accommodationGbpEquivalent(1250).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP · 1-month accommodation`;
+  if (plan === 'three_months_4000') {
+    return `€4,000 EUR · ≈ £${accommodationGbpEquivalent(4000).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP · 3-month accommodation`;
+  }
+  if (plan === 'one_month_shared_625') {
+    return `€625 EUR · ≈ £${accommodationGbpEquivalent(625).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP · 1-month shared accommodation`;
+  }
+  return `€1,250 EUR · ≈ £${accommodationGbpEquivalent(1250).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP · 1-month accommodation`;
 }
 
 export function getAccommodationSelection(
@@ -93,7 +97,8 @@ export function getAccommodationSelection(
   const permitType = derivePermitType(roleValue);
   if (!permitType) throw new Error('UNSUPPORTED_RECRUITMENT_ROLE');
 
-  const isShortStay = plan === 'one_month_1250';
+  const isShortStay = plan !== 'three_months_4000';
+  const isSharedShortStay = plan === 'one_month_shared_625';
   const employerRoute = route === 'bimed_legal_team';
   const refundTrigger: AccommodationRefundTrigger = isShortStay && !employerRoute
     ? 'one_month_accommodation_expiry'
@@ -101,20 +106,24 @@ export function getAccommodationSelection(
 
   return {
     accommodation_plan: plan,
-    accommodation_amount_eur: isShortStay ? 1250 : 4000,
+    accommodation_amount_eur: isSharedShortStay ? 625 : isShortStay ? 1250 : 4000,
     accommodation_period_months: isShortStay ? 1 : 3,
     accommodation_refund_installments: ACCOMMODATION_REFUND_INSTALLMENTS,
     accommodation_refund_trigger: refundTrigger,
     refund_trigger: refundTrigger,
     accommodation_plan_label: accommodationPlanLabel(plan),
-    accommodation_summary: isShortStay
-      ? 'BIMED-arranged accommodation for the first month while you complete training, onboarding and shadow shifts with BIMED.'
-      : 'BIMED-arranged accommodation for the initial three-month probationary period.',
+    accommodation_summary: isSharedShortStay
+      ? 'BIMED-arranged shared accommodation for the first month while you complete training, onboarding and shadow shifts with BIMED.'
+      : isShortStay
+        ? 'BIMED-arranged accommodation for the first month while you complete training, onboarding and shadow shifts with BIMED.'
+        : 'BIMED-arranged accommodation for the initial three-month probationary period.',
     subsequent_accommodation: isShortStay
       ? 'After the first month, you arrange and pay for your own accommodation in Ireland.'
       : 'The BIMED-arranged accommodation covers the initial three-month probationary period. Continued accommodation is handled under the agreed relocation and employment arrangements.',
     training_summary: isShortStay
-      ? 'The first month includes training, onboarding and shadow shifting with BIMED.'
+      ? isSharedShortStay
+        ? 'The first month includes shared accommodation, training, onboarding and shadow shifting with BIMED.'
+        : 'The first month includes training, onboarding and shadow shifting with BIMED.'
       : 'The three-month arrangement covers the probationary period, including your initial onboarding and work transition.',
     permit_submission_route: route,
     permit_submission_label: permitSubmissionLabel(route),
