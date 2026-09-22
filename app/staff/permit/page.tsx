@@ -72,7 +72,6 @@ export default function StaffPermitPage() {
   useEffect(() => { void load(); }, []);
 
   const availablePlans = useMemo(() => ['three_months_4000', 'three_months_shared_2000', 'one_month_1250', 'one_month_shared_625'] as const, []);
-  const displayedPlans = useMemo(() => sharedPartner ? [currentPlan] as const : changePlanMode ? availablePlans.filter((plan) => !isSharedAccommodationPlan(plan)) : availablePlans, [availablePlans, changePlanMode, sharedPartner, currentPlan]);
   const selectedOption = useMemo(() => options.find((option) => option.accommodation_plan === selectedPlan && option.permit_submission_route === selectedRoute) || null, [options, selectedPlan, selectedRoute]);
   const termsAcknowledged = Boolean(permit?.accommodation_terms_acknowledged_at);
   const selectionLocked = Boolean(permit?.permit_submission_route && termsAcknowledged);
@@ -80,6 +79,7 @@ export default function StaffPermitPage() {
   const sharedPartner = permit?.accommodation_share_role === 'partner' && Boolean(permit?.accommodation_share_id);
   const sharedPrimaryUnlinked = !sharedPartner && Boolean(permit?.accommodation_terms_acknowledged_at && isSharedAccommodationPlan(permit?.accommodation_plan as any) && !permit?.accommodation_share_id);
   const currentSharedTotal = isSharedAccommodationPlan(currentPlan as any) ? sharedAccommodationTotalEur(currentPlan as any) : null;
+  const displayedPlans = useMemo(() => sharedPartner ? [currentPlan] as const : changePlanMode ? availablePlans.filter((plan) => !isSharedAccommodationPlan(plan)) : availablePlans, [availablePlans, changePlanMode, sharedPartner, currentPlan]);
   const canChangeAccommodation = Boolean(termsAcknowledged && permit?.permit_submission_route && invoice && ['draft', 'issued'].includes(invoice.status) && !permit?.requested_at && permit?.status === 'not_started' && !permit?.cancellation_requested_at && !permit?.cancellation_finalized_at);
 
   async function acknowledgeAccommodation() {
