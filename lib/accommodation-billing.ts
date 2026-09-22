@@ -222,7 +222,7 @@ export function receiptHtml(input: { receipt: any; invoice: any; staff: any; pub
       </div>
       <div class="status-box"><div class="label">PAYMENT RECEIVED</div><div class="amount">€${Number(input.receipt.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })}</div></div>
       <section class="payment"><h2>Applied to</h2><div class="panel"><div class="kicker">INVOICE</div><strong>${e(input.invoice.invoice_number)}</strong><p>${e(input.invoice.description)}</p></div></section>
-      ${termsSection()}
+      ${termsSection(input.invoice)}
       <div class="notice"><strong>Receipt status:</strong> This document confirms that BIMED Healthcare Limited has recorded and receipted the payment against the referenced accommodation invoice. The agreed refund arrangements remain governed by the accommodation terms shown above.</div>
       ${signatureBlock(receiptDate, 'Receipt authorised by')}
       <a class="button" href="${e(input.publicUrl)}">View receipt online</a>
