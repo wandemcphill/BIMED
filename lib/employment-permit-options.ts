@@ -23,6 +23,16 @@ export function accommodationGbpEquivalent(amountEur: number): number {
 export const ACCOMMODATION_PLANS = ['three_months_4000', 'three_months_shared_2000', 'one_month_1250', 'one_month_shared_625'] as const;
 export type AccommodationPlan = (typeof ACCOMMODATION_PLANS)[number];
 
+export function isSharedAccommodationPlan(plan: AccommodationPlan): boolean {
+  return plan === 'three_months_shared_2000' || plan === 'one_month_shared_625';
+}
+
+export function sharedAccommodationTotalEur(plan: AccommodationPlan): number | null {
+  if (plan === 'three_months_shared_2000') return 4000;
+  if (plan === 'one_month_shared_625') return 1250;
+  return null;
+}
+
 export const PERMIT_SUBMISSION_ROUTES = ['candidate_or_agency', 'bimed_legal_team'] as const;
 export type PermitSubmissionRoute = (typeof PERMIT_SUBMISSION_ROUTES)[number];
 
