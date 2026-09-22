@@ -82,6 +82,7 @@ export default function StaffPermitPage() {
   const currentSharedTotal = isSharedAccommodationPlan(currentPlan as any) ? sharedAccommodationTotalEur(currentPlan as any) : null;
   const displayedPlans = useMemo(() => sharedPartner ? [currentPlan] as const : changePlanMode ? availablePlans.filter((plan) => !isSharedAccommodationPlan(plan)) : availablePlans, [availablePlans, changePlanMode, sharedPartner, currentPlan]);
   const canChangeAccommodation = Boolean(termsAcknowledged && permit?.permit_submission_route && invoice && ['draft', 'issued'].includes(invoice.status) && !permit?.requested_at && permit?.status === 'not_started' && !permit?.cancellation_requested_at && !permit?.cancellation_finalized_at);
+  const changePlanDisabled = !selectedPlan || !acknowledged || selectedPlan === permit?.accommodation_plan;
 
   async function acknowledgeAccommodation() {
     if (!selectedPlan || !selectedRoute) { setError('Choose an accommodation plan and a permit submission route first.'); return; }
@@ -414,7 +415,7 @@ export default function StaffPermitPage() {
             <span>I confirm the new accommodation plan and understand its payment, refund and accommodation terms.</span>
           </label>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button disabled={busy || !selectedPlan || isSharedAccommodationPlan(selectedPlan as any) || !acknowledged || selectedPlan === permit.accommodation_plan} onClick={() => void changeAccommodationPlan()} style={{ ...button, minWidth: 260, opacity: busy || !selectedPlan || isSharedAccommodationPlan(selectedPlan as any) || !acknowledged || selectedPlan === permit.accommodation_plan ? 0.55 : 1 }}>{busy ? 'Changing plan…' : 'Confirm new plan and issue invoice'}</button>
+            <button disabled={busy || changePlanDisabled || isSharedAccommodationPlan(selectedPlan as any)} onClick={() => void changeAccommodationPlan()} style={{ ...button, minWidth: 260, opacity: busy || changePlanDisabled || isSharedAccommodationPlan(selectedPlan as any) ? 0.55 : 1 }}>{busy ? 'Changing plan…' : 'Confirm new plan and issue invoice'}</button>
             <button type='button' disabled={busy} onClick={() => { setChangePlanMode(false); setSelectedPlan(permit.accommodation_plan || ''); setAcknowledged(false); setError(''); }} style={secondary}>Keep current plan</button>
           </div>
         </> : <div style={{ marginTop: 14, padding: 16, borderRadius: 12, background: '#ecfdf5', color: '#166534' }}>
