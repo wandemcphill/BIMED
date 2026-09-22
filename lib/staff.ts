@@ -8,6 +8,7 @@ import {
 } from './onboarding-readiness';
 import { generateBimedPortalEmail } from './staff-email';
 import { ensureBimedStaffOnboardingPackage } from './staff-onboarding';
+import { normalizeResidentialProfile } from './residential-profile';
 
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
@@ -155,7 +156,14 @@ export async function createStaffFromApplication(
   const effectiveStartDate = defaultStartDate();
   const effectiveEndDate = BIMED_DEFAULT_END_DATE_ISO;
   const effectiveName = signedContract?.employee_name || application.full_name;
-  const effectiveAddress = signedContract?.employee_address || application.address;
+  const residentialProfile = normalizeResidentialProfile({
+    address: signedContract?.employee_address || application.address,
+    residenceCountry: application.country_of_residence,
+    currentCountry: application.current_country,
+    livingInIreland: application.living_in_ireland,
+  });
+  const effectiveAddress = residentialProfile.address_line_1 || application.address || null;
+  const effectiveCountry = residentialProfile.country;
   const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
   const portalEmail = await generateBimedPortalEmail(client, effectiveName);
 
@@ -178,7 +186,35 @@ export async function createStaffFromApplication(
     if (promotionError || !promotedStaff) {
       throw asStaffProvisioningError(promotionError, 'Unable to atomically promote the staff profile.');
     }
-    staff = promotedStaff;
+
+    // The atomic promotion RPC historically defaulted recruitment-linked staff
+    // to Ireland. Reconcile the residential country/address from the application
+    // immediately after promotion.
+    const correctedResidentialProfile = normalizeResidentialProfile({
+      address: signedContract?.employee_address || application.address,
+      residenceCountry: application.country_of_residence,
+      currentCountry: application.current_country,
+      livingInIreland: application.living_in_ireland,
+    });
+    const { data: correctedStaff, error: residentialProfileError } = await client
+      .from('recruitment_staff')
+      .update({
+        address_line_1: correctedResidentialProfile.address_line_1,
+        country: correctedResidentialProfile.country,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', promotedStaff.id)
+      .select('*')
+      .single();
+
+    if (residentialProfileError || !correctedStaff) {
+      throw asStaffProvisioningError(
+        residentialProfileError,
+        'Unable to reconcile the recruit residential address and country.'
+      );
+    }
+
+    staff = correctedStaff;
   } else {
     const result = await client
       .from('recruitment_staff')
@@ -195,7 +231,7 @@ export async function createStaffFromApplication(
         employment_type: application.employment_type,
         employment_start_date: effectiveStartDate,
         employment_end_date: effectiveEndDate,
-        country: 'Ireland',
+        country: effectiveCountry,
         status: effectiveStatus,
         ...mapResidentialAddress(effectiveAddress),
         activation_token_hash: hashActivationToken(activationToken),

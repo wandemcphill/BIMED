@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getStaffSession } from '@/lib/staff-auth';
 import { createStaffAudit, STAFF_PHOTO_BUCKET, hashOneTimePhotoName } from '@/lib/staff';
+import { normalizeResidentialProfile } from '@/lib/residential-profile';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -20,7 +21,34 @@ export async function GET(request: NextRequest) {
   const client = db();
   const { data: staff, error } = await client.from('recruitment_staff').select(SAFE_PROFILE_FIELDS).eq('id', session.staff_id).single();
   if (error || !staff) return NextResponse.json({ error: 'Staff record not found.' }, { status: 404 });
-  return NextResponse.json({ staff: await withPhotoUrl(staff) });
+
+  let profile = staff;
+  if (staff.application_id) {
+    const { data: application } = await client
+      .from('recruitment_applications')
+      .select('address,country_of_residence,current_country,living_in_ireland')
+      .eq('id', staff.application_id)
+      .maybeSingle();
+
+    if (application) {
+      const normalized = normalizeResidentialProfile({
+        address: application.address || staff.address_line_1,
+        residenceCountry: application.country_of_residence,
+        currentCountry: application.current_country,
+        livingInIreland: application.living_in_ireland,
+      });
+
+      if (normalized.address_line_1 || normalized.country !== staff.country) {
+        profile = {
+          ...staff,
+          address_line_1: normalized.address_line_1 || staff.address_line_1,
+          country: normalized.country,
+        };
+      }
+    }
+  }
+
+  return NextResponse.json({ staff: await withPhotoUrl(profile) });
 }
 
 export async function PATCH(request: NextRequest) {
