@@ -329,6 +329,60 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (action === 'reset_accommodation_selection') {
+    if (!currentInvoice || !['draft', 'issued'].includes(currentInvoice.status)) {
+      return NextResponse.json({
+        error: 'The accommodation plan can only be changed before payment has been recorded. BIMED can review paid or payment-reported cases through the controlled admin process.',
+      }, { status: 409 });
+    }
+
+    try {
+      const { data: result, error: resetError } = await client.rpc('bimed_reset_staff_accommodation_selection', {
+        p_staff_id: staff.id,
+        p_actor: session.email,
+      });
+      if (resetError || !result) throw resetError || new Error('Unable to reset the accommodation selection.');
+
+      const { data: updatedPermit } = await client
+        .from('recruitment_staff_permit_cases')
+        .select('*')
+        .eq('id', permit.id)
+        .single();
+
+      await createStaffNotification(client, {
+        staffId: staff.id,
+        category: 'billing',
+        title: 'Accommodation selection reopened',
+        body: 'Your previous accommodation selection was voided before payment. You can now choose a different accommodation plan from the Employment permit workspace.',
+        actionUrl: '/staff/permit',
+      });
+
+      return NextResponse.json({
+        ok: true,
+        permit: updatedPermit || result.permit,
+        invoice: null,
+        accommodationOptionsReopened: true,
+      }, { status: 200 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const mapped: Record<string, { message: string; status: number }> = {
+        ACCOMMODATION_PLAN_CHANGE_LOCKED_PAID: {
+          message: 'The accommodation plan cannot be changed after payment has been recorded. BIMED must review the case through the controlled admin process.',
+          status: 409,
+        },
+        ACCOMMODATION_INVOICE_NOT_FOUND: {
+          message: 'The accommodation invoice could not be found. BIMED should review the permit case before making another selection.',
+          status: 409,
+        },
+      };
+      const handled = mapped[message];
+      return NextResponse.json(
+        { error: handled?.message || 'Unable to reopen the accommodation plan selection.' },
+        { status: handled?.status || 500 },
+      );
+    }
+  }
+
   if (permit.cancellation_requested_at
       && !permit.cancellation_revoked_at
       && !permit.cancellation_finalized_at) {
