@@ -47,6 +47,17 @@ describe('BIMED shared accommodation partner flow', () => {
     expect(migration).toContain("grant execute on function public.bimed_acknowledge_shared_accommodation_options");
   });
 
+
+  it('keeps shared plans on the dedicated partner workflow and uses the selected primary permit route for the refund trigger', async () => {
+    const [route, migration] = await Promise.all([
+      fs.readFile('app/api/staff/permit/route.ts', 'utf8'),
+      fs.readFile('supabase/migrations/20260922175000_shared_accommodation_refund_trigger_hardening.sql', 'utf8'),
+    ]);
+    expect(route).toContain('Shared accommodation plans must use the dedicated shared-accommodation workflow');
+    expect(migration).toContain("when p_permit_submission_route = 'candidate_or_agency' and v_period = 1");
+    expect(migration).toContain("where accommodation_plan = 'one_month_shared_625'");
+  });
+
   it('locks shared invitees to the arrangement they were assigned', async () => {
     const page = await fs.readFile('app/staff/permit/page.tsx', 'utf8');
     expect(page).toContain('const sharedPartner = permit?.accommodation_share_role === \'partner\'');
