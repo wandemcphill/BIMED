@@ -304,7 +304,7 @@ begin
     'share_id', v_share.id,
     'share_role', 'primary',
     'total_amount_eur', v_total,
-    'share_amount_eur', v_share,
+    'share_amount_eur', v_share.share_amount_eur,
     'partner_bimed_id', v_partner_staff.bimed_id,
     'partner_name', v_partner_staff.full_name,
     'partner_email', coalesce(v_partner_application.email, v_partner_staff.email),
@@ -317,7 +317,7 @@ begin
     'share_id', v_share.id,
     'share_role', 'partner',
     'total_amount_eur', v_total,
-    'share_amount_eur', v_share,
+    'share_amount_eur', v_share.share_amount_eur,
     'primary_bimed_id', v_primary_staff.bimed_id,
     'primary_name', v_primary_staff.full_name,
     'primary_email', coalesce(v_primary_application.email, v_primary_staff.email),
@@ -429,7 +429,7 @@ begin
         'partner_staff_id', v_partner_staff.id,
         'partner_bimed_id', v_partner_staff.bimed_id,
         'total_amount_eur', v_total,
-        'share_amount_eur', v_share,
+        'share_amount_eur', v_share.share_amount_eur,
         'primary_invoice_id', v_primary_invoice.id,
         'partner_invoice_id', v_partner_invoice.id,
         'atomic_workflow', true
@@ -444,7 +444,7 @@ begin
         'primary_staff_id', v_primary_staff.id,
         'primary_bimed_id', v_primary_staff.bimed_id,
         'total_amount_eur', v_total,
-        'share_amount_eur', v_share,
+        'share_amount_eur', v_share.share_amount_eur,
         'partner_invoice_id', v_partner_invoice.id,
         'atomic_workflow', true
       )
@@ -459,7 +459,7 @@ begin
     'partner_invoice_id', v_partner_invoice.id,
     'primary_permit_id', v_primary_permit.id,
     'partner_permit_id', v_partner_permit.id,
-    'share_amount_eur', v_share,
+    'share_amount_eur', v_share.share_amount_eur,
     'total_amount_eur', v_total,
     'already_exists', false
   );
