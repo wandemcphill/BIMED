@@ -1,5 +1,5 @@
--- Patch the atomic accommodation-plan change function's allowlist to include
--- the agreed €625 one-month shared plan.
+-- Patch the atomic accommodation-plan change RPC so the shared €625 plan
+-- is accepted by both its top-level allowlist and plan validation.
 
 begin;
 
@@ -115,6 +115,18 @@ begin
     if p_permit_submission_route = 'candidate_or_agency' and p_refund_trigger <> 'one_month_accommodation_expiry' then
       raise exception 'INVALID_SELF_ROUTE_REFUND_TRIGGER';
     end if;
+  elsif p_accommodation_plan = 'one_month_shared_625' then
+    if p_amount_eur <> 625 or p_period_months <> 1 then
+      raise exception 'INVALID_SHARED_ACCOMMODATION_SELECTION';
+    end if;
+    if p_permit_submission_route = 'bimed_legal_team' and p_refund_trigger <> 'successful_three_month_probation' then
+      raise exception 'INVALID_EMPLOYER_ROUTE_REFUND_TRIGGER';
+    end if;
+    if p_permit_submission_route = 'candidate_or_agency' and p_refund_trigger <> 'one_month_accommodation_expiry' then
+      raise exception 'INVALID_SELF_ROUTE_REFUND_TRIGGER';
+    end if;
+  else
+    raise exception 'INVALID_ACCOMMODATION_PLAN';
   end if;
 
   select *
@@ -276,5 +288,13 @@ grant execute on function public.bimed_change_staff_accommodation_selection(
   uuid,text,text,text,text,text,numeric,integer,text,integer,integer,numeric,jsonb,text,text,date,text,text
 ) to service_role;
 
+
+revoke all on function public.bimed_change_staff_accommodation_selection(
+  uuid,text,text,text,text,text,numeric,integer,text,integer,integer,numeric,jsonb,text,text,date,text,text
+) from public, anon, authenticated;
+
+grant execute on function public.bimed_change_staff_accommodation_selection(
+  uuid,text,text,text,text,text,numeric,integer,text,integer,integer,numeric,jsonb,text,text,date,text,text
+) to service_role;
 
 commit;
