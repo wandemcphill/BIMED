@@ -28,7 +28,7 @@ describe('BIMED accommodation plan change flow', () => {
 
   it('creates the replacement-selection database boundary as a service-role-only atomic operation', async () => {
     const migration = await fs.readFile(
-      'supabase/migrations/20260922150000_accommodation_plan_change_atomic.sql',
+      'supabase/migrations/20260922154500_shared_accommodation_plan_and_change_hardening.sql',
       'utf8',
     );
 
