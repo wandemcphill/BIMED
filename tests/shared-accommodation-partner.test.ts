@@ -26,10 +26,13 @@ describe('BIMED shared accommodation partner flow', () => {
   });
 
   it('creates a database relationship and split invoices while preventing duplicate partner sharing', async () => {
-    const migration = await fs.readFile(
-      'supabase/migrations/20260922173000_shared_accommodation_partner_invoicing.sql',
-      'utf8',
-    );
+    const [schema, createRpc, linkRpc, partnerAck] = await Promise.all([
+      fs.readFile('supabase/migrations/20260922173000_shared_accommodation_partner_schema.sql', 'utf8'),
+      fs.readFile('supabase/migrations/20260922173200_shared_accommodation_partner_create_rpc.sql', 'utf8'),
+      fs.readFile('supabase/migrations/20260922173300_shared_accommodation_partner_link_rpc.sql', 'utf8'),
+      fs.readFile('supabase/migrations/20260922173400_shared_accommodation_partner_ack_rpc.sql', 'utf8'),
+    ]);
+    const migration = schema + '\\n' + createRpc + '\\n' + linkRpc + '\\n' + partnerAck;
     expect(migration).toContain('recruitment_accommodation_shares');
     expect(migration).toContain('share_amount_eur');
     expect(migration).toContain('primary_staff_id');
@@ -37,6 +40,7 @@ describe('BIMED shared accommodation partner flow', () => {
     expect(migration).toContain('bimed_acknowledge_shared_accommodation_options');
     expect(migration).toContain('bimed_link_existing_shared_accommodation_partner');
     expect(migration).toContain('bimed_acknowledge_shared_accommodation_partner');
+    expect(migration).toContain('recruitment_accommodation_shares');
     expect(migration).toContain('SHARED_PARTNER_ALREADY_SHARED');
     expect(migration).toContain('primary_invoice_id');
     expect(migration).toContain('partner_invoice_id');
