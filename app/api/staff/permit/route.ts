@@ -165,9 +165,9 @@ async function getSharedBillingRecovery(client: any, permit: any) {
       amountEur: partnerInvoice.amount_eur,
     } : null,
     needsRecovery: Boolean(
-      !primaryInvoice ||
-      !partnerInvoice ||
-      [primaryInvoice.status, partnerInvoice.status].some((status) => !['issued', 'paid'].includes(status)),
+      primaryInvoice &&
+      partnerInvoice &&
+      [primaryInvoice.status, partnerInvoice.status].some((status) => status === 'draft'),
     ),
   };
 }
@@ -733,6 +733,15 @@ export async function POST(request: NextRequest) {
         body: 'The shared accommodation arrangement was saved, but one or more invoices could not be issued automatically. The arrangement is preserved and can be retried without creating duplicate invoices.',
         actionUrl: '/staff/permit',
       });
+      if (partnerContext?.staff?.id) {
+        await createStaffNotification(client, {
+          staffId: partnerContext.staff.id,
+          category: 'billing',
+          title: 'Shared accommodation billing needs recovery',
+          body: 'Your shared accommodation arrangement was saved, but one or more invoices could not be issued automatically. The arrangement is preserved and can be retried without creating duplicate invoices.',
+          actionUrl: '/staff/permit',
+        });
+      }
       return NextResponse.json({ error: 'The shared arrangement was saved, but one or more invoices could not be issued automatically. The arrangement is preserved and can be retried without creating duplicate invoices.', recoveryAvailable: true }, { status: 502 });
     }
 
@@ -818,6 +827,15 @@ export async function POST(request: NextRequest) {
         body: 'The sharing partner was linked successfully, but the partner invoice could not be issued automatically. The arrangement is preserved and can be retried without creating a duplicate invoice.',
         actionUrl: '/staff/permit',
       });
+      if (partnerContext.staff.id !== staff.id) {
+        await createStaffNotification(client, {
+          staffId: partnerContext.staff.id,
+          category: 'billing',
+          title: 'Shared accommodation billing needs recovery',
+          body: 'Your shared accommodation invoice could not be issued automatically yet. The arrangement is preserved and can be retried without creating a duplicate invoice.',
+          actionUrl: '/staff/permit',
+        });
+      }
       return NextResponse.json({ error: 'The partner was linked, but BIMED could not issue their invoice automatically. The arrangement is preserved and can be retried without creating a duplicate invoice.', recoveryAvailable: true }, { status: 502 });
     }
   }
