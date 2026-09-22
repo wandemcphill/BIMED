@@ -339,6 +339,144 @@ export async function POST(request: NextRequest) {
     }, { status: 409 });
   }
 
+  if (action === 'change_accommodation_selection') {
+    if (permit.cancellation_requested_at || permit.cancellation_finalized_at) {
+      return NextResponse.json({ error: 'The accommodation plan cannot be changed while the sponsorship cancellation workflow is active or finalised.' }, { status: 409 });
+    }
+    if (permit.status !== 'not_started' || permit.requested_at) {
+      return NextResponse.json({ error: 'The accommodation plan can only be changed before the employment-permit request has been submitted.' }, { status: 409 });
+    }
+    if (!currentInvoice || !['draft', 'issued'].includes(currentInvoice.status) || currentInvoice.paid_at || currentInvoice.payment_reported_at) {
+      return NextResponse.json({ error: 'The accommodation plan can only be changed before payment is reported or recorded.' }, { status: 409 });
+    }
+    if (!permit.accommodation_terms_acknowledged_at) {
+      return NextResponse.json({ error: 'There is no existing accommodation selection to change.' }, { status: 409 });
+    }
+    if (body?.acknowledged !== true) {
+      return NextResponse.json({ error: 'Please confirm the new accommodation plan before issuing the replacement invoice.' }, { status: 400 });
+    }
+
+    let selection;
+    try {
+      selection = validateAccommodationSelection({
+        plan: body?.accommodation_plan,
+        route: permit.permit_submission_route,
+        roleValue: application?.role_applied,
+      });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'INVALID_ACCOMMODATION_SELECTION';
+      const messages: Record<string, string> = {
+        INVALID_ACCOMMODATION_PLAN: 'Select one of the available accommodation plans.',
+        INVALID_PERMIT_SUBMISSION_ROUTE: 'The existing permit submission route is invalid and BIMED must review the case.',
+        UNSUPPORTED_RECRUITMENT_ROLE: 'Your recruitment role is not currently configured for an employment-permit route. BIMED must review the role before the accommodation plan can be changed.',
+      };
+      return NextResponse.json({ error: messages[code] || 'The accommodation plan could not be validated.' }, { status: 400 });
+    }
+
+    if (selection.accommodation_plan === permit.accommodation_plan) {
+      return NextResponse.json({ error: 'Choose a different accommodation plan before saving the change.' }, { status: 400 });
+    }
+
+    let result: any;
+    try {
+      result = await client.rpc('bimed_change_staff_accommodation_selection', {
+        p_staff_id: staff.id,
+        p_actor: session.email,
+        p_terms_version: ACCOMMODATION_OPTIONS_TERMS_VERSION,
+        p_accommodation_plan: selection.accommodation_plan,
+        p_permit_submission_route: selection.permit_submission_route,
+        p_permit_type: selection.permit_type,
+        p_amount_eur: selection.accommodation_amount_eur,
+        p_period_months: selection.accommodation_period_months,
+        p_refund_trigger: selection.accommodation_refund_trigger,
+        p_refund_installments: selection.accommodation_refund_installments,
+        p_permit_duration_months: selection.permit_duration_months,
+        p_permit_fee_eur: selection.permit_fee_eur,
+        p_selection_snapshot: selection,
+        p_invoice_number: makeInvoiceNumber(),
+        p_public_token: makePublicToken(),
+        p_due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+        p_invoice_description: selection.accommodation_plan === 'one_month_1250'
+          ? 'BIMED-arranged accommodation for the first month, including training, onboarding and shadow shifts'
+          : 'BIMED-arranged accommodation for the initial three-month probationary period',
+        p_invoice_notes: selection.refund_trigger === 'one_month_accommodation_expiry'
+          ? `Refund trigger: the one-month accommodation arrangement expires. Refund processing follows the applicable accommodation terms. Employment permit fee: €${selection.permit_fee_eur.toFixed(2)}. ${permitSubmissionLabel(selection.permit_submission_route)}.`
+          : `Refund trigger: successful three-month probationary period; refund in ${selection.accommodation_refund_installments} weekly instalments under the accommodation terms. Employment permit fee: €${selection.permit_fee_eur.toFixed(2)}. ${permitSubmissionLabel(selection.permit_submission_route)}.`,
+      });
+      if (result.error || !result.data) throw result.error || new Error('Unable to change the accommodation selection.');
+    } catch (error) {
+      const reason = error instanceof Error
+        ? error.message
+        : error && typeof error === 'object'
+          ? JSON.stringify(error)
+          : String(error);
+      console.error(JSON.stringify({ level: 'error', event: 'accommodation_plan_change_atomic_failed', staff_id: staff.id, reason }));
+      const mapped: Record<string, { message: string; status: number }> = {
+        ACCOMMODATION_PLAN_CHANGE_NOT_ALLOWED: {
+          message: 'The accommodation plan can no longer be changed because payment or the permit journey has progressed.',
+          status: 409,
+        },
+        ACCOMMODATION_PLAN_NO_CHANGE: {
+          message: 'Choose a different accommodation plan before saving the change.',
+          status: 400,
+        },
+      };
+      const handled = mapped[reason];
+      return NextResponse.json({ error: handled?.message || 'Unable to change the accommodation plan. No partial change was saved.' }, { status: handled?.status || 500 });
+    }
+
+    const { data: createdInvoice } = await client
+      .from('recruitment_accommodation_invoices')
+      .select('*')
+      .eq('id', result.data.invoice_id)
+      .maybeSingle();
+
+    if (!createdInvoice) {
+      return NextResponse.json({ error: 'The replacement accommodation invoice could not be loaded after the plan change. BIMED has been notified.' }, { status: 500 });
+    }
+
+    let issuedInvoice: any = null;
+    let invoicePublicUrl: string | null = null;
+    try {
+      const issuance = await issueAccommodationInvoice({
+        client,
+        invoice: createdInvoice,
+        staff,
+        application,
+        permit,
+        actor: session.email,
+        automatic: true,
+      });
+      issuedInvoice = issuance.invoice;
+      invoicePublicUrl = issuance.publicUrl;
+    } catch (error) {
+      console.error(JSON.stringify({ level: 'error', event: 'accommodation_plan_change_invoice_auto_issue_failed', staff_id: staff.id, invoice_id: createdInvoice.id, reason: error instanceof Error ? error.message : String(error) }));
+      await createStaffNotification(client, {
+        staffId: staff.id,
+        category: 'billing',
+        title: 'Accommodation plan changed',
+        body: 'Your new accommodation plan was recorded, but BIMED billing could not issue the replacement invoice automatically. BIMED will review the billing request.',
+        actionUrl: '/staff/permit',
+      });
+      return NextResponse.json({ error: 'Your accommodation plan was changed, but BIMED could not issue the replacement invoice automatically. Please refresh shortly or contact BIMED.' }, { status: 502 });
+    }
+
+    const { data: updatedPermit } = await client
+      .from('recruitment_staff_permit_cases')
+      .select('*')
+      .eq('id', result.data.permit_id)
+      .single();
+
+    return NextResponse.json({
+      permit: updatedPermit || permit,
+      invoice: issuedInvoice
+        ? { id: issuedInvoice.id, invoice_number: issuedInvoice.invoice_number, status: issuedInvoice.status }
+        : { id: result.data.invoice_id, invoice_number: result.data.invoice_number, status: result.data.invoice_status },
+      invoiceUrl: invoicePublicUrl,
+      changed: true,
+    }, { status: 200 });
+  }
+
   if (action === 'acknowledge_accommodation') {
     if (body?.acknowledged !== true) return NextResponse.json({ error: 'Please confirm that you understand and accept the selected accommodation, payment, refund and permit-route terms before continuing.' }, { status: 400 });
     if (currentInvoice && !permit.accommodation_terms_acknowledged_at) return NextResponse.json({ error: 'An accommodation invoice already exists for this case. BIMED should review the case before another acknowledgement is recorded.' }, { status: 409 });
