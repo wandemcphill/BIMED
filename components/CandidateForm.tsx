@@ -149,9 +149,13 @@ export default function CandidateForm({
         };
 
         if (parsed.token === token && parsed.form) {
+          // The invitation is authoritative for the role. Never let an older local draft
+          // overwrite the canonical role selected by the recruiter for this invitation.
+          const canonicalInviteRole = normalizeRecruitmentRole(invite?.role) ?? '';
           setForm((current) => ({
             ...current,
             ...parsed.form,
+            role_applied: canonicalInviteRole || current.role_applied,
             supporting_documents: Array.isArray(parsed.form?.supporting_documents)
               ? parsed.form.supporting_documents
               : current.supporting_documents,
