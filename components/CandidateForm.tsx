@@ -14,6 +14,7 @@ import {
   isInternationalCandidate,
 } from '@/lib/recruitment-config';
 import { getFirstInterviewQuestions, pickRandomAudioQuestionIds, findAudioInterviewQuestion } from '@/lib/interview-questions';
+import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import InterviewAnswerInput, { type InterviewAnswerValue } from '@/components/InterviewAnswerInput';
 import SpeakQuestionButton from '@/components/SpeakQuestionButton';
 
@@ -82,7 +83,7 @@ const initialForm = (invite?: Invite): FormValues => ({
   nationality: '',
   country_of_residence: '',
   address: '',
-  role_applied: invite?.role ?? '',
+  role_applied: normalizeRecruitmentRole(invite?.role) ?? '',
   employment_type: '',
   availability: '',
   start_date: '',
