@@ -379,3 +379,33 @@ Before public launch:
 - DETE application forms: https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/application-forms/
 - Irish Times home-care costs article: https://www.irishtimes.com/your-money/2025/03/28/home-care-plays-vital-role-filling-the-gap-between-family-and-nursing-homes/
 - HSE 2026 disability/respite material: https://about.hse.ie/news/hse-announces-summer-respite-initiatives-2026-for-adults-and-children-with-a-disability/
+
+
+## 19. Single-pass implementation audit record
+
+The public-site draft implementation was rendered and checked after the content build.
+
+Verified in the WordPress draft:
+- BIMED logo renders from the corrected media path.
+- Main navigation now exposes Home, About, Care & Support, Who We Support, Careers & Recruitment and Contact.
+- Old public recruitment presentation has been replaced in the draft by the Recruitment Centre content.
+- Recruitment flow, permit timing, integrity, accommodation and official contact sections render in the draft.
+- Accommodation options €4,000 / €2,000 shared / €1,250 / €625 shared render in the draft.
+- Public chatbot renders as a deterministic published-information FAQ and does not connect to candidate records.
+- Contact page retains its existing enquiry form and now has the official recruitment/contact information layer.
+- Footer outline-button styling was hardened for dark-background readability.
+- Mobile navigation and responsive presentation rules were included in the draft styling layer.
+
+External verification completed on 23 September 2026:
+- DETE confirms that employment-permit applications are submitted through Employment Permits Online and that a signed employment contract is required. https://www.enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/
+- DETE's current processing page shows that permit processing remains a government-side queue and is distinct from any BIMED internal 72-working-hour initiation target. https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/current-application-processing-dates/
+- Current Irish private-care reference sources include a 2025 Irish Times report of approximately €36.90/hour in Dublin and €33.90/hour in Cork/Galway for agency care, and a current 2026 Irish cost guide reporting approximately €25–€35/hour for basic home-care support. These remain market references, not BIMED contractual prices.
+
+### Launch gate
+
+The website remains unpublished. Final launch should occur only after:
+1. the approved accommodation Terms & Conditions and refund language are confirmed;
+2. the final customer-facing care-rate wording is approved;
+3. legal/compliance review of permit, address, immigration and reporting language is completed; and
+4. the WordPress draft is published only after an explicit BIMED release decision.
+
