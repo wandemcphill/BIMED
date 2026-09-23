@@ -72,7 +72,7 @@ export default function Home() {
               <h2>Current recruitment information</h2>
               <ul className="notes-list">
                 <li>Visa sponsorship may be available to eligible overseas and Ireland-based applicants.</li>
-                <li>Recruitment covers Dublin, Cork, Belfast and Limerick.</li>
+                <li>Recruitment covers Dublin, Cork and Galway.</li>
                 <li>Local recruitment: {recruitmentContacts.ireland}</li>
                 <li>Overseas recruitment: {recruitmentContacts.overseas}</li>
                 <li>This portal is for invited candidates and is not a public self-registration form.</li>
