@@ -35,7 +35,19 @@ export type CanonicalRecruitmentRoleSlug =
 
 const ROLE_ALIASES: Record<string, CanonicalRecruitmentRole> = {
   'healthcare worker': 'Healthcare Assistant',
+  'healthcare-worker': 'Healthcare Assistant',
+  'healthcare_worker': 'Healthcare Assistant',
+  'healthcare assistant (hca)': 'Healthcare Assistant',
+  hca: 'Healthcare Assistant',
 };
+
+function normalizeRoleKey(value: string): string {
+  return value
+    .replace(/[‐‑‒–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
 const ROLE_SLUGS: Record<CanonicalRecruitmentRole, CanonicalRecruitmentRoleSlug> = {
   'Support Worker': 'support-worker',
@@ -45,7 +57,7 @@ const ROLE_SLUGS: Record<CanonicalRecruitmentRole, CanonicalRecruitmentRoleSlug>
 };
 
 export function normalizeRecruitmentRole(value: string | null | undefined): CanonicalRecruitmentRole | null {
-  const normalized = value?.trim().toLowerCase();
+  const normalized = value ? normalizeRoleKey(value) : '';
   if (!normalized) return null;
 
   const direct = CANONICAL_RECRUITMENT_ROLES.find((role) => role.toLowerCase() === normalized);
