@@ -22,6 +22,11 @@ describe('BIMED role policy', () => {
     expect(normalizeRecruitmentRole('Senior Support Worker')).toBe('Senior Support Worker');
     expect(normalizeRecruitmentRole('Physiotherapist')).toBe('Physiotherapist');
     expect(normalizeRecruitmentRole('Healthcare Worker')).toBe('Healthcare Assistant');
+    expect(normalizeRecruitmentRole('healthcare-worker')).toBe('Healthcare Assistant');
+    expect(normalizeRecruitmentRole('healthcare_worker')).toBe('Healthcare Assistant');
+    expect(normalizeRecruitmentRole('Healthcare Assistant (HCA)')).toBe('Healthcare Assistant');
+    expect(normalizeRecruitmentRole(' HCA ')).toBe('Healthcare Assistant');
+    expect(normalizeRecruitmentRole('Healthcare Assistant\u2014')).toBeNull();
     expect(normalizeRecruitmentRole('Other')).toBeNull();
     expect([...CANONICAL_RECRUITMENT_ROLES]).toEqual([
       'Support Worker',
