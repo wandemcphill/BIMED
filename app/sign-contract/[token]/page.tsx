@@ -81,6 +81,10 @@ export default async function SignContractPage({ params }: PageProps) {
     applyContractOverrides(baseTemplate, {
       employeeName: signature.employee_name,
       employeeAddress: signature.employee_address,
+      employeeAddressStatus: signature.employee_address
+        ? 'Verified Irish residential address included.'
+        : 'Accommodation Not Verified: no Irish residential address included.',
+      startDate: signature.start_date,
     })
   );
 
@@ -96,7 +100,7 @@ export default async function SignContractPage({ params }: PageProps) {
         token={token}
         employeeName={signature.employee_name}
         employeeAddress={signature.employee_address || ''}
-        startDate="2027-01-11"
+        startDate={signature.start_date || BIMED_DEFAULT_START_DATE_ISO}
       />
     );
 
