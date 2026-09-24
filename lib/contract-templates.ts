@@ -263,7 +263,6 @@ function buildTemplate(
         'Qualifications, certificates and supporting professional evidence reasonably required for the Role.',
         'Relevant employment history, professional experience and reference information.',
         'Any other employee-side information or supporting evidence reasonably required for the employment permit application, right-to-work checks or statutory compliance.',
-      ]),
         '9. The salary in Clause 5 will not be reduced below the minimum salary required to keep the applicable employment permit valid, as published by the relevant authority from time to time.',
         '10. The Company will not retain your passport or other original personal documents, and no employment permit-related cost will be deducted from your wages through payroll.',
         '11. You must tell the Company immediately of any change to your immigration or right-to-work status. Where a renewal or further permission is required, you must cooperate with BIMED and take the employee-side steps requested of you in good time.',
