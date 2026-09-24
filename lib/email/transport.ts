@@ -43,7 +43,9 @@ export type EmailType =
   | 'second_interview_invite'
   | 'admin_second_interview_completed'
   | 'staff_portal_welcome'
-  | 'staff_password_reset';
+  | 'staff_password_reset'
+  | 'staff_portal_access_restricted'
+  | 'staff_portal_access_restored';
 
 export type SendResult =
   | { status: 'sent'; messageId: string | null }
