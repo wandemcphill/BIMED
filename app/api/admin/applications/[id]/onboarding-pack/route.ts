@@ -10,6 +10,7 @@ import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
 import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 import { getPreContractReadiness } from '@/lib/onboarding-readiness';
+import { resolveContractAddress, type ContractAddressResolution } from '@/lib/contract-accommodation';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { data: application, error: applicationError } = await client
       .from('recruitment_applications')
-      .select('id, full_name, email, address, start_date, role_applied, status, living_in_ireland')
+      .select('id, full_name, email, address, start_date, role_applied, status, living_in_ireland, contract_accommodation_option, verified_irish_residential_address, contract_accommodation_verified_at, contract_accommodation_verified_by')
       .eq('id', applicationId).maybeSingle();
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
@@ -61,10 +62,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const startDate = BIMED_DEFAULT_START_DATE_ISO;
+    const addressResolution: ContractAddressResolution = resolveContractAddress(currentApplication);
+    if (!addressResolution.ready) {
+      return NextResponse.json({ error: addressResolution.message }, { status: 409 });
+    }
+
     const contractInfo = {
       applicationId: currentApplication.id,
       employeeName: currentApplication.full_name,
-      employeeAddress: currentApplication.address,
+      employeeAddress: addressResolution.employeeAddress,
       startDate,
       issuedBy: session.email,
     };
@@ -174,6 +180,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         previous_status: previousStatus,
         new_status: transitionedApplication.status,
         start_date: startDate,
+        contract_address_mode: addressResolution.mode,
+        contract_address_included: Boolean(addressResolution.employeeAddress),
         canonical_default_start_date: BIMED_DEFAULT_START_DATE,
         email_status: email.status,
       },
