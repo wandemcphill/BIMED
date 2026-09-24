@@ -233,15 +233,67 @@ export function validateAdminInvite(input: unknown): JsonResult<{ email: string;
   }
 }
 
-export function validateAdminApplicationPatch(input: unknown): JsonResult<{ status?: string; notes?: string; notify_candidate?: boolean }> {
+export function validateAdminApplicationPatch(input: unknown): JsonResult<{
+  status?: string;
+  notes?: string;
+  notify_candidate?: boolean;
+  contract_accommodation_option?: 'private_accommodation' | 'accommodation_not_verified';
+  verified_irish_residential_address?: string | null;
+}> {
   if (!isPlainRecord(input)) return { ok: false, error: 'Request body must be a JSON object.' };
   try {
-    assertAllowedKeys(input, ['status', 'notes', 'notify_candidate']);
+    assertAllowedKeys(input, [
+      'status',
+      'notes',
+      'notify_candidate',
+      'contract_accommodation_option',
+      'verified_irish_residential_address',
+    ]);
     const status = stringField(input, 'status', 60);
     if (status && !recruitmentStatuses.includes(status as (typeof recruitmentStatuses)[number])) throw new Error('Invalid status value.');
     const notes = stringField(input, 'notes', 10000);
     const notifyCandidate = optionalBoolean(input, 'notify_candidate');
-    return { ok: true, data: { ...(status ? { status } : {}), ...(notes !== null ? { notes } : {}), ...(notifyCandidate !== undefined ? { notify_candidate: notifyCandidate } : {}) } };
+
+    let contractAccommodationOption: 'private_accommodation' | 'accommodation_not_verified' | undefined;
+    if (input.contract_accommodation_option !== undefined) {
+      if (
+        input.contract_accommodation_option !== 'private_accommodation'
+        && input.contract_accommodation_option !== 'accommodation_not_verified'
+      ) {
+        throw new Error('contract_accommodation_option is invalid.');
+      }
+      contractAccommodationOption = input.contract_accommodation_option;
+    }
+
+    let verifiedIrishResidentialAddress: string | null | undefined;
+    if (input.verified_irish_residential_address !== undefined) {
+      if (input.verified_irish_residential_address !== null && typeof input.verified_irish_residential_address !== 'string') {
+        throw new Error('verified_irish_residential_address must be a string or null.');
+      }
+      verifiedIrishResidentialAddress = input.verified_irish_residential_address === null
+        ? null
+        : input.verified_irish_residential_address.trim();
+      if (typeof verifiedIrishResidentialAddress === 'string' && verifiedIrishResidentialAddress.length > 500) {
+        throw new Error('verified_irish_residential_address is too long.');
+      }
+    }
+
+    if (contractAccommodationOption === 'private_accommodation' && !String(verifiedIrishResidentialAddress || '').trim()) {
+      throw new Error('A verified Irish residential address is required when Private Accommodation is selected.');
+    }
+
+    return {
+      ok: true,
+      data: {
+        ...(status ? { status } : {}),
+        ...(notes !== null ? { notes } : {}),
+        ...(notifyCandidate !== undefined ? { notify_candidate: notifyCandidate } : {}),
+        ...(contractAccommodationOption ? { contract_accommodation_option: contractAccommodationOption } : {}),
+        ...(verifiedIrishResidentialAddress !== undefined
+          ? { verified_irish_residential_address: verifiedIrishResidentialAddress }
+          : {}),
+      },
+    };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Invalid request.' };
   }
