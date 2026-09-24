@@ -178,7 +178,7 @@ describe('BIMED role policy', () => {
       ...resolved.schedules.flatMap((section) => [...section.paragraphs, ...(section.bullets ?? [])]),
       resolved.closingNote,
     ].join('\n');
-    const schedule1 = resolved.schedules.find((section) => section.heading === 'Schedule 1 - Additional Terms for Employment Permit Holders (Overseas Employees)')?.paragraphs.join('\n') || '';
+    const schedule1 = resolved.schedules.find((section) => section.heading === 'Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address')?.paragraphs.join('\n') || '';
     const schedule2 = resolved.schedules.find((section) => section.heading === 'Schedule 2 - Job Description');
 
     expect(field('Contracted hours')).toBe('35 hours per week');

@@ -23,7 +23,7 @@ describe('employment contract address rendering', () => {
     });
     const text = allContractText(rendered);
 
-    expect(rendered.employerSignatory.name).toBe('Desmond Morris');
+    expect(rendered.employerSignatory.name).toBe('Dezou Maurice');
     expect(rendered.editableFields.some((field) => field.label === 'Place of Primary Assignment')).toBe(true);
     expect(text).toContain('of 12 Example Street, Dublin, Ireland');
     expect(text).toContain('12 Example Street, Dublin, Ireland');
