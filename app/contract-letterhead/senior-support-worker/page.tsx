@@ -18,7 +18,7 @@ export default async function SeniorSupportWorkerContractPage({ searchParams }: 
   const { applicationId } = await searchParams;
   const result = await resolveContractTemplate('senior-support-worker', applicationId);
 
-  if (result.status === 'unauthorized' || result.status === 'not_found') {
+  if (result.status === 'unauthorized' || result.status === 'not_found' || result.status === 'blocked') {
     return <ContractAccessGate reason={result.status} />;
   }
 

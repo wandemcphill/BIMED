@@ -42,6 +42,10 @@ type ApplicationRecord = {
   consent: boolean;
   status: string;
   admin_notes: string | null;
+  contract_accommodation_option: 'private_accommodation' | 'accommodation_not_verified';
+  verified_irish_residential_address: string | null;
+  contract_accommodation_verified_at: string | null;
+  contract_accommodation_verified_by: string | null;
   submitted_at: string;
   updated_at: string | null;
   invite_id: string | null;
@@ -141,6 +145,8 @@ export default function AdminApplicationDetail({
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [contractAccommodationOption, setContractAccommodationOption] = useState<'private_accommodation' | 'accommodation_not_verified'>('accommodation_not_verified');
+  const [verifiedIrishResidentialAddress, setVerifiedIrishResidentialAddress] = useState('');
   const [contractRoleSlug, setContractRoleSlug] = useState('');
   const [signatures, setSignatures] = useState<ContractSignature[]>([]);
   const [externalContractVerification, setExternalContractVerification] = useState<ExternalContractVerification | null>(null);
@@ -176,6 +182,8 @@ export default function AdminApplicationDetail({
     setPayload(nextPayload);
     setStatus(nextPayload.application.status);
     setNotes(nextPayload.application.admin_notes || '');
+    setContractAccommodationOption(nextPayload.application.contract_accommodation_option || 'accommodation_not_verified');
+    setVerifiedIrishResidentialAddress(nextPayload.application.verified_irish_residential_address || '');
     setContractRoleSlug(guessContractRoleSlug(nextPayload.application.role_applied));
     setAuthenticated(true);
     setBootstrapping(false);
@@ -396,6 +404,11 @@ export default function AdminApplicationDetail({
       body: JSON.stringify({
         status,
         notes,
+        contract_accommodation_option: contractAccommodationOption,
+        verified_irish_residential_address:
+          contractAccommodationOption === 'private_accommodation'
+            ? verifiedIrishResidentialAddress.trim()
+            : null,
       }),
     });
 
@@ -550,9 +563,71 @@ export default function AdminApplicationDetail({
       </section>
 
       <section className="subcard">
+        <h2>Contract accommodation &amp; Irish address</h2>
+        {international ? (
+          <>
+            <p className="muted">
+              This setting controls whether an Irish residential address may appear in the final employment contract. The candidate's current or overseas application address is never used as an Irish contract address for an international hire.
+            </p>
+            <div className="grid">
+              <Field label="Contract accommodation option">
+                <select
+                  value={contractAccommodationOption}
+                  onChange={(event) => {
+                    const value = event.target.value as 'private_accommodation' | 'accommodation_not_verified';
+                    setContractAccommodationOption(value);
+                    if (value === 'accommodation_not_verified') setVerifiedIrishResidentialAddress('');
+                  }}
+                >
+                  <option value="private_accommodation">Private Accommodation</option>
+                  <option value="accommodation_not_verified">Accommodation Not Verified</option>
+                </select>
+              </Field>
+              {contractAccommodationOption === 'private_accommodation' && (
+                <Field label="Verified Irish residential address">
+                  <input
+                    value={verifiedIrishResidentialAddress}
+                    onChange={(event) => setVerifiedIrishResidentialAddress(event.target.value)}
+                    placeholder="Enter the verified Irish residential address"
+                  />
+                </Field>
+              )}
+            </div>
+            {contractAccommodationOption === 'private_accommodation' ? (
+              <div className="notice" style={{ marginTop: 12 }}>
+                <strong>Verification required before issue.</strong>
+                <div className="muted" style={{ marginTop: 4 }}>
+                  BIMED must have reviewed the candidate's accommodation details and supporting evidence before this address is recorded as verified. Once saved, the verified address is the only Irish residential address that the final contract may contain.
+                </div>
+              </div>
+            ) : (
+              <div className="notice" style={{ marginTop: 12 }}>
+                <strong>No Irish residential address will appear in the final contract.</strong>
+                <div className="muted" style={{ marginTop: 4 }}>
+                  The Place of Primary Assignment remains in the contract. The candidate does not need to provide private accommodation details for inclusion in the contract.
+                </div>
+              </div>
+            )}
+            {payload.application.contract_accommodation_verified_at && (
+              <p className="muted" style={{ marginTop: 10 }}>
+                Verified by {payload.application.contract_accommodation_verified_by || 'BIMED admin'} on {formatDate(payload.application.contract_accommodation_verified_at)}.
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="notice">
+            <strong>Ireland-based candidate.</strong>
+            <div className="muted" style={{ marginTop: 4 }}>
+              The candidate's recorded residential address may be used in the contract where available. The international accommodation verification rule does not apply.
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="subcard">
         <h2>Generate contract</h2>
         <p className="muted">
-          Opens the contract pre-filled with this candidate&apos;s name, address and start date. Line manager and pay still need
+          Opens the contract pre-filled with this candidate&apos;s name, a verified Irish residential address only where permitted by the accommodation setting, and start date. Line manager and pay still need
           to be confirmed before issue.
         </p>
         <div className="grid">

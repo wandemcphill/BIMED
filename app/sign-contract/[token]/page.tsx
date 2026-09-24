@@ -4,7 +4,7 @@ import SignContractForm from '@/components/SignContractForm';
 import { getContractSignatureByToken } from '@/lib/contract-signature';
 import { applyContractOverrides, getContractTemplate } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
-import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
+import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 
 export const metadata: Metadata = {
   title: 'Bimed Healthcare | Sign Your Employment Contract',
@@ -81,6 +81,10 @@ export default async function SignContractPage({ params }: PageProps) {
     applyContractOverrides(baseTemplate, {
       employeeName: signature.employee_name,
       employeeAddress: signature.employee_address,
+      employeeAddressStatus: signature.employee_address
+        ? 'Verified Irish residential address included.'
+        : 'No Irish residential address included.',
+      startDate: signature.start_date,
     })
   );
 
@@ -96,7 +100,7 @@ export default async function SignContractPage({ params }: PageProps) {
         token={token}
         employeeName={signature.employee_name}
         employeeAddress={signature.employee_address || ''}
-        startDate="2027-01-11"
+        startDate={signature.start_date || BIMED_DEFAULT_START_DATE_ISO}
       />
     );
 

@@ -16,7 +16,6 @@ export default function SignContractForm({
 }) {
   const router = useRouter();
   const [name, setName] = useState(employeeName);
-  const [address, setAddress] = useState(employeeAddress);
   const [date] = useState(startDate);
   const [typedName, setTypedName] = useState('');
   const [agreed, setAgreed] = useState(false);
@@ -46,7 +45,6 @@ export default function SignContractForm({
       body: JSON.stringify({
         signed_name: typedName.trim(),
         employee_name: name.trim(),
-        employee_address: address.trim(),
         start_date: date,
       }),
     });
@@ -64,16 +62,24 @@ export default function SignContractForm({
   return (
     <div className="sign-contract-panel">
       <p className="muted">
-        Check your details below and correct anything that is wrong before you sign - Bimed will not need to reissue the
-        contract for a typo.
+        Check your details below before you sign. Your Irish residential address, where shown, has been fixed from the BIMED contract record and cannot be changed on this signing page.
       </p>
       <div className="field">
         <label>Your full legal name</label>
         <input value={name} onChange={(event) => setName(event.target.value)} />
       </div>
       <div className="field" style={{ marginTop: 10 }}>
-        <label>Your address</label>
-        <input value={address} onChange={(event) => setAddress(event.target.value)} />
+        <label>Irish residential address</label>
+        {employeeAddress ? (
+          <input value={employeeAddress} readOnly aria-readonly="true" />
+        ) : (
+          <div className="notice">
+            <strong>No Irish residential address stated</strong>
+            <div className="muted" style={{ marginTop: 4 }}>
+              BIMED has not verified accommodation for inclusion of an Irish residential address in this contract. The Place of Primary Assignment remains stated in the contract.
+            </div>
+          </div>
+        )}
       </div>
       <div className="field" style={{ marginTop: 10 }}>
         <label>Contract start date</label>

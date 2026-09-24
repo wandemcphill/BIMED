@@ -4,11 +4,13 @@ import { ADMIN_SESSION_COOKIE_NAME, getAdminSessionFromToken } from '@/lib/admin
 import { applyContractOverrides, getContractTemplate, type ContractTemplate } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
 import { applyBimedContractDefaults } from '@/lib/bimed-role-policy';
+import { resolveContractAddress, type ContractAddressResolution } from '@/lib/contract-accommodation';
 
 export type ContractPrefillResult =
   | { status: 'template'; template: ContractTemplate; prefilledFor?: { name: string; email: string } }
   | { status: 'unauthorized' }
-  | { status: 'not_found' };
+  | { status: 'not_found' }
+  | { status: 'blocked'; reason: string };
 
 // Resolves the contract to render for a role page. With no applicationId this is the Bimed-wide
 // default role contract with canonical manager/start/probation/pay-frequency terms. With an
@@ -39,7 +41,7 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
   try {
     const result = await db()
       .from('recruitment_applications')
-      .select('full_name,email,address,start_date')
+      .select('full_name,email,address,start_date,living_in_ireland,contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by')
       .eq('id', applicationId)
       .maybeSingle();
     if (result.error || !result.data) return { status: 'not_found' };
@@ -48,9 +50,22 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
     return { status: 'not_found' };
   }
 
+  const addressResolution: ContractAddressResolution = resolveContractAddress(application);
+  if (!addressResolution.ready) {
+    return { status: 'blocked', reason: addressResolution.message };
+  }
+
   const templateWithCandidate = applyContractOverrides(baseTemplate, {
     employeeName: application.full_name,
-    employeeAddress: application.address,
+    employeeAddress: addressResolution.employeeAddress,
+    employeeAddressStatus:
+      addressResolution.mode === 'private_verified'
+        ? 'Private Accommodation: verified Irish residential address included.'
+        : addressResolution.mode === 'not_verified'
+          ? 'Accommodation Not Verified: no Irish residential address included.'
+          : addressResolution.employeeAddress
+            ? 'Ireland-based candidate: recorded residential address included.'
+            : 'Ireland-based candidate: no residential address recorded.',
     startDate: application.start_date,
   });
 

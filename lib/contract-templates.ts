@@ -39,7 +39,7 @@ const section = (heading: string, paragraphs: string[], bullets?: string[]): Con
 // All employment contracts are signed on behalf of Bimed Healthcare Limited by this signatory.
 // The signature block auto-fills the name and today's date - see EmploymentContractDocument.
 const employerSignatory: ContractSignatory = {
-  name: 'Dezou Maurice',
+  name: 'Desmond Morris',
   title: 'Authorised Signatory, Bimed Healthcare Limited',
 };
 
@@ -97,11 +97,16 @@ function buildTemplate(
     ],
     editableFields: [
       { label: 'Employee name', value: '[Insert employee name]', note: 'Replace with the employee full legal name.' },
-      { label: 'Employee address', value: '[Insert employee address]', note: 'Use the employee residential address.' },
+      {
+        label: 'Employee address',
+        value: '[Insert Irish residential address if verified]',
+        note: 'For overseas candidates, only use the Irish residential address after BIMED has verified the accommodation and address. Otherwise state that no Irish residential address is included.',
+      },
       { label: 'Job title', value: roleLabel, note: 'Use the agreed role title.' },
       { label: 'Line manager', value: '[Insert line manager name/title]', note: 'Replace with the reporting line.' },
       { label: 'Start date', value: '[Insert start date]', note: 'Confirm the commencement date.' },
-      { label: 'Work location', value: workLocationShort, note: 'Use the normal place of work or main client area.' },
+      { label: 'Place of Primary Assignment', value: workLocationShort, note: 'This is the primary assignment location or main assigned care area.' },
+      { label: 'Contract address status', value: '[Contract address status]', note: 'Shows whether the Irish residential address is included and why.' },
       { label: 'Contracted hours', value: contractedHours, note: 'Confirm the weekly hours before issue.' },
       { label: 'Pay', value: pay, note: 'Add hourly or annual pay as agreed.' },
       { label: 'Pay frequency', value: payFrequency, note: 'Choose the actual payroll cycle.' },
@@ -109,7 +114,7 @@ function buildTemplate(
     ],
     sections: [
       section('Part A - Core Contract of Employment', [
-        'This Contract of Employment is made between Bimed Healthcare Limited (Company Registration No. 587415), of 169 Castlemoyne, Dublin 13, Dublin, D13 X3C6, Ireland ("the Company", "Bimed", "we", "us"), and [Employee full name] of [Employee address] ("you", "the Employee").',
+        'This Contract of Employment is made between Bimed Healthcare Limited (Company Registration No. 587415), of 169 Castlemoyne, Dublin 13, Dublin, D13 X3C6, Ireland ("the Company", "Bimed", "we", "us"), and [Employee full name] [Employee address clause] ("you", "the Employee").',
         'This contract, together with the Employee Handbook and any policy referred to in it, sets out your terms and conditions of employment.',
       ]),
       section('1. Job Title, Duties and Reporting', [
@@ -126,8 +131,8 @@ function buildTemplate(
         '2.4 During probation, either party may end this contract by giving the notice set out in Clause 11 (Notice and Termination). Where the reason for ending your employment during probation relates to conduct or performance, the Company will still tell you the reason and give you a fair opportunity to respond, even where the full procedure in Clause 13 is not followed in full.',
         '2.5 The Company will confirm the successful completion of your probation to you in writing.',
       ]),
-      section('3. Place of Work', [
-        `3.1 Your normal place of work is ${workLocation}, and any other location the Company may reasonably require, given the nature of home and domiciliary care work.`,
+      section('3. Place of Primary Assignment and Work Location', [
+        `3.1 Your Place of Primary Assignment is ${workLocation}, and you may also be required to work at another location the Company may reasonably require, given the nature of home and domiciliary care work.`,
         '3.2 You may be required to travel between client locations in the course of your duties. No mileage or travel allowance applies unless separately agreed in writing.',
       ]),
       section('4. Hours of Work', [
@@ -236,16 +241,35 @@ function buildTemplate(
       ]),
     ],
     schedules: [
-      section('Schedule 1 - Additional Terms for Employment Permit Holders (Overseas Employees)', [
-        'This Schedule applies in addition to, and does not replace, the main body of this contract, where your right to work in Ireland depends on an employment permit.',
-        '1. Your employment, and its continuation, is conditional on you holding a valid employment permit for this Role at all times. The Company will apply for a General Employment Permit on your behalf, valid from your start date.',
-        '2. You must not start work until your employment permit has been granted and you have given the Company a copy of it.',
-        '3. The salary in Clause 5 will not be reduced below the minimum salary the Department of Enterprise, Tourism and Employment requires to keep your permit valid for this Role, as published from time to time.',
-        '4. The Company will not deduct the cost of your employment permit application or any recruitment fees from your pay, and will not retain your personal documents, including your passport, in accordance with Irish employment permit law.',
-        '5. You must tell the Company immediately of any change to your immigration status, and must apply for a permit renewal in good time before it expires, with the Company\'s assistance.',
-        '6. If your employment permit is refused, revoked, or not renewed, or if you otherwise cease to hold the right to work in Ireland, your employment will end automatically, and the Company will pay you any notice or entitlements due to you up to that date, in accordance with law.',
-        '7. If Bimed provides a relocation expense reimbursement under its relocation policy, this is set out separately in the Relocation Policy / Offer Letter and is conditional on the terms set out there, including successful completion of your probationary period.',
-        '8. This Schedule does not itself guarantee permit renewal or sponsorship of any future permit; these remain subject to the Company\'s ongoing business needs and Irish immigration law and policy in force at the relevant time.',
+      section('Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address', [
+        'This Schedule applies where your right to work in Ireland depends on an employment permit. It records the information BIMED requires from you for the employee-side of the permit process and the rules governing whether an Irish residential address appears in this contract.',
+        '1. Your employment, and its continuation, is conditional on you holding a valid employment permit and the right to work in Ireland for this Role. You must not start work until the required permit and immigration permissions have been granted and verified by BIMED.',
+        '2. Employee information you must provide to BIMED: you must provide complete, accurate and current personal, identification, qualification and employment information reasonably required for the employment permit application and related compliance checks.',
+        '3. BIMED employer-side information: BIMED Healthcare Limited will complete and provide the employer, company, employment, remuneration, position, workplace and other employer-side information and supporting employer documentation required for the employment permit application directly through the Department of Enterprise, Tourism and Employment (DETE) Employment Permits Online system. You are not required to obtain or complete BIMED\'s corporate, CRO, Revenue or other employer registration information. Where DETE requires an employee action or signature, BIMED will identify that action to you.',
+        '4. Employment permit application fee: the employment permit application fee applicable to the proposed two-year employment permit is EUR 1,000. Under this employment arrangement, the Employee is responsible for payment of this fee, regardless of the accommodation option selected. BIMED will not pay this fee on behalf of the Employee and it will not be deducted from the Employee\'s wages. Where BIMED requires evidence of payment or application submission, the Employee must provide that evidence when requested.',
+        '5. Accommodation and contract address status: [Contract address status].',
+        '6. Private Accommodation: if you select private accommodation and want your Irish residential address included in the Final Employment Contract, you must provide the accommodation details and supporting documentation requested by BIMED. BIMED will verify the accommodation and address before the address is included. The verified Irish residential address stated in this contract is the address recorded and verified by BIMED at the time of issue.',
+        '7. Accommodation Not Verified: if you select not to have your accommodation verified, or if BIMED has not verified the accommodation and Irish residential address, you are not required to provide private accommodation details for inclusion in the Final Employment Contract. In that circumstance, no Irish residential address is stated in this Final Employment Contract. The Place of Primary Assignment remains the contractual work location.',
+        '8. The employee-side information that may be requested by BIMED includes:',
+      ], [
+        'Full legal name exactly as shown on your passport or other accepted identity document.',
+        'Date of birth.',
+        'Nationality.',
+        'Passport number and passport expiry date.',
+        'Your current residential address and country of residence.',
+        'Your Irish residential address only where private accommodation has been selected, the accommodation evidence has been supplied, and BIMED has verified the address for contract use.',
+        'Personal email address and telephone number.',
+        'Relevant professional registration, licence or regulatory registration details, where applicable.',
+        'Qualifications, certificates and supporting professional evidence reasonably required for the Role.',
+        'Relevant employment history, professional experience and reference information.',
+        'Any other employee-side information or supporting evidence reasonably required for the employment permit application, right-to-work checks or statutory compliance.',
+      ]),
+        '9. The salary in Clause 5 will not be reduced below the minimum salary required to keep the applicable employment permit valid, as published by the relevant authority from time to time.',
+        '10. The Company will not retain your passport or other original personal documents, and no employment permit-related cost will be deducted from your wages through payroll.',
+        '11. You must tell the Company immediately of any change to your immigration or right-to-work status. Where a renewal or further permission is required, you must cooperate with BIMED and take the employee-side steps requested of you in good time.',
+        '12. If your employment permit is refused, revoked or not renewed, or if you otherwise cease to hold the right to work in Ireland, you must not continue working unlawfully and your employment may end in accordance with Clause 11 and applicable law.',
+        '13. Any visa application, immigration registration fee or other government charge that applies to you is separate from the employment permit application fee stated above and remains subject to the rules of the relevant authority.',
+        '14. This Schedule does not guarantee that an employment permit, visa, immigration permission or future renewal will be granted. Those decisions are made by the relevant authorities.',
       ]),
       section('Schedule 2 - Job Description', [
         'Job title: [insert]     Reports to: [insert]',
@@ -363,6 +387,7 @@ export function guessContractRoleSlug(roleApplied: string | null | undefined): s
 export type ContractOverrides = {
   employeeName?: string | null;
   employeeAddress?: string | null;
+  employeeAddressStatus?: string | null;
   startDate?: string | null;
 };
 
@@ -376,9 +401,20 @@ export function applyContractOverrides(template: ContractTemplate, overrides: Co
     replacements.push(['[Insert employee name]', overrides.employeeName]);
     replacements.push(['[Employee full name]', overrides.employeeName]);
   }
-  if (overrides.employeeAddress) {
-    replacements.push(['[Insert employee address]', overrides.employeeAddress]);
-    replacements.push(['[Employee address]', overrides.employeeAddress]);
+  if (overrides.employeeAddress !== undefined) {
+    const address = overrides.employeeAddress?.trim() || '';
+    replacements.push([
+      '[Insert Irish residential address if verified]',
+      address || 'Not stated in this contract',
+    ]);
+    replacements.push(['[Employee address clause]', address ? `of ${address}` : '']);
+    replacements.push([
+      '[Contract address status]',
+      overrides.employeeAddressStatus?.trim()
+        || (address ? 'Verified Irish residential address included.' : 'No Irish residential address included.'),
+    ]);
+    replacements.push(['[Insert employee address]', address]);
+    replacements.push(['[Employee address]', address]);
   }
   if (overrides.startDate) {
     const formatted = new Date(overrides.startDate).toLocaleDateString('en-IE', {
