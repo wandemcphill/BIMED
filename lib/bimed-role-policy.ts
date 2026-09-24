@@ -110,7 +110,14 @@ export function applyBimedContractDefaults(
 ): ContractTemplate {
   const startDate = BIMED_DEFAULT_START_DATE;
   const employeeName = overrides?.employeeName?.trim() || 'Employee name to be confirmed before issue';
-  const employeeAddress = overrides?.employeeAddress?.trim() || 'Employee address to be confirmed before issue';
+  const providedEmployeeAddress = overrides?.employeeAddress?.trim() || '';
+  const employeeAddress = providedEmployeeAddress || 'Not stated in canonical template until BIMED verification';
+  const employeeAddressClause = providedEmployeeAddress
+    ? \`of \${providedEmployeeAddress}\`
+    : '(Irish residential address not stated until verified)';
+  const contractAddressStatus = providedEmployeeAddress
+    ? 'Irish residential address supplied for rendering; BIMED verification required before issue.'
+    : 'No Irish residential address stated in the canonical template until BIMED verification.';
 
   const roleSlug = template.roleSlug as CanonicalRecruitmentRoleSlug;
   const roleSalary = BIMED_ROLE_SALARIES[roleSlug];
@@ -118,8 +125,11 @@ export function applyBimedContractDefaults(
   const replacements: Array<[string, string]> = [
     ['[Insert employee name]', employeeName],
     ['[Employee full name]', employeeName],
-    ['[Insert employee address]', employeeAddress],
-    ['[Employee address]', employeeAddress],
+    ['[Insert employee address]', providedEmployeeAddress],
+    ['[Employee address]', providedEmployeeAddress],
+    ['[Insert Irish residential address if verified]', employeeAddress],
+    ['[Employee address clause]', employeeAddressClause],
+    ['[Contract address status]', contractAddressStatus],
     ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[Insert start date]', startDate],
@@ -185,6 +195,19 @@ export function applyBimedContractDefaults(
   }
 
   const sections = template.sections.map((section) => applySectionReplacements(section, replacements));
+  const schedules = template.schedules.map((section) => applySectionReplacements(section, replacements));
+
+  if (roleSlug === 'physiotherapist') {
+    const permitSchedule = schedules.find(
+      (section) => section.heading === 'Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address'
+    );
+    if (permitSchedule && !permitSchedule.paragraphs.some((paragraph) => paragraph.includes('intended permit pathway is Critical Skills Employment Permit (CSEP)'))) {
+      permitSchedule.paragraphs.push(
+        'Where an employment permit is required for this Role, the Company\'s intended permit pathway is Critical Skills Employment Permit (CSEP), subject to DETE eligibility and final assessment. This statement does not guarantee permit eligibility or grant.'
+      );
+    }
+  }
+
   const commencementSection = sections.find((section) => section.heading === '2. Commencement of Employment and Probation');
   if (commencementSection && !commencementSection.paragraphs.some((paragraph) => paragraph.startsWith('2.6 Contract duration:'))) {
     commencementSection.paragraphs.push(`2.6 Contract duration: ${BIMED_DEFAULT_CONTRACT_DURATION}. The fixed term ends on 10 January 2029 unless a candidate-specific written variation expressly changes the term.`);
@@ -201,7 +224,7 @@ export function applyBimedContractDefaults(
     ...template,
     editableFields,
     sections,
-    schedules: template.schedules.map((section) => applySectionReplacements(section, replacements)),
+    schedules,
     closingNote: replaceText(template.closingNote, replacements),
   };
 }
