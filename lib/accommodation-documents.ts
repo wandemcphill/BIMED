@@ -6,7 +6,7 @@ import {
   permitTypeLabel,
   type AccommodationPermitSelection,
 } from '@/lib/employment-permit-options';
-import { ACCOMMODATION_PAYMENT_ACCOUNT, ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl } from '@/lib/accommodation-billing';
+import { ACCOMMODATION_ONLINE_PAYMENT_URL, ACCOMMODATION_PAYMENT_ACCOUNT, ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl } from '@/lib/accommodation-billing';
 import { ACCOMMODATION_GBP_RATE_SOURCE, accommodationGbpEquivalent } from '@/lib/employment-permit-options';
 
 function e(value: unknown) {
@@ -142,6 +142,11 @@ function documentStyles() {
     .status-box .amount { margin-top:5px; font-size:29px; font-weight:900; color:#065f46; }
     .footer { margin-top:28px; padding-top:14px; border-top:1px solid #e4eaee; color:#78909c; font-size:10px; line-height:1.5; }
     .button { display:inline-block; margin-top:22px; padding:11px 16px; border-radius:8px; background:#0f766e; color:#fff; text-decoration:none; font-size:12px; font-weight:800; }
+    .payment-card { margin-top:22px; padding:18px; border:1px solid #b9d9df; border-radius:12px; background:#f1fbfd; }
+    .payment-card h3 { margin:0; color:#163247; font-size:16px; }
+    .payment-card p { margin:7px 0 0; color:#334e68; font-size:12px; line-height:1.55; }
+    .payment-card .pay-button { display:inline-block; margin-top:12px; padding:11px 16px; border-radius:8px; background:#0a8ec6; color:#fff; text-decoration:none; font-size:12px; font-weight:900; }
+    .payment-card .pay-url { margin-top:8px; color:#0a5d78; font-size:10px; overflow-wrap:anywhere; }
     @media (max-width:700px) { .inner { padding:28px 22px 30px; } .masthead { flex-direction:column; } .doc-title { text-align:left; } .meta-grid,.detail-grid { grid-template-columns:1fr; } }
     @media print { body { background:#fff; } .sheet { margin:0; max-width:none; border:0; box-shadow:none; } .button { display:none; } }
   </style>`;
@@ -193,6 +198,12 @@ export function invoiceHtml(input: { invoice: any; staff: any; publicUrl?: strin
       <div class="notice"><strong>GBP payment option:</strong> Candidates who prefer to pay in British pounds may use the indicative equivalent of <strong>£${accommodationGbpEquivalent(Number(input.invoice.amount_eur)).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP</strong> for this invoice, based on ${e(ACCOMMODATION_GBP_RATE_SOURCE)}. The contractual accommodation amount remains <strong>€${Number(input.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong>. Bank conversion charges or rate changes may affect the final amount actually credited.</div>
       ${arrangementPanel(selection)}
       <section class="section"><h2>Payment details</h2><div class="detail-grid">${accountRows.map(([label, value]) => `<div class="detail-row"><span>${e(label)}</span><strong>${e(value)}</strong></div>`).join('')}</div></section>
+      <section class="payment-card">
+        <h3>Pay this invoice online</h3>
+        <p>Use the secure online checkout below to pay the accommodation invoice. The invoice amount remains the contractual EUR amount shown above.</p>
+        <a class="pay-button" href="${ACCOMMODATION_ONLINE_PAYMENT_URL}" target="_blank" rel="noopener noreferrer">Pay online securely</a>
+        <div class="pay-url">${e(ACCOMMODATION_ONLINE_PAYMENT_URL)}</div>
+      </section>
       <section class="terms"><div class="section-kicker">TERMS & CONDITIONS · VERSION ${e(selection.terms_version || ACCOMMODATION_OPTIONS_TERMS_VERSION)}</div><h2>Accommodation arrangement terms</h2><ol>${terms.map((term) => `<li>${e(term)}</li>`).join('')}</ol></section>
       <div class="notice"><strong>Important:</strong> This accommodation arrangement is separate from employment permit and visa decisions made by the relevant authorities. Payment does not guarantee permit approval, visa approval, entry to Ireland, right to work or continued employment.</div>
       ${signatureBlock(input.invoice.issued_at || input.invoice.issue_date, 'Authorised by')}
