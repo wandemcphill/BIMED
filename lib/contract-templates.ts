@@ -131,8 +131,8 @@ function buildTemplate(
         '2.4 During probation, either party may end this contract by giving the notice set out in Clause 11 (Notice and Termination). Where the reason for ending your employment during probation relates to conduct or performance, the Company will still tell you the reason and give you a fair opportunity to respond, even where the full procedure in Clause 13 is not followed in full.',
         '2.5 The Company will confirm the successful completion of your probation to you in writing.',
       ]),
-      section('3. Place of Work', [
-        `3.1 Your normal place of work is ${workLocation}, and any other location the Company may reasonably require, given the nature of home and domiciliary care work.`,
+      section('3. Place of Primary Assignment and Work Location', [
+        `3.1 Your Place of Primary Assignment is ${workLocation}, and you may also be required to work at another location the Company may reasonably require, given the nature of home and domiciliary care work.`,
         '3.2 You may be required to travel between client locations in the course of your duties. No mileage or travel allowance applies unless separately agreed in writing.',
       ]),
       section('4. Hours of Work', [
