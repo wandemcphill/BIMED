@@ -615,6 +615,75 @@ export async function POST(request: NextRequest) {
     }, { status: 200 });
   }
 
+  if (action === 'request_shared_accommodation_match') {
+    if (!['three_months_shared_2000', 'one_month_shared_625'].includes(body?.accommodation_plan)) {
+      return NextResponse.json({ error: 'Select a shared accommodation plan first.' }, { status: 400 });
+    }
+    if (body?.acknowledged !== true) {
+      return NextResponse.json({ error: 'Please confirm the shared accommodation terms before continuing.' }, { status: 400 });
+    }
+    let selection;
+    try {
+      selection = validateAccommodationSelection({
+        plan: body.accommodation_plan,
+        route: body.permit_submission_route,
+        roleValue: application?.role_applied,
+      });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'INVALID_ACCOMMODATION_SELECTION';
+      const messages: Record<string, string> = {
+        INVALID_ACCOMMODATION_PLAN: 'Select a shared accommodation plan.',
+        INVALID_PERMIT_SUBMISSION_ROUTE: 'Select who will submit and pay the employment permit application.',
+        UNSUPPORTED_RECRUITMENT_ROLE: 'Your recruitment role is not currently configured for an employment-permit route.',
+      };
+      return NextResponse.json({ error: messages[code] || 'The shared accommodation selection could not be validated.' }, { status: 400 });
+    }
+    let result: any;
+    try {
+      result = await client.rpc('bimed_request_shared_accommodation_match', {
+        p_staff_id: staff.id,
+        p_actor: session.email,
+        p_terms_version: ACCOMMODATION_OPTIONS_TERMS_VERSION,
+        p_accommodation_plan: selection.accommodation_plan,
+        p_permit_submission_route: selection.permit_submission_route,
+        p_permit_type: selection.permit_type,
+        p_permit_fee_eur: selection.permit_fee_eur,
+        p_permit_duration_months: selection.permit_duration_months,
+        p_selection_snapshot: selection,
+        p_partner_identifier: typeof body?.partner_identifier === 'string' ? body.partner_identifier.trim() : '',
+        p_bill_to_email: application?.email || staff.email || '',
+        p_invoice_number: makeInvoiceNumber(),
+        p_public_token: makePublicToken(),
+        p_due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      });
+      if (result.error || !result.data) throw result.error || new Error('Unable to record the shared accommodation request.');
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      const mapped: Record<string, { message: string; status: number }> = {
+        STAFF_NOT_FOUND: { message: 'Your BIMED staff record could not be found.', status: 404 },
+        STAFF_NOT_ELIGIBLE_FOR_ACCOMMODATION: { message: 'Your BIMED accommodation workspace is not currently eligible for this request.', status: 409 },
+        PERMIT_CASE_NOT_FOUND: { message: 'Your employment-permit case has not been initialized. BIMED needs to review the account.', status: 409 },
+        SHARED_ACCOMMODATION_SELECTION_NOT_AVAILABLE: { message: 'The accommodation selection has already been recorded or has progressed beyond the shared-plan request stage. Refresh the page to see the current status.', status: 409 },
+        SHARED_ACCOMMODATION_INVOICE_ALREADY_EXISTS: { message: 'An accommodation invoice already exists for this case. Refresh the page to continue with the existing arrangement.', status: 409 },
+      };
+      const handled = mapped[reason];
+      console.error(JSON.stringify({ level: 'error', event: 'shared_accommodation_match_request_failed', staff_id: staff.id, reason }));
+      return NextResponse.json({ error: handled?.message || 'Unable to record the shared accommodation request. No partial change was saved.' }, { status: handled?.status || 500 });
+    }
+    const { data: createdInvoice } = await client.from('recruitment_accommodation_invoices').select('*').eq('id', result.data.invoice_id).maybeSingle();
+    if (!createdInvoice) return NextResponse.json({ error: 'The shared accommodation invoice could not be loaded after the request was saved. BIMED has been notified.' }, { status: 500 });
+    try {
+      await issueAccommodationInvoice({ client, invoice: createdInvoice, staff, application, permit, actor: session.email, automatic: true });
+    } catch (error) {
+      console.error(JSON.stringify({ level: 'error', event: 'shared_accommodation_pending_invoice_issue_failed', staff_id: staff.id, invoice_id: createdInvoice.id, reason: error instanceof Error ? error.message : String(error) }));
+      await createStaffNotification(client, { staffId: staff.id, category: 'billing', title: 'Shared accommodation request recorded', body: 'Your shared accommodation request was recorded, but BIMED billing could not issue the accommodation invoice automatically. The request is preserved for review.', actionUrl: '/staff/permit' });
+      return NextResponse.json({ error: 'Your shared accommodation request was recorded, but BIMED could not issue the invoice automatically. BIMED will review the billing record.', recoveryAvailable: true }, { status: 502 });
+    }
+    await createStaffNotification(client, { staffId: staff.id, category: 'billing', title: 'Shared accommodation request received', body: 'Your shared accommodation plan has been recorded. BIMED will arrange or assign the eligible sharing partner. Your accommodation invoice is available in the portal.', actionUrl: '/staff/permit' });
+    const { data: updatedPermit } = await client.from('recruitment_staff_permit_cases').select('*').eq('id', result.data.permit_id).single();
+    const { data: issued } = await client.from('recruitment_accommodation_invoices').select('id,invoice_number,status,public_token').eq('id', createdInvoice.id).single();
+    return NextResponse.json({ permit: updatedPermit || permit, invoice: issued || { id: createdInvoice.id, invoice_number: createdInvoice.invoice_number, status: createdInvoice.status }, invoiceUrl: issued ? `${appUrl()}/invoices/accommodation/${issued.public_token}` : null, sharedMatchPending: true }, { status: 201 });
+  }
   if (action === 'acknowledge_shared_accommodation') {
     if (body?.acknowledged !== true) {
       return NextResponse.json({ error: 'Please confirm the shared accommodation terms before continuing.' }, { status: 400 });

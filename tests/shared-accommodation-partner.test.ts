@@ -16,6 +16,8 @@ describe('BIMED shared accommodation partner flow', () => {
 
     expect(route).toContain("if (action === 'acknowledge_shared_accommodation')");
     expect(route).toContain("bimed_acknowledge_shared_accommodation_options");
+    expect(route).toContain("if (action === 'request_shared_accommodation_match')");
+    expect(route).toContain("bimed_request_shared_accommodation_match");
     expect(route).toContain('p_partner_identifier');
     expect(route).toContain("if (action === 'link_existing_shared_accommodation_partner')");
     expect(route).toContain("bimed_link_existing_shared_accommodation_partner");
@@ -68,6 +70,17 @@ describe('BIMED shared accommodation partner flow', () => {
     expect(page).toContain('Retry shared invoice issuance');
     expect(page).toContain('BILLING RECOVERY');
     expect(page).toContain('sharedBillingRecovery?.needsRecovery');
+  });
+
+  it('allows BIMED-assisted partner matching without requiring a partner identifier up front', async () => {
+    const [migration, page] = await Promise.all([
+      fs.readFile('supabase/migrations/20260924180000_fix_accommodation_selection_and_shared_match.sql', 'utf8'),
+      fs.readFile('app/staff/permit/page.tsx', 'utf8'),
+    ]);
+    expect(migration).toContain('bimed_request_shared_accommodation_match');
+    expect(migration).toContain("shared_match_status', 'pending_bimed_match'");
+    expect(page).toContain('You do not need to know another BIMED candidate before selecting this plan.');
+    expect(page).toContain('request_shared_accommodation_match');
   });
 
   it('locks shared invitees to the arrangement they were assigned', async () => {
