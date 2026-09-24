@@ -73,7 +73,8 @@ export default function StaffPermitPage() {
   }
   useEffect(() => { void load(); }, []);
 
-  const currentPlan = selectedPlan || permit?.accommodation_plan || 'three_months_4000';
+  const persistedPlan = (permit?.accommodation_plan || '') as AccommodationOption['accommodation_plan'] | '';
+  const currentPlan = selectedPlan || persistedPlan;
   const availablePlans = useMemo(() => ['three_months_4000', 'three_months_shared_2000', 'one_month_1250', 'one_month_shared_625'] as const, []);
   const selectedOption = useMemo(() => options.find((option) => option.accommodation_plan === selectedPlan && option.permit_submission_route === selectedRoute) || null, [options, selectedPlan, selectedRoute]);
   const termsAcknowledged = Boolean(permit?.accommodation_terms_acknowledged_at);
@@ -388,12 +389,20 @@ export default function StaffPermitPage() {
           const option = options.find((item) => item.accommodation_plan === plan && item.permit_submission_route === (selectedRoute || 'bimed_legal_team')) || options.find((item) => item.accommodation_plan === plan);
           if (!option) return null;
           const selected = currentPlan === plan;
-          return <button key={plan} type='button' disabled={planLocked || busy || sharedPartner} onClick={() => { setSelectedPlan(plan); if (changePlanMode) setAcknowledged(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', border: selected ? '2px solid #0f766e' : '1px solid #d9e2ec', borderRadius: 14, padding: 16, background: selected ? '#f0fdfa' : '#fff', cursor: planLocked ? 'default' : 'pointer', color: '#102a43' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}><div><div style={{ fontSize: 12, fontWeight: 900, color: '#0f766e', letterSpacing: .6 }}>{plan === 'three_months_4000' ? '3-MONTH PLAN' : plan === 'three_months_shared_2000' ? '3-MONTH SHARED PLAN' : plan === 'one_month_shared_625' ? '1-MONTH SHARED PLAN' : '1-MONTH PLAN'}</div><h3 style={{ margin: '4px 0 4px', fontSize: 22 }}>{option.accommodation_plan_label}</h3></div>{selected && <span style={{ fontSize: 11, fontWeight: 900, background: '#ccfbf1', padding: '5px 8px', borderRadius: 999 }}>SELECTED</span>}</div><p style={{ lineHeight: 1.6, margin: '8px 0', color: '#334e68' }}>{option.accommodation_summary}</p><p style={{ lineHeight: 1.6, margin: 0, color: '#627d98' }}>{option.subsequent_accommodation}</p><div style={{ marginTop: 12, padding: 10, borderRadius: 10, background: '#f8fafc', color: '#334e68', fontSize: 13 }}><strong>{plan === 'three_months_4000' || plan === 'three_months_shared_2000' ? 'Probationary period:' : plan === 'one_month_shared_625' ? 'Shared training month:' : 'Training month:'}</strong> {option.training_summary}</div></button>;
+          const selectable = !planLocked && !busy && !sharedPartner;
+          return <button key={plan} type='button' disabled={!selectable} aria-pressed={selected} onClick={() => { setSelectedPlan(plan); setError(''); if (changePlanMode) { setAcknowledged(false); setSelectedRoute(permit.permit_submission_route || ''); } }} style={{ display: 'block', width: '100%', textAlign: 'left', border: selected ? '2px solid #0f766e' : '1px solid #d9e2ec', borderRadius: 14, padding: 16, background: selected ? '#f0fdfa' : '#fff', cursor: selectable ? 'pointer' : 'default', color: '#102a43', opacity: selectable ? 1 : 0.72 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}><div><div style={{ fontSize: 12, fontWeight: 900, color: '#0f766e', letterSpacing: .6 }}>{plan === 'three_months_4000' ? '3-MONTH PLAN' : plan === 'three_months_shared_2000' ? '3-MONTH SHARED PLAN' : plan === 'one_month_shared_625' ? '1-MONTH SHARED PLAN' : '1-MONTH PLAN'}</div><h3 style={{ margin: '4px 0 4px', fontSize: 22 }}>{option.accommodation_plan_label}</h3></div>{selected && <span style={{ fontSize: 11, fontWeight: 900, background: '#ccfbf1', padding: '5px 8px', borderRadius: 999 }}>SELECTED</span>}</div><p style={{ lineHeight: 1.6, margin: '8px 0', color: '#334e68' }}>{option.accommodation_summary}</p><p style={{ lineHeight: 1.6, margin: 0, color: '#627d98' }}>{option.subsequent_accommodation}</p><div style={{ marginTop: 12, padding: 10, borderRadius: 10, background: '#f8fafc', color: '#334e68', fontSize: 13 }}><strong>{plan === 'three_months_4000' || plan === 'three_months_shared_2000' ? 'Probationary period:' : plan === 'one_month_shared_625' ? 'Shared training month:' : 'Training month:'}</strong> {option.training_summary}</div></button>;
         })}
       </div></section>
 
-      <section style={{ ...card, marginTop: 18 }}><h2 style={{ marginTop: 0 }}>2. Choose who submits and pays the employment permit</h2><p style={muted}>The permit type is not a user choice. BIMED derives it from your recruitment role and applies the relevant route. The current application fee guidance is €1,000 for a permit covering more than 6 months up to 24 months.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,420px),1fr))', gap: 14, marginTop: 14 }}>
-        {(['candidate_or_agency','bimed_legal_team'] as const).map((route) => {
+      <section style={{ ...card, marginTop: 18 }}>
+        <h2 style={{ marginTop: 0 }}>2. Choose who submits and pays the employment permit</h2>
+        {!selectedPlan && !termsAcknowledged ? (
+          <div style={{ marginTop: 10, padding: 14, borderRadius: 12, background: '#fffbeb', color: '#854d0e', lineHeight: 1.6 }}>
+            <strong>Select an accommodation plan first.</strong> Your permit submission options will appear here after you choose a plan.
+          </div>
+        ) : null}
+        <p style={muted}>The permit type is not a user choice. BIMED derives it from your recruitment role and applies the relevant route. The current application fee guidance is €1,000 for a permit covering more than 6 months up to 24 months.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,420px),1fr))', gap: 14, marginTop: 14 }}>
+        {selectedPlan && (['candidate_or_agency','bimed_legal_team'] as const).map((route) => {
           const option = options.find((item) => item.accommodation_plan === (selectedPlan || currentPlan) && item.permit_submission_route === route);
           if (!option) return null;
           const selected = (selectedRoute || permit.permit_submission_route) === route;
@@ -427,18 +436,18 @@ export default function StaffPermitPage() {
           <p style={{ lineHeight: 1.7 }}>Choose the accommodation plan and permit submission route before BIMED issues your invoice. The amount shown here always matches the plan currently selected above.</p>
           {isSharedAccommodationPlan(selectedPlan as any) && <div style={{ margin: '12px 0', padding: 14, borderRadius: 12, background: '#fff7ed', border: '1px solid #fed7aa', color: '#7c2d12', lineHeight: 1.65 }}>
             <strong>Shared accommodation</strong>
-            <div style={{ marginTop: 5 }}>Your invoice will be half of the selected arrangement: <strong>€{currentSharedTotal ? (currentSharedTotal / 2).toLocaleString('en-IE', { minimumFractionDigits: 2 }) : '—'} EUR</strong>. Your sharing candidate will receive their own linked invoice for the same amount.</div>
+            <div style={{ marginTop: 5 }}>Your share is <strong>€{currentSharedTotal ? (currentSharedTotal / 2).toLocaleString('en-IE', { minimumFractionDigits: 2 }) : '—'} EUR</strong>. You do not need to know another BIMED candidate before selecting this plan. BIMED can arrange the sharing partner after your request is recorded.</div>
             <label style={{ display: 'block', marginTop: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 900, color: '#7c2d12' }}>BIMED ID or BIMED email of the candidate sharing with you</div>
-              <input value={partnerIdentifier} onChange={(e) => setPartnerIdentifier(e.target.value)} placeholder="e.g. BH-001245 or candidate@bimedhealthcare.com" style={{ ...input, marginTop: 7 }} />
+              <div style={{ fontSize: 12, fontWeight: 900, color: '#7c2d12' }}>Already have a BIMED candidate to share with? (Optional)</div>
+              <input value={partnerIdentifier} onChange={(e) => setPartnerIdentifier(e.target.value)} placeholder="BIMED ID or candidate@bimedhealthcare.com" style={{ ...input, marginTop: 7 }} />
             </label>
           </div>}
           <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: '#334e68', lineHeight: 1.6 }}>
             <input type='checkbox' checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} style={{ marginTop: 5, flexShrink: 0 }} />
             <span>I understand the selected accommodation arrangement, the applicable refund trigger, who will submit and pay the employment permit, the permit fee, and that immigration/permit approvals remain subject to the relevant authorities.</span>
           </label>
-          <button disabled={busy || !selectedOption || !acknowledged || (isSharedAccommodationPlan(selectedPlan as any) && !partnerIdentifier.trim())} onClick={() => void acknowledgeAccommodation()} style={{ ...button, width: '100%', maxWidth: 720, opacity: busy || !selectedOption || !acknowledged || (isSharedAccommodationPlan(selectedPlan as any) && !partnerIdentifier.trim()) ? 0.55 : 1 }}>
-            {busy ? 'Recording…' : isSharedAccommodationPlan(selectedPlan as any) ? 'Confirm shared plan and issue both invoices' : 'Confirm selections and issue accommodation invoice'}
+          <button disabled={busy || !selectedOption || !acknowledged} onClick={() => void acknowledgeAccommodation()} style={{ ...button, width: '100%', maxWidth: 720, opacity: busy || !selectedOption || !acknowledged ? 0.55 : 1 }}>
+            {busy ? 'Recording…' : isSharedAccommodationPlan(selectedPlan as any) ? (partnerIdentifier.trim() ? 'Confirm shared plan and issue both invoices' : 'Confirm shared plan and request BIMED partner match') : 'Confirm selections and issue accommodation invoice'}
           </button>
         </> : sharedPrimaryUnlinked ? <>
           <p style={{ lineHeight: 1.7 }}>Your shared accommodation plan is recorded, but the sharing candidate has not yet been linked. Enter their BIMED ID or BIMED email below. BIMED will create their matching invoice and notify them.</p>
