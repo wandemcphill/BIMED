@@ -18,7 +18,7 @@ export default async function HealthcareAssistantContractPage({ searchParams }: 
   const { applicationId } = await searchParams;
   const result = await resolveContractTemplate('healthcare-assistant', applicationId);
 
-  if (result.status === 'unauthorized' || result.status === 'not_found') {
+  if (result.status === 'unauthorized' || result.status === 'not_found' || result.status === 'blocked') {
     return <ContractAccessGate reason={result.status} />;
   }
 
