@@ -74,7 +74,7 @@ describe('BIMED shared accommodation partner flow', () => {
 
   it('allows BIMED-assisted partner matching without requiring a partner identifier up front', async () => {
     const [migration, page] = await Promise.all([
-      fs.readFile('supabase/migrations/20260924180000_fix_accommodation_selection_and_shared_match.sql', 'utf8'),
+      fs.readFile('supabase/migrations/20260924171045_fix_accommodation_selection_and_shared_match_20260924.sql', 'utf8'),
       fs.readFile('app/staff/permit/page.tsx', 'utf8'),
     ]);
     expect(migration).toContain('bimed_request_shared_accommodation_match');
