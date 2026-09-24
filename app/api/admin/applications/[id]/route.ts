@@ -60,7 +60,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { id: applicationId } = await context.params;
   const body = validation.data;
   const client = db();
-  const { data: before } = await client.from('recruitment_applications').select('status,email').eq('id', applicationId).maybeSingle();
+  const { data: before } = await client.from('recruitment_applications')
+    .select('status,email,contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by')
+    .eq('id', applicationId)
+    .maybeSingle();
   const previousStatus = before?.status || null;
 
   let staffIdentity: { bimed_id: string; bimed_email: string; activationUrl: string | null; welcomeEmailSent: boolean } | null = null;
@@ -134,8 +137,39 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (result.error || !result.data) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
       data = result.data;
     } else {
-      const updatePayload: Record<string, string> = { updated_at: new Date().toISOString() };
+      const updatePayload: Record<string, string | null> = { updated_at: new Date().toISOString() };
       if (body.notes !== undefined) updatePayload.admin_notes = body.notes;
+
+      if (body.contract_accommodation_option !== undefined) {
+        updatePayload.contract_accommodation_option = body.contract_accommodation_option;
+        if (body.contract_accommodation_option === 'accommodation_not_verified') {
+          updatePayload.verified_irish_residential_address = null;
+          updatePayload.contract_accommodation_verified_at = null;
+          updatePayload.contract_accommodation_verified_by = null;
+        } else if (body.verified_irish_residential_address !== undefined) {
+          updatePayload.verified_irish_residential_address = body.verified_irish_residential_address || null;
+          updatePayload.contract_accommodation_verified_at = new Date().toISOString();
+          updatePayload.contract_accommodation_verified_by = session.email;
+        }
+      } else if (body.verified_irish_residential_address !== undefined) {
+        const existingOption = before?.contract_accommodation_option || 'accommodation_not_verified';
+        if (existingOption !== 'private_accommodation') {
+          return NextResponse.json(
+            { error: 'Select Private Accommodation before recording a verified Irish residential address.' },
+            { status: 400 },
+          );
+        }
+        if (!body.verified_irish_residential_address) {
+          updatePayload.verified_irish_residential_address = null;
+          updatePayload.contract_accommodation_verified_at = null;
+          updatePayload.contract_accommodation_verified_by = null;
+        } else {
+          updatePayload.verified_irish_residential_address = body.verified_irish_residential_address;
+          updatePayload.contract_accommodation_verified_at = new Date().toISOString();
+          updatePayload.contract_accommodation_verified_by = session.email;
+        }
+      }
+
       const result = await client.from('recruitment_applications')
         .update(updatePayload)
         .eq('id', applicationId)
@@ -160,7 +194,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     inviteId: data.invite_id,
     eventType: 'admin_application_updated',
     actor: session.email,
-    metadata: { status: body.status || data.status, previous_status: previousStatus, notes_updated: body.notes !== undefined },
+    metadata: {
+      status: body.status || data.status,
+      previous_status: previousStatus,
+      notes_updated: body.notes !== undefined,
+      contract_accommodation_option: data.contract_accommodation_option || null,
+      contract_address_verified: Boolean(data.contract_accommodation_verified_at && data.verified_irish_residential_address),
+    },
   });
 
   let statusEmail = null;
