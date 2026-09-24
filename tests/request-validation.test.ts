@@ -53,4 +53,22 @@ describe('request validation', () => {
     expect(validateAdminApplicationPatch({ status: 'Interview', notes: 'Ready', notify_candidate: true }).ok).toBe(true);
     expect(validateAdminApplicationPatch({ status: 'not-a-real-status' }).ok).toBe(false);
   });
+
+  it('requires a verified Irish address when Private Accommodation is selected', () => {
+    expect(validateAdminApplicationPatch({
+      contract_accommodation_option: 'private_accommodation',
+      verified_irish_residential_address: '12 Example Street, Dublin, Ireland',
+    }).ok).toBe(true);
+    expect(validateAdminApplicationPatch({
+      contract_accommodation_option: 'private_accommodation',
+    }).ok).toBe(false);
+  });
+
+  it('clears the contract address when Accommodation Not Verified is selected', () => {
+    const result = validateAdminApplicationPatch({
+      contract_accommodation_option: 'accommodation_not_verified',
+      verified_irish_residential_address: null,
+    });
+    expect(result.ok).toBe(true);
+  });
 });
