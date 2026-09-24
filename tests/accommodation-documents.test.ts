@@ -28,6 +28,9 @@ describe('accommodation invoice payment details', () => {
     expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.bic_swift);
     expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.account_number);
     expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.sort_code);
+    expect(html).toContain('https://www.payssion.com/checkout/live_d5a43be9bff6d1a2');
+    expect(html).toContain('href="https://www.payssion.com/checkout/live_d5a43be9bff6d1a2"');
+    expect(html).toContain('Pay online securely');
   });
   it('renders the selected one-month shared €625 terms instead of the legacy €4,000 terms', async () => {
     const { invoiceHtml } = await import('@/lib/accommodation-billing');
