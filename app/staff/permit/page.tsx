@@ -89,13 +89,12 @@ export default function StaffPermitPage() {
   async function acknowledgeAccommodation() {
     if (!selectedPlan || !selectedRoute) { setError('Choose an accommodation plan and a permit submission route first.'); return; }
     if (!acknowledged) { setError('Please confirm that you understand the selected accommodation, payment, refund and permit-route terms.'); return; }
-    if (isSharedAccommodationPlan(selectedPlan) && !partnerIdentifier.trim()) {
-      setError('Enter the BIMED ID or BIMED email of the candidate you will share accommodation with.');
-      return;
-    }
     setBusy(true); setError('');
     try {
-      const action = isSharedAccommodationPlan(selectedPlan) ? 'acknowledge_shared_accommodation' : 'acknowledge_accommodation';
+      const isShared = isSharedAccommodationPlan(selectedPlan);
+      const action = isShared
+        ? (partnerIdentifier.trim() ? 'acknowledge_shared_accommodation' : 'request_shared_accommodation_match')
+        : 'acknowledge_accommodation';
       const response = await fetch('/api/staff/permit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -104,7 +103,7 @@ export default function StaffPermitPage() {
           acknowledged: true,
           accommodation_plan: selectedPlan,
           permit_submission_route: selectedRoute,
-          ...(isSharedAccommodationPlan(selectedPlan) ? { partner_identifier: partnerIdentifier.trim() } : {}),
+          ...(isShared ? { partner_identifier: partnerIdentifier.trim() || null } : {}),
         }),
       });
       const data = await response.json();
