@@ -6,7 +6,7 @@ import {
   permitTypeLabel,
   type AccommodationPermitSelection,
 } from '@/lib/employment-permit-options';
-import { ACCOMMODATION_ONLINE_PAYMENT_URL, ACCOMMODATION_PAYMENT_ACCOUNT, ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl } from '@/lib/accommodation-billing';
+import { ACCOMMODATION_SIGNATORY_NAME, ACCOMMODATION_SIGNATORY_TITLE, appUrl } from '@/lib/accommodation-billing';
 
 function e(value: unknown) {
   return String(value ?? '')
@@ -141,11 +141,8 @@ function documentStyles() {
     .status-box .amount { margin-top:5px; font-size:29px; font-weight:900; color:#065f46; }
     .footer { margin-top:28px; padding-top:14px; border-top:1px solid #e4eaee; color:#78909c; font-size:10px; line-height:1.5; }
     .button { display:inline-block; margin-top:22px; padding:11px 16px; border-radius:8px; background:#0f766e; color:#fff; text-decoration:none; font-size:12px; font-weight:800; }
-    .payment-card { margin-top:22px; padding:18px; border:1px solid #b9d9df; border-radius:12px; background:#f1fbfd; }
-    .payment-card h3 { margin:0; color:#163247; font-size:16px; }
-    .payment-card p { margin:7px 0 0; color:#334e68; font-size:12px; line-height:1.55; }
-    .payment-card .pay-button { display:inline-block; margin-top:12px; padding:11px 16px; border-radius:8px; background:#0a8ec6; color:#fff; text-decoration:none; font-size:12px; font-weight:900; }
-    .payment-card .pay-url { margin-top:8px; color:#0a5d78; font-size:10px; overflow-wrap:anywhere; }
+    .payment-instructions { margin-top:22px; }
+    .payment-instructions .notice { margin-top:0; }
     @media (max-width:700px) { .inner { padding:28px 22px 30px; } .masthead { flex-direction:column; } .doc-title { text-align:left; } .meta-grid,.detail-grid { grid-template-columns:1fr; } }
     @media print { body { background:#fff; } .sheet { margin:0; max-width:none; border:0; box-shadow:none; } .button { display:none; } }
   </style>`;
@@ -174,18 +171,6 @@ function arrangementPanel(selection: any) {
 export function invoiceHtml(input: { invoice: any; staff: any; publicUrl?: string }) {
   const selection = selectionForInvoice(input.invoice);
   const publicUrl = input.publicUrl || `${appUrl()}/invoices/accommodation/${input.invoice.public_token}`;
-  // Always render the current canonical payment account so historical snapshots cannot reintroduce retired payment instructions.
-  const account = ACCOMMODATION_PAYMENT_ACCOUNT;
-  const accountRows = [
-    ['Account name', account.account_name],
-    ['Bank', account.bank_name],
-    ['IBAN', account.iban],
-    ['BIC / SWIFT', account.bic_swift],
-    ['Account number', account.account_number],
-    ['Sort code', account.sort_code],
-    ['Branch', account.branch_details],
-    ['Payment reference', account.payment_reference_instructions || input.invoice.invoice_number],
-  ].filter(([, value]) => value);
   const terms = termsForSelection(selection);
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${e(input.invoice.invoice_number)} · BIMED Healthcare</title>${documentStyles()}</head><body>
@@ -195,15 +180,9 @@ export function invoiceHtml(input: { invoice: any; staff: any; publicUrl?: strin
       <div class="meta-grid"><div class="panel"><div class="kicker">BILLED TO</div><strong>${e(input.invoice.bill_to_name || input.staff.full_name)}</strong><p>${e(input.invoice.bill_to_email || input.staff.email || '')}</p><p>BIMED ID: ${e(input.staff.bimed_id || '')}</p></div><div class="panel"><div class="kicker">ARRANGEMENT</div><strong>€${Number(input.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong><p>${e(selection.accommodation_plan_label || accommodationPlanLabel(selection.accommodation_plan))}</p><p>${e(selection.accommodation_summary || '')}</p></div></div>
       <div class="summary"><table><thead><tr><th>Description</th><th>Amount</th></tr></thead><tbody><tr><td>${e(input.invoice.description)}</td><td>€${Number(input.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })}</td></tr></tbody><tfoot><tr class="total"><td>TOTAL DUE</td><td>€${Number(input.invoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })}</td></tr></tfoot></table></div>
       ${arrangementPanel(selection)}
-      <section class="section"><h2>Payment details</h2><div class="detail-grid">${accountRows.map(([label, value]) => `<div class="detail-row"><span>${e(label)}</span><strong>${e(value)}</strong></div>`).join('')}</div>
-        <div class="notice"><strong>Bank transfer verification:</strong> Bank-transfer payments to WebGeek Technologies are normally verified within 1–3 working days. International payments may require additional banking checks.</div>
-        <div class="notice"><strong>Online payment processing:</strong> International payments made through the online payment link can take up to 15 working days to be received and settled.</div>
-      </section>
-      <section class="payment-card">
-        <h3>Pay this invoice online</h3>
-        <p>Use the secure online checkout below to pay the accommodation invoice. The invoice amount remains the contractual EUR amount shown above.</p>
-        <a class="pay-button" href="${ACCOMMODATION_ONLINE_PAYMENT_URL}" target="_blank" rel="noopener noreferrer">Pay online securely</a>
-        <div class="pay-url">${e(ACCOMMODATION_ONLINE_PAYMENT_URL)}</div>
+      <section class="section payment-instructions">
+        <h2>Payment instructions</h2>
+        <div class="notice"><strong>Payment details are not included on this invoice.</strong> When you are ready to proceed with payment, please email <strong>manager@bimedhealthcare.com</strong> directly to request the current payment account details and payment instructions.</div>
       </section>
       <section class="terms"><div class="section-kicker">TERMS & CONDITIONS · VERSION ${e(selection.terms_version || ACCOMMODATION_OPTIONS_TERMS_VERSION)}</div><h2>Accommodation arrangement terms</h2><ol>${terms.map((term) => `<li>${e(term)}</li>`).join('')}</ol></section>
       <div class="notice"><strong>Important:</strong> This accommodation arrangement is separate from employment permit and visa decisions made by the relevant authorities. Payment does not guarantee permit approval, visa approval, entry to Ireland, right to work or continued employment.</div>

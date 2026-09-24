@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { appUrl, ACCOMMODATION_PAYMENT_ACCOUNT, sendAccommodationEmail } from '@/lib/accommodation-billing';
+import { appUrl, sendAccommodationEmail } from '@/lib/accommodation-billing';
 import { accommodationGbpEquivalent } from '@/lib/employment-permit-options';
 import { createStaffAudit, createStaffNotification } from '@/lib/staff';
 
@@ -43,33 +43,13 @@ export async function issueAccommodationInvoice(input: {
     };
   }
 
-  const { data: account } = await client
-    .from('recruitment_payment_accounts')
-    .select('*')
-    .eq('is_active', true)
-    .maybeSingle();
-
-  const accountSnapshot = account
-    ? {
-        account_name: account.account_name,
-        bank_name: account.bank_name,
-        iban: account.iban,
-        bic_swift: account.bic_swift,
-        account_number: account.account_number,
-        sort_code: account.sort_code,
-        branch_details: account.branch_details,
-        payment_reference_instructions: account.payment_reference_instructions,
-        currency: account.currency,
-      }
-    : ACCOMMODATION_PAYMENT_ACCOUNT;
-
   const dueDate = invoice.due_date || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
   const { data: atomicResult, error: invoiceError } = await client.rpc('bimed_issue_accommodation_invoice', {
     p_invoice_id: invoice.id,
     p_actor: actor,
     p_due_date: dueDate,
-    p_payment_account_snapshot: accountSnapshot,
+    p_payment_account_snapshot: null,
   });
 
   if (invoiceError || !atomicResult?.invoice) {
@@ -86,8 +66,7 @@ export async function issueAccommodationInvoice(input: {
   }
 
   const publicUrl = `${appUrl()}/invoices/accommodation/${updatedInvoice.public_token}`;
-  const candidateEmail = application?.email || staff.email;
-  const recipients = Array.from(new Set([candidateEmail, 'overseas@bimedhealthcare.com', 'manager@bimedhealthcare.com'].filter(Boolean)));
+  const recipients = ['info@bimedhealthcare.com', 'manager@bimedhealthcare.com'];
   const shared = updatedInvoice.arrangement_snapshot?.shared === true;
   const otherCandidateName = updatedInvoice.arrangement_snapshot?.share_role === 'partner'
     ? updatedInvoice.arrangement_snapshot?.primary_name
@@ -102,11 +81,11 @@ export async function issueAccommodationInvoice(input: {
       subject: shared ? `BIMED shared accommodation invoice ${updatedInvoice.invoice_number} is ready` : `BIMED accommodation invoice ${updatedInvoice.invoice_number} is ready`,
       html: `<div style="font-family:Arial,sans-serif;color:#172b4d">
         <h2>${shared ? 'Your BIMED shared accommodation invoice is ready' : 'Your BIMED accommodation invoice is ready'}</h2>
-        <p>Hello ${staff.full_name},</p>
-        <p>${shared ? `Your shared accommodation arrangement is linked to <strong>${otherCandidateName || 'another BIMED candidate'}</strong>. Shared arrangement reference: <strong>${sharedReference || '—'}</strong>. Total accommodation arrangement: <strong>€${totalArrangement.toLocaleString('en-IE', { minimumFractionDigits: 2 })}</strong>. Your invoice is your <strong>50% share</strong>.` : ''}</p><p>Your accommodation invoice <strong>${updatedInvoice.invoice_number}</strong> for <strong>€${Number(updatedInvoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong> has been issued.</p>
-        <p>Please open the invoice in the BIMED Staff Portal to review the accommodation terms, your share, amount due, and the official payment details.</p>
+        <p>Hello BIMED Team,</p>
+        <p><strong>${staff.full_name}</strong> (${staff.bimed_id}) has an accommodation invoice <strong>${updatedInvoice.invoice_number}</strong> for <strong>€${Number(updatedInvoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR</strong>.</p><p>${shared ? `The shared accommodation arrangement is linked to <strong>${otherCandidateName || 'another BIMED candidate'}</strong>. Shared arrangement reference: <strong>${sharedReference || '—'}</strong>. Total accommodation arrangement: <strong>€${totalArrangement.toLocaleString('en-IE', { minimumFractionDigits: 2 })}</strong>; the invoice represents the candidate's <strong>50% share</strong>.` : 'The invoice reflects the accommodation and permit selections recorded in the Staff Portal.'}</p>
+        <p>Please open the invoice in the BIMED Staff Portal to review the accommodation selection, your share, amount due, and terms.</p>
         <p><a href="${publicUrl}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f766e;color:#fff;text-decoration:none;font-weight:800">Open accommodation invoice</a></p>
-        <p style="font-size:12px;color:#627d98">For security and accuracy, the bank account and payment instructions are displayed on the portal invoice itself rather than repeated in this email.</p>
+        <p style="font-size:12px;color:#627d98">Payment account details are not included on the invoice. When you are ready to proceed with payment, email manager@bimedhealthcare.com directly to request the current payment details and instructions.</p>
       </div>`,
     });
   } catch (error) {
@@ -123,7 +102,7 @@ export async function issueAccommodationInvoice(input: {
     staffId: staff.id,
     category: 'billing',
     title: automatic ? 'Accommodation invoice issued automatically' : 'Accommodation invoice issued',
-    body: `Your accommodation invoice ${updatedInvoice.invoice_number} for €${Number(updatedInvoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR (GBP equivalent ≈ £${accommodationGbpEquivalent(Number(updatedInvoice.amount_eur)).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP) has been issued. Open the invoice from the Staff Portal to review the payment details and terms.`,
+    body: `Your accommodation invoice ${updatedInvoice.invoice_number} for €${Number(updatedInvoice.amount_eur).toLocaleString('en-IE', { minimumFractionDigits: 2 })} EUR (GBP equivalent ≈ £${accommodationGbpEquivalent(Number(updatedInvoice.amount_eur)).toLocaleString('en-GB', { minimumFractionDigits: 2 })} GBP) has been issued. Open the invoice from the Staff Portal to review your selected accommodation arrangement, amount and terms. Email manager@bimedhealthcare.com when you are ready to request payment details.`,
     actionUrl: `/invoices/accommodation/${updatedInvoice.public_token}`,
   });
 

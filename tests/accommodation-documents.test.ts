@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ACCOMMODATION_PAYMENT_ACCOUNT } from '@/lib/accommodation-billing';
 import { invoiceHtml } from '@/lib/accommodation-documents';
 
 describe('accommodation invoice payment details', () => {
-  it('includes the canonical account details when an invoice has no snapshot', () => {
+  it('does not expose bank account details or an online payment link', () => {
     const html = invoiceHtml({
       invoice: {
         invoice_number: 'BIMED-ACC-2026-TEST',
@@ -15,6 +14,16 @@ describe('accommodation invoice payment details', () => {
         bill_to_name: 'Ada Byron',
         bill_to_email: 'ada@example.com',
         payment_account_snapshot: {},
+        arrangement_snapshot: {
+          accommodation_plan: 'three_months_4000',
+          accommodation_amount_eur: 4000,
+          accommodation_period_months: 3,
+          permit_submission_route: 'bimed_legal_team',
+          permit_type: 'general_employment_permit',
+          permit_fee_eur: 1000,
+          permit_duration_months: 24,
+          terms_version: '2026-09-17-v2',
+        },
         issue_date: '2026-09-18',
         issued_at: '2026-09-18T08:00:00.000Z',
         due_date: '2026-09-25',
@@ -23,19 +32,19 @@ describe('accommodation invoice payment details', () => {
       publicUrl: 'https://recruitment.bimedhealthcare.com/invoices/accommodation/public-token',
     });
 
-    expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.account_name);
-    expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.iban);
-    expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.bic_swift);
-    expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.account_number);
-    expect(html).toContain(ACCOMMODATION_PAYMENT_ACCOUNT.sort_code);
-    expect(html).toContain('https://www.payssion.com/checkout/live_d5a43be9bff6d1a2');
-    expect(html).toContain('href="https://www.payssion.com/checkout/live_d5a43be9bff6d1a2"');
-    expect(html).toContain('Pay online securely');
-    expect(html).toContain('1–3 working days');
-    expect(html).toContain('15 working days');
-    expect(html).not.toContain('GBP equivalent');
-    expect(html).not.toContain('GBP payment option');
+    expect(html).toContain('Payment details are not included on this invoice.');
+    expect(html).toContain('manager@bimedhealthcare.com');
+    expect(html).not.toContain('WEBGEEK TECHNOLOGIES LTD');
+    expect(html).not.toContain('DE81202208000048523738');
+    expect(html).not.toContain('SXPYDEHH');
+    expect(html).not.toContain('00008988');
+    expect(html).not.toContain('04-09-97');
+    expect(html).not.toContain('payssion.com');
+    expect(html).not.toContain('Pay online securely');
+    expect(html).not.toContain('1–3 working days');
+    expect(html).not.toContain('15 working days');
   });
+
   it('renders the selected one-month shared €625 terms instead of the legacy €4,000 terms', async () => {
     const { invoiceHtml } = await import('@/lib/accommodation-billing');
     const html = invoiceHtml({
