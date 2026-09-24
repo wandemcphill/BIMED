@@ -83,7 +83,7 @@ export default async function SignContractPage({ params }: PageProps) {
       employeeAddress: signature.employee_address,
       employeeAddressStatus: signature.employee_address
         ? 'Verified Irish residential address included.'
-        : 'Accommodation Not Verified: no Irish residential address included.',
+        : 'No Irish residential address included.',
       startDate: signature.start_date,
     })
   );
