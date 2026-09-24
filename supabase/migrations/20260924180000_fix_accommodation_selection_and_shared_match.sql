@@ -389,11 +389,11 @@ end;
 $function$;
 
 revoke all on function public.bimed_request_shared_accommodation_match(
-  uuid,text,text,text,text,text,numeric,integer,jsonb,text,text,text,date
+  uuid,text,text,text,text,text,numeric,integer,jsonb,text,text,text,text,date
 ) from public, anon, authenticated;
 
 grant execute on function public.bimed_request_shared_accommodation_match(
-  uuid,text,text,text,text,text,numeric,integer,jsonb,text,text,text,date
+  uuid,text,text,text,text,text,numeric,integer,jsonb,text,text,text,text,date
 ) to service_role;
 
 
