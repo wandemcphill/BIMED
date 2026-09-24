@@ -83,7 +83,7 @@ export default function StaffPermitPage() {
   const sharedPartner = permit?.accommodation_share_role === 'partner' && Boolean(permit?.accommodation_share_id);
   const sharedPrimaryUnlinked = !sharedPartner && Boolean(permit?.accommodation_terms_acknowledged_at && isSharedAccommodationPlan(permit?.accommodation_plan as any) && !permit?.accommodation_share_id);
   const currentSharedTotal = isSharedAccommodationPlan(currentPlan as any) ? sharedAccommodationTotalEur(currentPlan as any) : null;
-  const displayedPlans = useMemo(() => sharedPartner ? [currentPlan] as const : changePlanMode ? availablePlans.filter((plan) => !isSharedAccommodationPlan(plan)) : availablePlans, [availablePlans, changePlanMode, sharedPartner, currentPlan]);
+  const displayedPlans = useMemo(() => sharedPartner ? [currentPlan] as const : availablePlans, [availablePlans, sharedPartner, currentPlan]);
   const canChangeAccommodation = Boolean(termsAcknowledged && permit?.permit_submission_route && invoice && ['draft', 'issued'].includes(invoice.status) && !permit?.requested_at && permit?.status === 'not_started' && !permit?.cancellation_requested_at && !permit?.cancellation_finalized_at);
 
   async function acknowledgeAccommodation() {
@@ -461,7 +461,7 @@ export default function StaffPermitPage() {
           <p style={{ lineHeight: 1.7 }}>This is a legacy accommodation acknowledgement created before the permit-route choice was added. Select who will submit and pay the employment permit so BIMED can continue the permit workflow.</p>
           <button disabled={busy || !selectedRoute} onClick={() => void selectLegacyRoute()} style={{ ...button, width: '100%', maxWidth: 620, opacity: busy || !selectedRoute ? 0.55 : 1 }}>{busy ? 'Saving…' : 'Save permit submission route'}</button>
         </> : changePlanMode ? <>
-          <p style={{ lineHeight: 1.7 }}>You can change between <strong>€4,000 for 3 months</strong> and <strong>€1,250 for 1 month</strong> before payment is reported or recorded and before the employment-permit request is submitted. Shared accommodation plans are established through the dedicated shared-accommodation flow because they require a verified two-person accommodation partner. Your existing unpaid invoice will be superseded and a new invoice will be issued for the non-shared plan you choose.</p>
+          <p style={{ lineHeight: 1.7 }}>You can change between the available accommodation plans, including the <strong>€625 one-month shared plan</strong>, before payment is reported or recorded and before the employment-permit request is submitted. Your existing unpaid invoice will be superseded and the invoice will be updated for the plan you choose. For a shared plan, BIMED will arrange or link the sharing partner after the change is recorded.</p>
           <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: '#334e68', lineHeight: 1.6 }}>
             <input type='checkbox' checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} style={{ marginTop: 5, flexShrink: 0 }} />
             <span>I confirm the new accommodation plan and understand its payment, refund and accommodation terms.</span>
@@ -472,7 +472,7 @@ export default function StaffPermitPage() {
           </div>
         </> : <div style={{ marginTop: 14, padding: 16, borderRadius: 12, background: '#ecfdf5', color: '#166534' }}>
           <strong>Accommodation terms and selections recorded</strong>
-          <div style={{ marginTop: 5, lineHeight: 1.6 }}>Your plan and permit route are recorded. You may change the accommodation plan before payment is reported or recorded and before the employment-permit request is submitted. {accommodationReady ? 'The current invoice has been issued and your next workflows are unlocked.' : 'The invoice will be issued immediately after confirmation. Your permit/travel workflows remain locked until the invoice is issued.'}</div>
+          <div style={{ marginTop: 5, lineHeight: 1.6 }}>Your plan and permit route are recorded. You may change the accommodation plan before payment is reported or recorded and before the employment-permit request is submitted. {accommodationReady ? 'The current invoice has been issued and your next workflows are unlocked. If you selected the wrong plan, use Change accommodation plan before making or reporting payment.' : 'The invoice will be issued immediately after confirmation. Your permit/travel workflows remain locked until the invoice is issued.'}</div>
           {canChangeAccommodation && <button type='button' disabled={busy || Boolean(permit.accommodation_share_id)} onClick={() => { setChangePlanMode(true); setAcknowledged(false); setError(''); }} style={{ ...secondary, marginTop: 12 }}>{busy ? 'Opening…' : 'Change accommodation plan'}</button>}
           {invoice && invoiceUrl && ['issued','paid'].includes(invoice.status) && <a href={invoiceUrl} target='_blank' rel='noreferrer' style={{ ...secondary, display: 'inline-block', marginTop: 12 }}>Open accommodation invoice</a>}
         </div>}
