@@ -4,7 +4,7 @@ import SignContractForm from '@/components/SignContractForm';
 import { getContractSignatureByToken } from '@/lib/contract-signature';
 import { applyContractOverrides, getContractTemplate } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
-import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE } from '@/lib/bimed-role-policy';
+import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 
 export const metadata: Metadata = {
   title: 'Bimed Healthcare | Sign Your Employment Contract',
