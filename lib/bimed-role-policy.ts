@@ -113,7 +113,7 @@ export function applyBimedContractDefaults(
   const providedEmployeeAddress = overrides?.employeeAddress?.trim() || '';
   const employeeAddress = providedEmployeeAddress || 'Not stated in canonical template until BIMED verification';
   const employeeAddressClause = providedEmployeeAddress
-    ? \`of \${providedEmployeeAddress}\`
+    ? `of ${providedEmployeeAddress}`
     : '(Irish residential address not stated until verified)';
   const contractAddressStatus = providedEmployeeAddress
     ? 'Irish residential address supplied for rendering; BIMED verification required before issue.'
