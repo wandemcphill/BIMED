@@ -39,7 +39,7 @@ const section = (heading: string, paragraphs: string[], bullets?: string[]): Con
 // All employment contracts are signed on behalf of Bimed Healthcare Limited by this signatory.
 // The signature block auto-fills the name and today's date - see EmploymentContractDocument.
 const employerSignatory: ContractSignatory = {
-  name: 'Desmond Morris',
+  name: 'Dezou Maurice',
   title: 'Authorised Signatory, Bimed Healthcare Limited',
 };
 
