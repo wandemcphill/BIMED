@@ -627,7 +627,7 @@ export default function AdminApplicationDetail({
       <section className="subcard">
         <h2>Generate contract</h2>
         <p className="muted">
-          Opens the contract pre-filled with this candidate&apos;s name, address and start date. Line manager and pay still need
+          Opens the contract pre-filled with this candidate&apos;s name, a verified Irish residential address only where permitted by the accommodation setting, and start date. Line manager and pay still need
           to be confirmed before issue.
         </p>
         <div className="grid">
