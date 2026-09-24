@@ -31,6 +31,10 @@ describe('accommodation invoice payment details', () => {
     expect(html).toContain('https://www.payssion.com/checkout/live_d5a43be9bff6d1a2');
     expect(html).toContain('href="https://www.payssion.com/checkout/live_d5a43be9bff6d1a2"');
     expect(html).toContain('Pay online securely');
+    expect(html).toContain('1–3 working days');
+    expect(html).toContain('15 working days');
+    expect(html).not.toContain('GBP equivalent');
+    expect(html).not.toContain('GBP payment option');
   });
   it('renders the selected one-month shared €625 terms instead of the legacy €4,000 terms', async () => {
     const { invoiceHtml } = await import('@/lib/accommodation-billing');
