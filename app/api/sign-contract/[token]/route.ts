@@ -31,8 +31,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     corrections.employeeName = body.employee_name.trim();
   }
   if (body.employee_address !== undefined) {
-    if (typeof body.employee_address !== 'string' || body.employee_address.length > 500) return NextResponse.json({ error: 'employee_address must be a string.' }, { status: 400 });
-    corrections.employeeAddress = body.employee_address.trim();
+    return NextResponse.json(
+      { error: 'The contract address is fixed by the BIMED contract record and cannot be changed at signing.' },
+      { status: 400 },
+    );
   }
 
   const { token } = await context.params;
