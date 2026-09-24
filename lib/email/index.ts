@@ -43,6 +43,9 @@ export type ApplicationEmailRecord = {
   work_permission?: string | null;
   status?: string | null;
   submitted_at?: string | null;
+  contract_accommodation_option?: 'private_accommodation' | 'accommodation_not_verified' | null;
+  verified_irish_residential_address?: string | null;
+  contract_accommodation_verified_at?: string | null;
 };
 
 export type InterviewEmailRecord = {
