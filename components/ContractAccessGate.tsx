@@ -1,4 +1,4 @@
-export default function ContractAccessGate({ reason }: { reason: 'unauthorized' | 'not_found' | 'blocked'; message?: string }) {
+export default function ContractAccessGate({ reason }: { reason: 'unauthorized' | 'not_found' | 'blocked' }) {
   const blocked = reason === 'blocked';
 
   return (
