@@ -20,7 +20,8 @@ describe('BIMED accommodation plan change flow', () => {
     expect(page).toContain('€4,000 for 3 months');
     expect(page).toContain('€1,250 for 1 month');
     expect(page).toContain("'one_month_shared_625'");
-    expect(page).toContain('Shared accommodation plans are established through the dedicated shared-accommodation flow');
+    expect(page).toContain('€625 one-month shared plan');
+    expect(page).toContain('BIMED will arrange or link the sharing partner after the change is recorded.');
     expect(page).toContain("!selectedPlan || !acknowledged || selectedPlan === permit.accommodation_plan");
     expect(page).toContain("permit?.permit_submission_route");
     expect(page).toContain("['draft', 'issued'].includes(invoice.status)");
