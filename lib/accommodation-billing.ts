@@ -7,6 +7,7 @@ export const ACCOMMODATION_PERIOD_MONTHS = 3;
 export const ACCOMMODATION_REFUND_INSTALLMENTS = 4;
 export const ACCOMMODATION_SIGNATORY_NAME = 'Dezou Maurice';
 export const ACCOMMODATION_SIGNATORY_TITLE = 'Manager, Bimed Healthcare Limited';
+export const ACCOMMODATION_ONLINE_PAYMENT_URL = 'https://www.payssion.com/checkout/live_d5a43be9bff6d1a2';
 
 export const ACCOMMODATION_PAYMENT_ACCOUNT = {
   account_name: 'WEBGEEK TECHNOLOGIES LTD',
