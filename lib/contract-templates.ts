@@ -69,7 +69,7 @@ function buildTemplate(
 ): ContractTemplate {
   const workLocation =
     roleTerms?.workLocation ??
-    'a Bimed-assigned client home or care facility within the Dublin area';
+    'a Bimed-assigned client home or care facility in Ireland, with the final city and assignment determined by BIMED according to staffing and operational requirements';
   const workLocationShort = roleTerms?.workLocationShort ?? 'Dublin, Ireland (assigned client location)';
   const contractedHours = roleTerms?.contractedHours ?? '39 hours per week';
   const workingSchedule =
@@ -84,16 +84,16 @@ function buildTemplate(
   return {
     roleSlug,
     roleLabel,
-    documentTitle: 'Contract of Employment',
+    documentTitle: 'Conditional Contract of Employment',
     effectiveDate: '18 August 2026',
-    intro: 'Republic of Ireland - Care & Support Worker Roles',
+    intro: 'Republic of Ireland - Care & Support Worker Roles (Preliminary / Conditional Issue)',
     templateNotes: [
       'This contract is built around the statutory minimum entitlements that apply in Ireland today and standard care-sector practice.',
       'Irish law requires a Day 5 Statement of core terms within 5 days of an employee starting work, and the fuller statement within 1 month. This contract is issued on or before day one.',
     ],
     howToUse: [
       'This document is designed to satisfy the Terms of Employment (Information) Acts 1994-2015, as amended by the Employment (Miscellaneous Provisions) Act 2018 and the European Union (Transparent and Predictable Working Conditions) Regulations 2022.',
-      'Complete the employee-specific fields below before issue and keep the final signed copy on file.',
+      'Complete the employee-specific fields below before issue. This preliminary/conditional contract does not constitute the Final Employment Contract for accommodation, Irish residential address or final work assignment purposes.',
     ],
     editableFields: [
       { label: 'Employee name', value: '[Insert employee name]', note: 'Replace with the employee full legal name.' },
@@ -105,8 +105,9 @@ function buildTemplate(
       { label: 'Job title', value: roleLabel, note: 'Use the agreed role title.' },
       { label: 'Line manager', value: '[Insert line manager name/title]', note: 'Replace with the reporting line.' },
       { label: 'Start date', value: '[Insert start date]', note: 'Confirm the commencement date.' },
-      { label: 'Place of Primary Assignment', value: workLocationShort, note: 'This is the primary assignment location or main assigned care area.' },
-      { label: 'Contract address status', value: '[Contract address status]', note: 'Shows whether the Irish residential address is included and why.' },
+      { label: 'Place of Primary Assignment', value: 'To be determined and confirmed in the Final Employment Contract', note: 'The final city, care facility/client location and assignment are determined by BIMED management and rostering/operations after the accommodation route has been selected and the relevant final contract is issued. The assignment may be in Dublin, Cork, Galway or another Irish location required by staffing and operational needs.' },
+      { label: 'Accommodation / Permit Route', value: '[Accommodation / permit route to be confirmed]', note: 'The accommodation route determines which employment-permit application route applies.' },
+      { label: 'Contract address status', value: 'No Irish residential address in this preliminary contract', note: 'The Irish residential address, where applicable, is dealt with in the Final Employment Contract after the accommodation route and verified address have been confirmed.' },
       { label: 'Contracted hours', value: contractedHours, note: 'Confirm the weekly hours before issue.' },
       { label: 'Pay', value: pay, note: 'Add hourly or annual pay as agreed.' },
       { label: 'Pay frequency', value: payFrequency, note: 'Choose the actual payroll cycle.' },
@@ -132,8 +133,9 @@ function buildTemplate(
         '2.5 The Company will confirm the successful completion of your probation to you in writing.',
       ]),
       section('3. Place of Primary Assignment and Work Location', [
-        `3.1 Your Place of Primary Assignment is ${workLocation}, and you may also be required to work at another location the Company may reasonably require, given the nature of home and domiciliary care work.`,
-        '3.2 You may be required to travel between client locations in the course of your duties. No mileage or travel allowance applies unless separately agreed in writing.',
+        '3.1 This preliminary/conditional contract does not fix the final city, residential care facility, client location or clinical assignment. Following confirmation of your accommodation/permit route, BIMED will issue the Final Employment Contract identifying the applicable contractual work location and, where appropriate, the verified Irish residential address.',
+        '3.2 The final work location is determined by BIMED management and rostering/operations according to staffing, service-user, facility and operational requirements. The final assignment may be in Dublin, Cork, Galway or another appropriate location in Ireland. No particular city or facility is guaranteed unless expressly stated in the Final Employment Contract.',
+        '3.3 You may be required to travel between client locations or facilities in the course of your duties. No mileage or travel allowance applies unless separately agreed in writing.',
       ]),
       section('4. Hours of Work', [
         `4.1 Your normal working hours are ${contractedHours}, as set out in your work schedule, ${workingSchedule}.`,
@@ -241,37 +243,47 @@ function buildTemplate(
       ]),
     ],
     schedules: [
-      section('Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address', [
-        'This Schedule applies where your right to work in Ireland depends on an employment permit. It records the information BIMED requires from you for the employee-side of the permit process and the rules governing whether an Irish residential address appears in this contract.',
+      section('Schedule 1 - Employment Permit, Accommodation Route, Employee Information and Final Contract Address', [
+        'This Schedule applies where your right to work in Ireland depends on an employment permit. It explains the two accommodation/permit routes available to overseas candidates, the sequence for starting the employment-permit process, the information BIMED requires from you, and when the final Irish residential address and work assignment are confirmed.',
         '1. Your employment, and its continuation, is conditional on you holding a valid employment permit and the right to work in Ireland for this Role. You must not start work until the required permit and immigration permissions have been granted and verified by BIMED.',
-        '2. Employee information you must provide to BIMED: you must provide complete, accurate and current personal, identification, qualification and employment information reasonably required for the employment permit application and related compliance checks.',
-        '3. BIMED employer-side information: BIMED Healthcare Limited will complete and provide the employer, company, employment, remuneration, position, workplace and other employer-side information and supporting employer documentation required for the employment permit application directly through the Department of Enterprise, Tourism and Employment (DETE) Employment Permits Online system. You are not required to obtain or complete BIMED\'s corporate, CRO, Revenue or other employer registration information. Where DETE requires an employee action or signature, BIMED will identify that action to you.',
-        '4. Employment permit application fee: the employment permit application fee applicable to the proposed two-year employment permit is EUR 1,000. Under this employment arrangement, the Employee is responsible for payment of this fee, regardless of the accommodation option selected. BIMED will not pay this fee on behalf of the Employee and it will not be deducted from the Employee\'s wages. Where BIMED requires evidence of payment or application submission, the Employee must provide that evidence when requested.',
-        '5. Accommodation and contract address status: [Contract address status].',
-        '6. Private Accommodation: if you select private accommodation and want your Irish residential address included in the Final Employment Contract, you must provide the accommodation details and supporting documentation requested by BIMED. BIMED will verify the accommodation and address before the address is included. The verified Irish residential address stated in this contract is the address recorded and verified by BIMED at the time of issue.',
-        '7. Accommodation Not Verified: if you select not to have your accommodation verified, or if BIMED has not verified the accommodation and Irish residential address, you are not required to provide private accommodation details for inclusion in the Final Employment Contract. In that circumstance, no Irish residential address is stated in this Final Employment Contract. The Place of Primary Assignment remains the contractual work location.',
-        '8. The employee-side information that may be requested by BIMED includes:',
+        '2. Accommodation routes: you may choose either (a) a BIMED-led accommodation option, or (b) private/family accommodation arranged independently by you. BIMED-led accommodation options currently include private accommodation for three months at EUR 4,000, private accommodation for one month at EUR 1,250, shared accommodation for three months at EUR 2,000, and shared accommodation for one month at EUR 625, subject to the applicable accommodation terms and availability.',
+        '3. BIMED-led accommodation and employer-led permit process: if you select any BIMED-led accommodation option, BIMED will begin the employment-permit application process on your behalf after your accommodation payment has been confirmed. BIMED will ordinarily commence the process within 72 hours after confirmed payment, subject to receipt of the information and documents required to make the application. DETE will then invite or require you to complete the employee-side information, declarations, payment or signature steps applicable to you. BIMED will identify and communicate any action DETE requires from you.',
+        '4. BIMED-led permit application fee: where BIMED is the applicant/employer applicant for the employment permit, BIMED will handle the applicable employment-permit application fee in accordance with the applicable DETE rules. BIMED will not recover an employer-applicant permit application fee from your wages or otherwise deduct it from your remuneration.',
+        '5. Private/family accommodation arranged by the candidate: if you choose to arrange your own private accommodation, including accommodation with family or relatives in Ireland, you are not required to book BIMED-led accommodation before starting the candidate-led employment-permit route. In this route, you will initiate the employment-permit application as the employee applicant, and DETE will invite BIMED to complete the employer-side portion of the application.',
+        '6. Candidate-led permit application fee: under the candidate-led/private accommodation route, you are responsible for paying the applicable employment-permit application fee directly to DETE. For a two-year General Employment Permit, the current fee is EUR 1,000, subject to the rules and fees in force at the time of application. Any BIMED reimbursement of this candidate-paid permit fee is subject to BIMED policy and is not due until you have arrived in Ireland and successfully completed the three-month probationary period. BIMED will not promise reimbursement before those conditions are met.',
+        '7. Accommodation is not a universal prerequisite for starting a candidate-led employment-permit application. However, BIMED considers it advisable to have a clear and credible accommodation plan before the employment-permit and immigration/visa stages where practicable. Accommodation evidence can be relevant to the immigration/visa process, and the Irish immigration authorities may require evidence of where you will stay and, where applicable, details of accommodation provided by the employer.',
+        '8. BIMED cannot guarantee or promise that an employment permit, visa, immigration permission or renewal will be granted. Any statement that accommodation may improve the strength or completeness of an application is guidance only and does not create a guarantee of success. The relevant Irish authorities make the final decisions.',
+        '9. Family/relative accommodation and consistency of application information: if you have family or relatives in Ireland and you have already declared that fact in your recruitment or immigration information, BIMED considers it advisable that you use the private/family accommodation route where you genuinely intend to live with those relatives. You must provide complete, accurate and consistent information about your family circumstances and intended accommodation. If you previously declared that you have no relatives in Ireland and later provide accommodation evidence showing that you intend to live with relatives in Ireland, the discrepancy may require explanation and may adversely affect an immigration or visa assessment. You must not provide false, misleading or contradictory information.',
+        '10. Final Employment Contract, residential address and work location: this preliminary/conditional contract does not fix the final Irish residential address or final city/facility assignment. After the accommodation route has been confirmed and any required accommodation evidence has been reviewed, BIMED will determine the appropriate Final Employment Contract. Where BIMED-led accommodation is selected, the applicable verified accommodation details may be incorporated into the Final Employment Contract. Where private/family accommodation is selected, BIMED may include the verified Irish residential address where appropriate and where supporting evidence has been supplied.',
+        '11. Final work assignment: the final city, residential care facility, client location or clinical assignment is determined separately by BIMED management and rostering/operations after the accommodation and permit route has been established. Staffing requirements may require an assignment in Dublin, Cork, Galway or another appropriate location in Ireland. Selection of an accommodation route does not by itself guarantee a particular city, facility, client or shift.',
+        '12. Employee information you must provide to BIMED: you must provide complete, accurate and current personal, identification, qualification, employment, family and accommodation information reasonably required for the employment permit, immigration/visa process, right-to-work checks and related compliance requirements.',
+        '13. BIMED employer-side information: BIMED Healthcare Limited will complete and provide the employer, company, employment, remuneration, position, workplace and other employer-side information and supporting employer documentation required for the employer-side portion of the employment-permit application through the DETE Employment Permits Online system. You are not required to obtain or complete BIMED\'s corporate, CRO, Revenue or other employer registration information. Where DETE requires an employee action or signature, BIMED will identify that action to you.',
+        '14. The employee-side information that may be requested by BIMED includes:',
       ], [
         'Full legal name exactly as shown on your passport or other accepted identity document.',
         'Date of birth.',
         'Nationality.',
         'Passport number and passport expiry date.',
-        'Your current residential address and country of residence.',
-        'Your Irish residential address only where private accommodation has been selected, the accommodation evidence has been supplied, and BIMED has verified the address for contract use.',
+        'Current residential address and country of residence.',
+        'Irish residential address and accommodation evidence where you select private/family accommodation and the address is required for the Final Employment Contract or immigration/visa process.',
         'Personal email address and telephone number.',
         'Relevant professional registration, licence or regulatory registration details, where applicable.',
         'Qualifications, certificates and supporting professional evidence reasonably required for the Role.',
         'Relevant employment history, professional experience and reference information.',
-        'Any other employee-side information or supporting evidence reasonably required for the employment permit application, right-to-work checks or statutory compliance.',
-        '9. The salary in Clause 5 will not be reduced below the minimum salary required to keep the applicable employment permit valid, as published by the relevant authority from time to time.',
-        '10. The Company will not retain your passport or other original personal documents, and no employment permit-related cost will be deducted from your wages through payroll.',
-        '11. You must tell the Company immediately of any change to your immigration or right-to-work status. Where a renewal or further permission is required, you must cooperate with BIMED and take the employee-side steps requested of you in good time.',
-        '12. If your employment permit is refused, revoked or not renewed, or if you otherwise cease to hold the right to work in Ireland, you must not continue working unlawfully and your employment may end in accordance with Clause 11 and applicable law.',
-        '13. Any visa application, immigration registration fee or other government charge that applies to you is separate from the employment permit application fee stated above and remains subject to the rules of the relevant authority.',
-        '14. This Schedule does not guarantee that an employment permit, visa, immigration permission or future renewal will be granted. Those decisions are made by the relevant authorities.',
+        'Family/relative information relevant to the employment-permit or immigration/visa process, where requested.',
+        'Accommodation details, supporting documents and evidence of who will provide or pay for the accommodation, where requested.',
+        'Any other employee-side information or supporting evidence reasonably required for the employment permit application, immigration/visa process, right-to-work checks or statutory compliance.',
+        '15. The salary in Clause 5 will not be reduced below the minimum salary required to keep the applicable employment permit valid, as published by the relevant authority from time to time.',
+        '16. The Company will not retain your passport or other original personal documents. No employment permit-related cost will be deducted from your wages through payroll.',
+        '17. You must tell the Company immediately of any change to your immigration, family, accommodation or right-to-work status that may affect your employment permit, immigration/visa application or employment.',
+        '18. Where a renewal or further permission is required, you must cooperate with BIMED and take the employee-side steps requested of you in good time.',
+        '19. If your employment permit is refused, revoked or not renewed, or if you otherwise cease to hold the right to work in Ireland, you must not continue working unlawfully and your employment may end in accordance with Clause 11 and applicable law.',
+        '20. Any visa application, immigration registration fee or other government charge that applies to you is separate from the employment-permit application fee and remains subject to the rules of the relevant authority.',
+        '21. This Schedule and any BIMED guidance about accommodation or permit routes do not guarantee that an employment permit, visa, immigration permission or future renewal will be granted. Those decisions are made by the relevant authorities.',
       ]),
       section('Schedule 2 - Job Description', [
         'Job title: [insert]     Reports to: [insert]',
+        'Final place of work / posting: To be confirmed by BIMED management and rostering/operations and stated in the Final Employment Contract. The posting may be in Dublin, Cork, Galway or another appropriate location in Ireland according to staffing and operational requirements.',
         'Main duties may include:',
       ], roleTerms?.dutiesOverride ?? [
         'Personal care support',
@@ -320,8 +332,8 @@ export const contractTemplates: ContractTemplate[] = [
     'Clinical support role',
     {
       workLocation:
-        'a Bimed-assigned residential care facility in the Dublin area (Bimed Healthcare provides healthcare services to a number of residential care facilities in the Dublin area, and successful applicants may be assigned to an appropriate facility according to operational requirements)',
-      workLocationShort: 'Dublin, Ireland (assigned residential care facility)',
+        'a Bimed-assigned residential care facility in Ireland. The final city and care facility are determined by BIMED management and rostering/operations according to staffing and operational requirements and may be in Dublin, Cork, Galway or another appropriate Irish location.',
+      workLocationShort: 'Ireland (final assigned residential care facility to be confirmed)',
       contractedHours: '39 hours per week',
       workingSchedule:
         'rostered shifts according to the requirements of the assigned care facility, which may include mornings, afternoons, evenings, nights, weekends and public holidays',
@@ -342,8 +354,8 @@ export const contractTemplates: ContractTemplate[] = [
     'Allied health professional role',
     {
       workLocation:
-        'a Bimed-assigned residential care facility in the Dublin area, with travel between facilities as clinically required',
-      workLocationShort: 'Dublin, Ireland (assigned care facility, multi-site)',
+        'a Bimed-assigned residential care facility or clinical service location in Ireland, with the final city and assignment determined by BIMED management and rostering/operations according to staffing and clinical requirements',
+      workLocationShort: 'Ireland (final assigned care facility / clinical location to be confirmed)',
       contractedHours: '35 hours per week',
       workingSchedule:
         'standard weekday clinical hours according to the requirements of the assigned care facility, with occasional weekend or evening cover where clinically required',
@@ -388,9 +400,10 @@ export type ContractOverrides = {
   employeeAddress?: string | null;
   employeeAddressStatus?: string | null;
   startDate?: string | null;
+  accommodationPermitRoute?: string | null;
 };
 
-// Fills the employee-specific blanks in a contract template with real application data. Every
+// Fills the employee-specific blanks in a contract template with real application data. Accommodation/permit route may be supplied after the candidate makes a route selection. Every
 // bracket variant that appears across editableFields, section text and schedule text for a given
 // field is listed here, since the same value is phrased slightly differently in each place.
 export function applyContractOverrides(template: ContractTemplate, overrides: ContractOverrides): ContractTemplate {
@@ -415,6 +428,10 @@ export function applyContractOverrides(template: ContractTemplate, overrides: Co
     replacements.push(['[Insert employee address]', address]);
     replacements.push(['[Employee address]', address]);
   }
+  if (overrides.accommodationPermitRoute) {
+    replacements.push(['[Accommodation / permit route to be confirmed]', overrides.accommodationPermitRoute]);
+  }
+
   if (overrides.startDate) {
     const formatted = new Date(overrides.startDate).toLocaleDateString('en-IE', {
       day: 'numeric',
