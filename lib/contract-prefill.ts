@@ -12,9 +12,6 @@ export type ContractPrefillResult =
   | { status: 'not_found' }
   | { status: 'blocked'; reason: string };
 
-// Resolves the contract to render for a role page. With no applicationId this is the Bimed-wide
-// default role contract with canonical manager/start/probation/pay-frequency terms. With an
-// applicationId, candidate data is filled only for a verified admin session.
 export async function resolveContractTemplate(roleSlug: string, applicationId?: string): Promise<ContractPrefillResult> {
   const rawTemplate = getContractTemplate(roleSlug);
   if (!rawTemplate) return { status: 'not_found' };
@@ -33,15 +30,13 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
 
   const cookieStore = await cookies();
   const session = await getAdminSessionFromToken(cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value);
-  if (!session) {
-    return { status: 'unauthorized' };
-  }
+  if (!session) return { status: 'unauthorized' };
 
   let application;
   try {
     const result = await db()
       .from('recruitment_applications')
-      .select('full_name,email,address,start_date,living_in_ireland,contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by')
+      .select('full_name,email,address,start_date,living_in_ireland,country_of_residence,current_country,contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by')
       .eq('id', applicationId)
       .maybeSingle();
     if (result.error || !result.data) return { status: 'not_found' };
