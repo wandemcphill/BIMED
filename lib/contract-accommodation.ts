@@ -31,14 +31,32 @@ export type ContractAddressResolution =
 export type ContractAddressApplication = {
   living_in_ireland?: string | null;
   address?: string | null;
+  country_of_residence?: string | null;
+  current_country?: string | null;
   contract_accommodation_option?: string | null;
   verified_irish_residential_address?: string | null;
   contract_accommodation_verified_at?: string | null;
   contract_accommodation_verified_by?: string | null;
 };
 
+function normalizeCountry(value?: string | null) {
+  return value?.trim().toLowerCase().replace(/[^a-z]/g, '') || '';
+}
+
+function isExplicitlyNonIrishCountry(application: ContractAddressApplication) {
+  const countries = [application.country_of_residence, application.current_country]
+    .map(normalizeCountry)
+    .filter(Boolean);
+
+  return countries.length > 0 && countries.some((country) => country !== 'ireland' && country !== 'republicofireland');
+}
+
 export function resolveContractAddress(application: ContractAddressApplication): ContractAddressResolution {
-  const isInternational = application.living_in_ireland === 'No';
+  // Never allow a known non-Irish current/residential country to flow into the
+  // Irish residential-address field, even if the legacy living_in_ireland flag is
+  // stale or incorrectly set to "Yes".
+  const isInternational =
+    application.living_in_ireland === 'No' || isExplicitlyNonIrishCountry(application);
 
   if (!isInternational) {
     return {
