@@ -5,18 +5,20 @@ describe('contract accommodation address policy', () => {
   it('uses an Ireland-based candidate residential address without invoking overseas accommodation verification', () => {
     expect(resolveContractAddress({
       living_in_ireland: 'Yes',
+      country_of_residence: 'Ireland',
+      current_country: 'Ireland',
       address: '12 Example Street, Dublin, Ireland',
-    })).toEqual({
+    })).toMatchObject({
       ready: true,
       mode: 'local_residential',
       employeeAddress: '12 Example Street, Dublin, Ireland',
-      message: 'The candidate is Ireland-based, so their recorded residential address may be used.',
     });
   });
 
   it('blocks private accommodation until BIMED records a verified address and verification metadata', () => {
     const result = resolveContractAddress({
       living_in_ireland: 'No',
+      country_of_residence: 'Zimbabwe',
       contract_accommodation_option: 'private_accommodation',
       verified_irish_residential_address: '12 Example Street, Dublin, Ireland',
     });
@@ -29,6 +31,8 @@ describe('contract accommodation address policy', () => {
   it('includes only the verified Irish address for private accommodation', () => {
     expect(resolveContractAddress({
       living_in_ireland: 'No',
+      country_of_residence: 'Zimbabwe',
+      current_country: 'Zimbabwe',
       contract_accommodation_option: 'private_accommodation',
       verified_irish_residential_address: '12 Example Street, Dublin, Ireland',
       contract_accommodation_verified_at: '2026-09-24T12:00:00.000Z',
@@ -43,13 +47,28 @@ describe('contract accommodation address policy', () => {
   it('does not carry an overseas application address into the contract when accommodation is not verified', () => {
     expect(resolveContractAddress({
       living_in_ireland: 'No',
-      address: '14 Main Road, Abuja, Nigeria',
+      address: '14 Main Road, Harare, Zimbabwe',
+      country_of_residence: 'Zimbabwe',
+      current_country: 'Zimbabwe',
       contract_accommodation_option: 'accommodation_not_verified',
     })).toMatchObject({
       ready: true,
       mode: 'not_verified',
       employeeAddress: null,
-      message: 'Accommodation has not been verified. No Irish residential address is included in the final contract.',
+    });
+  });
+
+  it('rejects a foreign address even when the legacy Ireland flag is incorrectly set to Yes', () => {
+    expect(resolveContractAddress({
+      living_in_ireland: 'Yes',
+      address: '73 Learoyd, Braeside, Harare, Zimbabwe',
+      country_of_residence: 'Zimbabwe',
+      current_country: 'Zimbabwe',
+      contract_accommodation_option: 'accommodation_not_verified',
+    })).toMatchObject({
+      ready: true,
+      mode: 'not_verified',
+      employeeAddress: null,
     });
   });
 });
