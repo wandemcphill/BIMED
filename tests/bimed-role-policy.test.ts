@@ -19,6 +19,10 @@ import {
 describe('BIMED role policy', () => {
   it('normalizes supported and legacy recruitment role labels', () => {
     expect(normalizeRecruitmentRole('Support Worker')).toBe('Support Worker');
+    expect(normalizeRecruitmentRole('support-worker')).toBe('Support Worker');
+    expect(normalizeRecruitmentRole('healthcare-assistant')).toBe('Healthcare Assistant');
+    expect(normalizeRecruitmentRole('senior-support-worker')).toBe('Senior Support Worker');
+    expect(normalizeRecruitmentRole('physiotherapist')).toBe('Physiotherapist');
     expect(normalizeRecruitmentRole('Senior Support Worker')).toBe('Senior Support Worker');
     expect(normalizeRecruitmentRole('Physiotherapist')).toBe('Physiotherapist');
     expect(normalizeRecruitmentRole('Healthcare Worker')).toBe('Healthcare Assistant');

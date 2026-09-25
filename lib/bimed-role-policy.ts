@@ -63,6 +63,10 @@ export function normalizeRecruitmentRole(value: string | null | undefined): Cano
   const direct = CANONICAL_RECRUITMENT_ROLES.find((role) => role.toLowerCase() === normalized);
   if (direct) return direct;
 
+  const slugMatch = (Object.entries(ROLE_SLUGS) as Array<[CanonicalRecruitmentRole, CanonicalRecruitmentRoleSlug]>)
+    .find(([, slug]) => slug === normalized)?.[0];
+  if (slugMatch) return slugMatch;
+
   return ROLE_ALIASES[normalized] ?? null;
 }
 
