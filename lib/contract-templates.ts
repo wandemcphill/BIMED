@@ -70,7 +70,7 @@ function buildTemplate(
   const workLocation =
     roleTerms?.workLocation ??
     'a Bimed-assigned client home or care facility in Ireland, with the final city and assignment determined by BIMED according to staffing and operational requirements';
-  const workLocationShort = roleTerms?.workLocationShort ?? 'Dublin, Ireland (assigned client location)';
+  const workLocationShort = roleTerms?.workLocationShort ?? 'Ireland (final assigned location to be confirmed)';
   const contractedHours = roleTerms?.contractedHours ?? '39 hours per week';
   const workingSchedule =
     roleTerms?.workingSchedule ??
