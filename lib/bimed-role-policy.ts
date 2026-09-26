@@ -195,9 +195,19 @@ export function applyBimedContractDefaults(
   }
 
   const sections = template.sections.map((section) => applySectionReplacements(section, replacements));
-  const schedules = template.schedules.map((section) => applySectionReplacements(section, replacements));
+  let schedules = template.schedules.map((section) => applySectionReplacements(section, replacements));
 
   if (roleSlug === 'physiotherapist') {
+    schedules = schedules.map((section) => ({
+      ...section,
+      paragraphs: section.paragraphs.map((paragraph) =>
+        paragraph.replace(
+          'For a two-year General Employment Permit, the current fee is EUR 1,000, subject to the rules and fees in force at the time of application.',
+          'The applicable employment-permit application fee is subject to the selected permit route and the DETE rules and fees in force at the time of application.'
+        )
+      ),
+    }));
+
     const permitSchedule = schedules.find(
       (section) => section.heading === 'Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address'
     );
