@@ -106,7 +106,7 @@ function buildTemplate(
       { label: 'Line manager', value: '[Insert line manager name/title]', note: 'Replace with the reporting line.' },
       { label: 'Start date', value: '[Insert start date]', note: 'Confirm the commencement date.' },
       { label: 'Place of Primary Assignment', value: 'To be determined and confirmed in the Final Employment Contract', note: 'The final city, care facility/client location and assignment are determined by BIMED management and rostering/operations after the accommodation route has been selected and the relevant final contract is issued. The assignment may be in Dublin, Cork, Galway or another Irish location required by staffing and operational needs.' },
-      { label: 'Accommodation / Permit Route', value: '[Accommodation / permit route to be confirmed]', note: 'The accommodation route determines which employment-permit application route applies.' },
+      { label: 'Accommodation / Permit Route', value: 'To be confirmed following accommodation and permit route selection', note: 'The accommodation route determines which employment-permit application route applies.' },
       { label: 'Contract address status', value: 'No Irish residential address in this preliminary contract', note: 'The Irish residential address, where applicable, is dealt with in the Final Employment Contract after the accommodation route and verified address have been confirmed.' },
       { label: 'Contracted hours', value: contractedHours, note: 'Confirm the weekly hours before issue.' },
       { label: 'Pay', value: pay, note: 'Add hourly or annual pay as agreed.' },
@@ -243,7 +243,7 @@ function buildTemplate(
       ]),
     ],
     schedules: [
-      section('Schedule 1 - Employment Permit, Accommodation Route, Employee Information and Final Contract Address', [
+      section('Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address', [
         'This Schedule applies where your right to work in Ireland depends on an employment permit. It explains the two accommodation/permit routes available to overseas candidates, the sequence for starting the employment-permit process, the information BIMED requires from you, and when the final Irish residential address and work assignment are confirmed.',
         '1. Your employment, and its continuation, is conditional on you holding a valid employment permit and the right to work in Ireland for this Role. You must not start work until the required permit and immigration permissions have been granted and verified by BIMED.',
         '2. Accommodation routes: you may choose either (a) a BIMED-led accommodation option, or (b) private/family accommodation arranged independently by you. BIMED-led accommodation options currently include private accommodation for three months at EUR 4,000, private accommodation for one month at EUR 1,250, shared accommodation for three months at EUR 2,000, and shared accommodation for one month at EUR 625, subject to the applicable accommodation terms and availability.',
@@ -422,6 +422,11 @@ export function applyContractOverrides(template: ContractTemplate, overrides: Co
     replacements.push(['[Employee address clause]', address ? `of ${address}` : '']);
     replacements.push([
       '[Contract address status]',
+      overrides.employeeAddressStatus?.trim()
+        || (address ? 'Verified Irish residential address included.' : 'No Irish residential address included.'),
+    ]);
+    replacements.push([
+      'No Irish residential address in this preliminary contract',
       overrides.employeeAddressStatus?.trim()
         || (address ? 'Verified Irish residential address included.' : 'No Irish residential address included.'),
     ]);
