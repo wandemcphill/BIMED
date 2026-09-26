@@ -145,8 +145,12 @@ export function validateCandidateApplication(input: unknown): JsonResult<Record<
     const role = normalizeRecruitmentRole(roleInput);
     if (!role) throw new Error('role_applied is invalid.');
 
-    const living = stringField(input, 'living_in_ireland', 10, true)!;
-    if (living !== 'Yes' && living !== 'No') throw new Error('living_in_ireland is invalid.');
+    const livingInput = stringField(input, 'living_in_ireland', 10, true)!;
+    // Candidate-facing Yes/No controls can be affected by browser autofill, restored drafts,
+    // or locale/translation layers. Accept harmless casing/whitespace differences and store
+    // the canonical value used by routing and database logic.
+    const living = livingInput.toLowerCase() === 'yes' ? 'Yes' : livingInput.toLowerCase() === 'no' ? 'No' : null;
+    if (!living) throw new Error('living_in_ireland is invalid.');
 
     const consent = optionalBoolean(input, 'consent');
     if (consent !== true) throw new Error('consent is required.');
