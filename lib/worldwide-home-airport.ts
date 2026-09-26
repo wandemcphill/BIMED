@@ -8,6 +8,7 @@ const FIXED: Record<string, Airport> = {
   KE: { code: 'NBO', name: 'Jomo Kenyatta International Airport', city: 'Nairobi', country_code: 'KE', country_name: 'Kenya' },
   ZA: { code: 'JNB', name: 'O. R. Tambo International Airport', city: 'Johannesburg', country_code: 'ZA', country_name: 'South Africa' },
   IN: { code: 'DEL', name: 'Indira Gandhi International Airport', city: 'New Delhi', country_code: 'IN', country_name: 'India' },
+  PH: { code: 'CRK', name: 'Clark International Airport', city: 'Clark, Pampanga', country_code: 'PH', country_name: 'Philippines' },
   AE: { code: 'DXB', name: 'Dubai International Airport', city: 'Dubai', country_code: 'AE', country_name: 'United Arab Emirates' },
   GB: { code: 'LHR', name: 'Heathrow Airport', city: 'London', country_code: 'GB', country_name: 'United Kingdom' },
   US: { code: 'JFK', name: 'John F. Kennedy International Airport', city: 'New York', country_code: 'US', country_name: 'United States' },
