@@ -243,7 +243,7 @@ function buildTemplate(
       ]),
     ],
     schedules: [
-      section('Schedule 1 - Employment Permit, Accommodation Route, Employee Information and Final Contract Address', [
+      section('Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address', [
         'This Schedule applies where your right to work in Ireland depends on an employment permit. It explains the two accommodation/permit routes available to overseas candidates, the sequence for starting the employment-permit process, the information BIMED requires from you, and when the final Irish residential address and work assignment are confirmed.',
         '1. Your employment, and its continuation, is conditional on you holding a valid employment permit and the right to work in Ireland for this Role. You must not start work until the required permit and immigration permissions have been granted and verified by BIMED.',
         '2. Accommodation routes: you may choose either (a) a BIMED-led accommodation option, or (b) private/family accommodation arranged independently by you. BIMED-led accommodation options currently include private accommodation for three months at EUR 4,000, private accommodation for one month at EUR 1,250, shared accommodation for three months at EUR 2,000, and shared accommodation for one month at EUR 625, subject to the applicable accommodation terms and availability.',
@@ -415,21 +415,24 @@ export function applyContractOverrides(template: ContractTemplate, overrides: Co
   }
   if (overrides.employeeAddress !== undefined) {
     const address = overrides.employeeAddress?.trim() || '';
+    const addressStatus =
+      overrides.employeeAddressStatus?.trim()
+      || (address ? 'Verified Irish residential address included.' : 'no Irish residential address included.');
+
     replacements.push([
       '[Insert Irish residential address if verified]',
       address || 'Not stated in this contract',
     ]);
     replacements.push(['[Employee address clause]', address ? `of ${address}` : '']);
-    replacements.push([
-      '[Contract address status]',
-      overrides.employeeAddressStatus?.trim()
-        || (address ? 'Verified Irish residential address included.' : 'No Irish residential address included.'),
-    ]);
+    replacements.push(['[Contract address status]', addressStatus]);
+    replacements.push(['No Irish residential address in this preliminary contract', addressStatus]);
     replacements.push(['[Insert employee address]', address]);
     replacements.push(['[Employee address]', address]);
   }
   if (overrides.accommodationPermitRoute) {
     replacements.push(['[Accommodation / permit route to be confirmed]', overrides.accommodationPermitRoute]);
+  } else {
+    replacements.push(['[Accommodation / permit route to be confirmed]', 'To be confirmed before permit route selection']);
   }
 
   if (overrides.startDate) {
