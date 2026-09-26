@@ -21,6 +21,17 @@ describe('request validation', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('normalizes harmless casing and whitespace in the living-in-Ireland answer', () => {
+    const result = validateCandidateApplication({
+      token: 'abc', full_name: 'Jane Doe', email: 'jane@example.com',
+      country_of_residence: 'Nigeria', role_applied: 'Healthcare Assistant', living_in_ireland: ' no ',
+      current_country: 'Nigeria', work_permission: 'No', requires_employment_permit: 'Yes',
+      relocation_readiness: 'Ready', supporting_documents: [], consent: true,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.living_in_ireland).toBe('No');
+  });
+
   it('requires international pathway fields', () => {
     const result = validateCandidateApplication({
       token: 'abc', full_name: 'Jane Doe', email: 'jane@example.com',
