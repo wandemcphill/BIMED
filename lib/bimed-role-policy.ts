@@ -130,6 +130,7 @@ export function applyBimedContractDefaults(
     ['[Insert Irish residential address if verified]', employeeAddress],
     ['[Employee address clause]', employeeAddressClause],
     ['[Contract address status]', contractAddressStatus],
+    ['[Accommodation / permit route to be confirmed]', 'To be confirmed before permit route selection'],
     ['[Insert line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[line manager name/title]', BIMED_DEFAULT_LINE_MANAGER],
     ['[Insert start date]', startDate],
@@ -201,10 +202,18 @@ export function applyBimedContractDefaults(
     const permitSchedule = schedules.find(
       (section) => section.heading === 'Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address'
     );
-    if (permitSchedule && !permitSchedule.paragraphs.some((paragraph) => paragraph.includes('intended permit pathway is Critical Skills Employment Permit (CSEP)'))) {
-      permitSchedule.paragraphs.push(
-        'Where an employment permit is required for this Role, the Company\'s intended permit pathway is Critical Skills Employment Permit (CSEP), subject to DETE eligibility and final assessment. This statement does not guarantee permit eligibility or grant.'
+
+    if (permitSchedule) {
+      const withoutGeneralPermitLabel = permitSchedule.paragraphs.map((paragraph) =>
+        replaceText(paragraph, [['General Employment Permit', 'employment permit']])
       );
+      permitSchedule.paragraphs = withoutGeneralPermitLabel;
+
+      if (!permitSchedule.paragraphs.some((paragraph) => paragraph.includes('intended permit pathway is Critical Skills Employment Permit (CSEP)'))) {
+        permitSchedule.paragraphs.push(
+          'Where an employment permit is required for this Role, the Company\'s intended permit pathway is Critical Skills Employment Permit (CSEP), subject to DETE eligibility and final assessment. This statement does not guarantee permit eligibility or grant.'
+        );
+      }
     }
   }
 
