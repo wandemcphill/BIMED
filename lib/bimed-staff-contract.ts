@@ -183,7 +183,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     return { status: 'not_found', reason: 'This staff record does not have a supported BIMED employment role.' };
   }
 
-  const [applicationResult, permitResult, signatureResult] = await Promise.all([
+  const [applicationResult, permitResult, signatureResult, externalContractResult] = await Promise.all([
     client.from('recruitment_applications')
       .select('contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by,living_in_ireland,country_of_residence,address')
       .eq('id', staff.application_id)
@@ -202,7 +202,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
       .maybeSingle(),
   ]);
 
-  if (applicationResult.error || permitResult.error || signatureResult.error) {
+  if (applicationResult.error || permitResult.error || signatureResult.error || externalContractResult.error) {
     return { status: 'not_found', reason: 'The staff contract record could not be loaded completely.' };
   }
 
@@ -210,6 +210,15 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
   const permit = permitResult.data;
 
   if (!permit) return { status: 'blocked', reason: 'The overseas employment-permit case has not been initialized.' };
+  if (!signatureResult.data && !externalContractResult.data) {
+    return { status: 'blocked', reason: 'The initial BIMED onboarding contract must already be signed or administrator-verified before the separate permit-stage contract can be issued.' };
+  }
+  if (!permit.permit_submission_route) {
+    return { status: 'blocked', reason: 'The employment-permit submission route has not yet been selected.' };
+  }
+  if (!String(staff.primary_location || '').trim()) {
+    return { status: 'blocked', reason: 'Place of Primary Assignment has not yet been recorded for this hire.' };
+  }
 
   const { data: invoice } = await client
     .from('recruitment_accommodation_invoices')
@@ -231,7 +240,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     .eq('permit_case_id', permit.id)
     .maybeSingle();
 
-  if (!itinerary?.id || !itinerary.departure_airport_code || !itinerary.travel_date || !itinerary.passenger_count) {
+  if (!itinerary?.id || !itinerary.departure_airport_code || !itinerary.departure_airport_name || !itinerary.destination_airport_code || !itinerary.travel_date || !itinerary.passenger_count || !Array.isArray(itinerary.passengers) || itinerary.passengers.length !== Number(itinerary.passenger_count)) {
     return {
       status: 'blocked',
       reason: 'The candidate has not yet submitted the required travel itinerary. Submit the initial travel request before issuing the DETE permit-stage contract.',
