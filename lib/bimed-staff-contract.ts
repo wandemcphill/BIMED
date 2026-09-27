@@ -168,7 +168,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
 
   const { data: staff, error: staffError } = await client
     .from('recruitment_staff')
-    .select('id,application_id,bimed_id,full_name,email,job_title,role,employment_start_date,employment_end_date,employment_type,department,manager_name,primary_location,address_line_1,address_line_2,city,county,eircode,country,updated_at')
+    .select('id,application_id,bimed_id,status,full_name,email,job_title,role,employment_start_date,employment_end_date,employment_type,department,manager_name,primary_location,address_line_1,address_line_2,city,county,eircode,country,updated_at')
     .eq('id', staffId)
     .maybeSingle();
 
