@@ -16,8 +16,10 @@ type PageProps = {
 };
 
 export default async function PhysiotherapistContractPage({ searchParams }: PageProps) {
-  const { applicationId } = await searchParams;
-  const result = await resolveContractTemplate('physiotherapist', applicationId);
+  const { applicationId, staffId } = await searchParams;
+  const result = staffId
+    ? await resolveStaffContractTemplate(staffId)
+    : await resolveContractTemplate('physiotherapist', applicationId);
 
   if (result.status === 'unauthorized' || result.status === 'not_found' || result.status === 'blocked') {
     return <ContractAccessGate reason={result.status} />;
