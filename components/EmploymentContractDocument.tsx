@@ -10,39 +10,32 @@ export default function EmploymentContractDocument({
   employerSignatureDate,
 }: {
   template: ContractTemplate;
+  /** Replaces the default blank employee signature line - used by the live e-signing page. */
   employeeSignatureSlot?: ReactNode;
+  /** Candidate identity shown when the contract was opened from a specific application. */
   prefilledFor?: { name: string; email: string };
+  /** Actual employer signature/issue date for an archived contract copy. */
   employerSignatureDate?: string | null;
 }) {
   const employeeName = template.editableFields.find((field) => field.label === 'Employee name')?.value || 'Employee';
-  const bimedId = template.editableFields.find((field) => field.label === 'BIMED ID')?.value;
-  const primaryAssignment = template.editableFields.find((field) => field.label === 'Place of Primary Assignment')?.value;
-  const accommodation = template.editableFields.find((field) => field.label === 'Accommodation arrangement')?.value;
-  const departureAirport = template.editableFields.find((field) => field.label === 'Departure airport')?.value;
-  const arrivalAirport = template.editableFields.find((field) => field.label === 'Final airport in Ireland')?.value;
-  const travellingParty = template.editableFields.find((field) => field.label === 'Travelling party')?.value;
-
   return (
     <EmploymentContractLetterhead>
       <section className="contract-section">
         <div className="contract-actions">
-          <div>
-            <span className="pill">CONTRACT OF EMPLOYMENT</span>
-            <div className="contract-document-purpose">DETE employment-permit supporting contract</div>
-          </div>
+          <span className="pill">CONTRACT OF EMPLOYMENT</span>
           <PrintContractButton />
         </div>
 
         {prefilledFor ? (
           <div className="contract-prefill-notice" role="status">
-            <strong>Canonical BIMED record</strong>
+            <strong>Candidate details</strong>
             <span>
-              This employment contract has been populated from the recorded BIMED employment data for {prefilledFor.name}. Operational particulars such as assignment, accommodation and travel update from the linked portal records.
+              This employment contract has been populated for {prefilledFor.name}. The employment details below come from the candidate's recruitment record.
             </span>
           </div>
         ) : null}
 
-        <div className="contract-meta contract-meta-four">
+        <div className="contract-meta">
           <div>
             <span>Document title</span>
             <strong>{template.documentTitle}</strong>
@@ -52,49 +45,25 @@ export default function EmploymentContractDocument({
             <strong>{template.roleLabel}</strong>
           </div>
           <div>
-            <span>Issued / effective record</span>
+            <span>Effective date</span>
             <strong>{template.effectiveDate}</strong>
           </div>
           <div>
-            <span>Contract status</span>
-            <strong>{bimedId ? 'BIMED staff contract · ' + bimedId : 'Employment contract'}</strong>
+            <span>Version</span>
+            <strong>Final</strong>
           </div>
         </div>
 
         <h1>{template.roleLabel} Employment Contract</h1>
         <p className="contract-intro">{template.intro}</p>
 
-        <div className="contract-key-facts">
-          <div>
-            <span>Primary assignment</span>
-            <strong>{withPlaceholders(primaryAssignment || 'To be confirmed')}</strong>
-          </div>
-          <div>
-            <span>Accommodation</span>
-            <strong>{withPlaceholders(accommodation || 'To be confirmed')}</strong>
-          </div>
-          <div>
-            <span>Initial departure</span>
-            <strong>{withPlaceholders(departureAirport || 'To be confirmed')}</strong>
-          </div>
-          <div>
-            <span>Final airport in Ireland</span>
-            <strong>{withPlaceholders(arrivalAirport || 'To be confirmed')}</strong>
-          </div>
-          <div>
-            <span>Travelling party</span>
-            <strong>{withPlaceholders(travellingParty || 'To be confirmed')}</strong>
-          </div>
-        </div>
-
         <div className="contract-panel">
-          <h2>Employment and permit particulars</h2>
+          <h2>Employment details</h2>
           <div className="contract-field-grid">
             {template.editableFields.map((field) => (
               <div className="contract-field" key={field.label}>
                 <span>{field.label}</span>
                 <strong>{withPlaceholders(field.value)}</strong>
-                {field.note ? <small>{withPlaceholders(field.note)}</small> : null}
               </div>
             ))}
           </div>
@@ -141,7 +110,8 @@ export default function EmploymentContractDocument({
           <h2>Signatures</h2>
           <p className="contract-intro">{withPlaceholders(template.closingNote)}</p>
           <p className="contract-intro">
-            Keep the signed and countersigned copy on file together with the Employee Handbook, privacy notice and any employment-permit, visa or vetting documents that apply.
+            Keep the signed and countersigned copy on file together with the Employee Handbook, privacy notice and any permit or vetting
+            documents that apply.
           </p>
         </section>
 
@@ -176,7 +146,7 @@ function formatSignatureDate(value?: string): string {
     : date.toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-const placeholderPattern = /(\[[^\]]+\])/g;
+const placeholderPattern = /(\[[^[\]]+\])/g;
 
 function withPlaceholders(text: string): ReactNode[] {
   return text.split(placeholderPattern).map((part, index) =>
