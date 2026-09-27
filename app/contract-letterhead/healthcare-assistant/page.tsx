@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import EmploymentContractDocument from '@/components/EmploymentContractDocument';
 import ContractAccessGate from '@/components/ContractAccessGate';
 import { resolveContractTemplate } from '@/lib/contract-prefill';
+import { resolveStaffContractTemplate } from '@/lib/bimed-staff-contract';
 
 export const metadata: Metadata = {
   title: 'Bimed Healthcare | Healthcare Assistant Contract Template',
@@ -11,12 +12,14 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 type PageProps = {
-  searchParams: Promise<{ applicationId?: string }>;
+  searchParams: Promise<{ applicationId?: string; staffId?: string }>;
 };
 
 export default async function HealthcareAssistantContractPage({ searchParams }: PageProps) {
-  const { applicationId } = await searchParams;
-  const result = await resolveContractTemplate('healthcare-assistant', applicationId);
+  const { applicationId, staffId } = await searchParams;
+  const result = staffId
+    ? await resolveStaffContractTemplate(staffId)
+    : await resolveContractTemplate('healthcare-assistant', applicationId);
 
   if (result.status === 'unauthorized' || result.status === 'not_found' || result.status === 'blocked') {
     return <ContractAccessGate reason={result.status} />;
