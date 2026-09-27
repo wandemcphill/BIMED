@@ -157,7 +157,7 @@ function formatSignatureDate(value?: string): string {
     : date.toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-const placeholderPattern = /(\\[[^\\]]+\\])/g;
+const placeholderPattern = /(\[[^\]]+\])/g;
 
 function withPlaceholders(value: string): ReactNode {
   return value.split(placeholderPattern).map((part, index) =>
