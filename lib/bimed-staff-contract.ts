@@ -201,6 +201,10 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    client.from('recruitment_external_contract_verifications')
+      .select('role_slug,verified_at')
+      .eq('application_id', staff.application_id)
+      .maybeSingle(),
   ]);
 
   if (applicationResult.error || permitResult.error || signatureResult.error || externalContractResult.error) {
@@ -364,6 +368,13 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     'Travel date': { value: formatDate(travelDate) },
     'Travelling party': { value: String(passengerCount) + ' passenger' + (Number(passengerCount) === 1 ? '' : 's') },
     'Airport pickup': { value: airportPickup ? 'Included' : 'Not included' },
+    'Employee email': { value: staff.email },
+    'Date of birth': { value: 'Recorded in BIMED personnel records and available to the permit application' },
+    'Nationality': { value: 'Recorded in BIMED personnel records and available to the permit application' },
+    'SOC / occupation classification': { value: 'To be confirmed in Employment Permits Online before submission' },
+    'Pay reference period': { value: BIMED_DEFAULT_PAY_FREQUENCY },
+    'Collective agreement / ERO / SEO': { value: 'No separate collective agreement recorded by BIMED; applicable Irish statutory terms and any applicable ERO/SEO will apply' },
+    'Social insurance': { value: 'PRSI and other statutory social insurance contributions as required by Irish law' },
     'Employer contact': { value: 'BIMED Recruitment / Overseas Recruitment · recruitment@bimedhealthcare.com · overseas@bimedhealthcare.com' },
   };
 
