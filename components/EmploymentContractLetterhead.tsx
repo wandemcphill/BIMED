@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Image from 'next/image';
+import { BIMED_LETTERHEAD } from '@/lib/bimed-letterhead';
 
 export default function EmploymentContractLetterhead({
   children,
@@ -16,29 +17,39 @@ export default function EmploymentContractLetterhead({
             <div className="contract-logo-mark">
               <Image
                 src="/bimed-logo.png"
-                alt="Bimed Healthcare Limited"
+                alt={BIMED_LETTERHEAD.legalName}
                 width={200}
                 height={67}
                 priority
               />
             </div>
-            <div>
-              <p className="contract-company">Bimed Healthcare Limited</p>
-              <p className="contract-tagline">Love. Care. Comfort.</p>
+            <div className="contract-brand-copy">
+              <p className="contract-company">{BIMED_LETTERHEAD.legalName}</p>
+              <p className="contract-tagline">{BIMED_LETTERHEAD.tagline}</p>
+              <p className="contract-registration">Company No. {BIMED_LETTERHEAD.companyNumber} · {BIMED_LETTERHEAD.jurisdiction}</p>
             </div>
           </div>
-          <div className="contract-contact">
-            <div>
-              <span>Recruitment</span>
-              <strong>recruitment@bimedhealthcare.com</strong>
-            </div>
-            <div>
-              <span>Admin</span>
-              <strong>info@bimedhealthcare.com</strong>
-            </div>
-            <div>
-              <span>Location</span>
-              <strong>Dublin, Ireland</strong>
+
+          <div className="contract-header-side">
+            <div className="contract-document-badge">{BIMED_LETTERHEAD.documentLabel}</div>
+            <div className="contract-document-compliance">{BIMED_LETTERHEAD.complianceLabel}</div>
+            <div className="contract-contact">
+              <div>
+                <span>Principal office</span>
+                <strong>{BIMED_LETTERHEAD.principalOffice}</strong>
+              </div>
+              <div>
+                <span>Recruitment</span>
+                <strong>{BIMED_LETTERHEAD.recruitmentEmail}</strong>
+              </div>
+              <div>
+                <span>Overseas recruitment</span>
+                <strong>{BIMED_LETTERHEAD.overseasEmail}</strong>
+              </div>
+              <div>
+                <span>General administration</span>
+                <strong>{BIMED_LETTERHEAD.adminEmail}</strong>
+              </div>
             </div>
           </div>
         </header>
@@ -46,6 +57,18 @@ export default function EmploymentContractLetterhead({
         <div className="contract-rule" />
 
         {children}
+
+        <footer className="contract-footer">
+          <div>
+            <strong>{BIMED_LETTERHEAD.legalName}</strong>
+            <span>Company No. {BIMED_LETTERHEAD.companyNumber}</span>
+            <span>{BIMED_LETTERHEAD.principalOffice}</span>
+          </div>
+          <div>
+            <span>{BIMED_LETTERHEAD.website}</span>
+            <span>{BIMED_LETTERHEAD.recruitmentEmail}</span>
+          </div>
+        </footer>
       </article>
     </div>
   );
