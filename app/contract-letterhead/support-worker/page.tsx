@@ -16,8 +16,10 @@ type PageProps = {
 };
 
 export default async function SupportWorkerContractPage({ searchParams }: PageProps) {
-  const { applicationId } = await searchParams;
-  const result = await resolveContractTemplate('support-worker', applicationId);
+  const { applicationId, staffId } = await searchParams;
+  const result = staffId
+    ? await resolveStaffContractTemplate(staffId)
+    : await resolveContractTemplate('support-worker', applicationId);
 
   if (result.status === 'unauthorized' || result.status === 'not_found' || result.status === 'blocked') {
     return <ContractAccessGate reason={result.status} />;
