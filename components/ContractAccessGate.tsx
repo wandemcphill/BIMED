@@ -18,7 +18,7 @@ export default function ContractAccessGate({ reason }: { reason: 'unauthorized' 
               {reason === 'unauthorized'
                 ? 'This link pre-fills a candidate\'s personal details. Sign in to the admin dashboard first, then reopen it.'
                 : blocked
-                  ? 'This permit-stage contract is deliberately locked until the overseas hire has completed the required accommodation step and submitted the initial travel itinerary. It is separate from the earlier onboarding contract.'
+                  ? 'Private Accommodation is selected, but BIMED has not recorded a verified Irish residential address. Verify the accommodation and address before issuing the final contract.'
                   : 'The application this link points to could not be found. It may have been removed.'}
             </p>
           </div>
@@ -26,9 +26,9 @@ export default function ContractAccessGate({ reason }: { reason: 'unauthorized' 
             <strong>What to do next</strong>
             <p>
               {reason === 'unauthorized'
-                ? 'Open the admin dashboard, sign in, then open the DETE permit-stage contract from an eligible overseas permit case.'
+                ? 'Open the admin dashboard, sign in, then use "Generate contract" from the candidate record.'
                 : blocked
-                  ? 'Return to the overseas permit case, complete the accommodation route and travel itinerary, then reopen the permit-stage contract.'
+                  ? 'Return to the candidate record, verify the accommodation/address or select "Accommodation Not Verified", then generate the contract again.'
                   : 'Return to the admin dashboard and re-open the candidate record.'}
             </p>
             <a className="secondary link-button" href="/admin">
