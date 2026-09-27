@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { ADMIN_SESSION_COOKIE_NAME, getAdminSessionFromToken } from '@/lib/admin-session';
 import { getContractTemplate, type ContractTemplate } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
+import { resolveContractAddress } from '@/lib/contract-accommodation';
 import {
   applyBimedContractDefaults,
   BIMED_DEFAULT_CONTRACT_DURATION,
@@ -256,6 +257,12 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
   const currentEmployeeAddress = joinAddress(staff) || application?.address || 'Current residential address recorded in the BIMED recruitment record';
   const employeeAddress = currentEmployeeAddress;
   const employeeAddressStatus = 'Current residential address from the BIMED recruitment/staff record. This is separate from the Irish accommodation address used for the permit-stage relocation record.';
+  if (accommodation.private) {
+    const addressResolution = resolveContractAddress(application || {});
+    if (!addressResolution.ready || addressResolution.mode !== 'private_verified') {
+      return { status: 'blocked', reason: addressResolution.message };
+    }
+  }
 
   const accommodationRoute = accommodation.private
     ? 'Private accommodation selected by employee'
@@ -386,9 +393,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
   const dynamicTemplate: ContractTemplate = {
     ...template,
     documentTitle: 'Final Employment Contract for Employment Permit Application',
-    effectiveDate: signatureResult.data?.issued_at
-      ? 'Issued ' + formatDate(signatureResult.data.issued_at)
-      : 'Prepared ' + formatDate(staff.updated_at),
+    effectiveDate: 'Prepared ' + formatDate(new Date().toISOString()),
     intro: 'Republic of Ireland · ' + roleLabel + ' · Permit-stage employment contract',
     editableFields: replaceFields(template, dynamicFieldValues),
     sections: allSections,
