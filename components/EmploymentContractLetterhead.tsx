@@ -35,8 +35,8 @@ export default function EmploymentContractLetterhead({
             <div className="contract-document-compliance">{BIMED_LETTERHEAD.complianceLabel}</div>
             <div className="contract-contact">
               <div>
-                <span>Principal office</span>
-                <strong>{BIMED_LETTERHEAD.principalOffice}</strong>
+                <span>Registered office</span>
+                <strong>{BIMED_LETTERHEAD.registeredOffice}</strong>
               </div>
               <div>
                 <span>Recruitment</span>
@@ -62,7 +62,7 @@ export default function EmploymentContractLetterhead({
           <div>
             <strong>{BIMED_LETTERHEAD.legalName}</strong>
             <span>Company No. {BIMED_LETTERHEAD.companyNumber}</span>
-            <span>{BIMED_LETTERHEAD.principalOffice}</span>
+            <span>{BIMED_LETTERHEAD.registeredOffice}</span>
           </div>
           <div>
             <span>{BIMED_LETTERHEAD.website}</span>
