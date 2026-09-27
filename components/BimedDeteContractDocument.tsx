@@ -38,7 +38,7 @@ export default function BimedDeteContractDocument({
             <div className="dete-compliance">{BIMED_LETTERHEAD.complianceLabel}</div>
             <div className="dete-contact-block">
               <span>Principal office</span>
-              <strong>{BIMED_LETTERHEAD.principalOffice}</strong>
+              <strong>{BIMED_LETTERHEAD.registeredOffice}</strong>
               <span>Recruitment</span>
               <strong>{BIMED_LETTERHEAD.recruitmentEmail}</strong>
               <span>Overseas recruitment</span>
@@ -158,7 +158,7 @@ export default function BimedDeteContractDocument({
           <div>
             <strong>{BIMED_LETTERHEAD.legalName}</strong>
             <span>Company No. {BIMED_LETTERHEAD.companyNumber}</span>
-            <span>{BIMED_LETTERHEAD.principalOffice}</span>
+            <span>{BIMED_LETTERHEAD.registeredOffice}</span>
           </div>
           <div>
             <span>{BIMED_LETTERHEAD.website}</span>
