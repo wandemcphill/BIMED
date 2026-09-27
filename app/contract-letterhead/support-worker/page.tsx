@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import EmploymentContractDocument from '@/components/EmploymentContractDocument';
+import DeteEmploymentContractDocument from '@/components/DeteEmploymentContractDocument';
 import ContractAccessGate from '@/components/ContractAccessGate';
 import { resolveContractTemplate } from '@/lib/contract-prefill';
 import { resolveStaffContractTemplate } from '@/lib/bimed-staff-contract';
@@ -25,5 +26,7 @@ export default async function SupportWorkerContractPage({ searchParams }: PagePr
     return <ContractAccessGate reason={result.status} />;
   }
 
-  return <EmploymentContractDocument template={result.template} prefilledFor={result.prefilledFor} />;
+  return staffId
+    ? <DeteEmploymentContractDocument template={result.template} prefilledFor={result.prefilledFor} />
+    : <EmploymentContractDocument template={result.template} prefilledFor={result.prefilledFor} />;
 }
