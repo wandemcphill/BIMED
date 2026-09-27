@@ -1007,12 +1007,57 @@ button:disabled {
   max-width: 100%;
 }
 
+.contract-brand-copy {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
 .contract-company {
   margin: 0;
   color: var(--navy);
-  font-weight: 800;
+  font-weight: 850;
   font-size: 20px;
   letter-spacing: 0.2px;
+}
+
+.contract-registration {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+
+.contract-header-side {
+  min-width: 310px;
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+}
+
+.contract-document-badge {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+}
+
+.contract-document-compliance {
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.contract-company + .contract-tagline {
+  margin-top: 2px;
 }
 
 .contract-tagline {
@@ -1024,9 +1069,10 @@ button:disabled {
 
 .contract-contact {
   display: grid;
-  gap: 8px;
-  min-width: 240px;
+  gap: 7px;
+  min-width: 310px;
   text-align: right;
+  max-width: 420px;
 }
 
 .contract-contact span,
@@ -1046,9 +1092,17 @@ button:disabled {
 }
 
 .contract-rule {
-  height: 1px;
-  background: linear-gradient(90deg, rgba(23, 50, 77, 0.18), rgba(0, 143, 202, 0.2), rgba(23, 50, 77, 0.18));
-  margin: 24px 0 28px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(23, 50, 77, 0.18), rgba(0, 143, 202, 0.55), rgba(23, 50, 77, 0.18));
+  margin: 20px 0 24px;
+}
+
+.contract-document-purpose {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15px;
 }
 
 .contract-section h1 {
@@ -1066,8 +1120,46 @@ button:disabled {
 .contract-meta {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 18px;
+}
+
+.contract-meta-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.contract-key-facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.contract-key-facts > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dbe8ec;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfefe 0%, #f3f9fa 100%);
+}
+
+.contract-key-facts span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.55px;
+}
+
+.contract-key-facts strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--navy);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .contract-meta strong,
@@ -1225,6 +1317,32 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 32px;
   margin-top: 26px;
+}
+
+.contract-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid #dbe8ec;
+  color: #718096;
+  font-size: 9px;
+  line-height: 1.45;
+  letter-spacing: 0.1px;
+}
+
+.contract-footer > div {
+  display: grid;
+  gap: 2px;
+}
+
+.contract-footer > div:last-child {
+  text-align: right;
+}
+
+.contract-footer strong {
+  color: var(--navy);
 }
 
 .signature-line {
@@ -1440,15 +1558,43 @@ button.danger {
   .contract-header,
   .contract-brand,
   .contract-contact,
+  .contract-header-side,
   .contract-actions {
     display: block;
     text-align: left;
   }
 
+  .contract-header-side {
+    min-width: 0;
+    margin-top: 14px;
+  }
+
+  .contract-contact {
+    min-width: 0;
+    max-width: none;
+    margin-top: 10px;
+  }
+
+  .contract-document-badge,
+  .contract-document-compliance {
+    width: fit-content;
+  }
+
   .contract-meta,
+  .contract-meta-four,
+  .contract-key-facts,
   .contract-grid,
   .contract-signatures {
     grid-template-columns: 1fr;
+  }
+
+  .contract-footer {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .contract-footer > div:last-child {
+    text-align: left;
   }
 
   .contract-field-grid {
