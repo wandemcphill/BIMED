@@ -1500,3 +1500,481 @@ button.danger {
     print-color-adjust: exact;
   }
 }
+
+
+/* Permit-stage DETE contract. Kept namespace-isolated from the original onboarding contract. */
+.dete-contract-page {
+  padding: 28px 18px 60px;
+  background: transparent;
+}
+
+.dete-contract-sheet {
+  max-width: 1020px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgba(23, 50, 77, 0.09);
+  padding: 28px 34px 32px;
+}
+
+.dete-contract-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.dete-contract-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.dete-contract-logo img {
+  display: block;
+  width: 210px;
+  height: auto;
+  max-width: 100%;
+}
+
+.dete-contract-brand-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dete-contract-company {
+  color: var(--navy);
+  font-size: 21px;
+  font-weight: 850;
+  letter-spacing: 0.15px;
+}
+
+.dete-contract-tagline {
+  color: var(--teal);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dete-contract-registration {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
+}
+
+.dete-contract-header-side {
+  min-width: 320px;
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+}
+
+.dete-contract-badge {
+  display: inline-block;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.85px;
+}
+
+.dete-contract-compliance {
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.65px;
+  text-transform: uppercase;
+}
+
+.dete-contract-contact {
+  display: grid;
+  gap: 6px;
+  min-width: 320px;
+  max-width: 430px;
+  text-align: right;
+}
+
+.dete-contract-contact span,
+.dete-contract-meta span,
+.dete-contract-field > span,
+.dete-contract-key-facts span,
+.dete-contract-signatures > div > span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.45px;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.dete-contract-contact strong {
+  display: block;
+  color: var(--navy);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.dete-contract-rule {
+  height: 2px;
+  margin: 20px 0 24px;
+  background: linear-gradient(90deg, rgba(23,50,77,.18), rgba(10,142,198,.55), rgba(23,50,77,.18));
+}
+
+.dete-contract-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.dete-contract-pill {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+}
+
+.dete-contract-purpose {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dete-contract-prefill {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid #cfe3e3;
+  border-radius: 12px;
+  background: #f0f7f8;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dete-contract-prefill strong {
+  color: var(--navy);
+}
+
+.dete-contract-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.dete-contract-meta > div,
+.dete-contract-key-facts > div {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #dbe8ec;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfefe 0%, #f4f9fa 100%);
+}
+
+.dete-contract-meta strong {
+  color: var(--navy);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.dete-contract-section h1 {
+  margin-top: 0;
+}
+
+.dete-contract-intro {
+  font-size: 14px;
+  line-height: 1.68;
+  margin-bottom: 16px;
+}
+
+.dete-contract-key-facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.dete-contract-key-facts strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--navy);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.dete-contract-panel {
+  margin-top: 12px;
+  padding: 17px;
+  border: 1px solid #dbe8ec;
+  border-radius: 15px;
+  background: #f9fcfd;
+}
+
+.dete-contract-panel h2 {
+  margin: 0 0 12px;
+}
+
+.dete-contract-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.dete-contract-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dbe8ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.dete-contract-field strong {
+  color: var(--navy);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.dete-contract-field small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.dete-contract-body p {
+  margin: 8px 0 0;
+  line-height: 1.65;
+}
+
+.dete-contract-bullets {
+  margin: 9px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.dete-contract-bullets li {
+  line-height: 1.55;
+}
+
+.dete-contract-schedules {
+  margin-top: 16px;
+}
+
+.dete-contract-schedule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.dete-contract-schedule {
+  padding: 13px;
+  border: 1px solid #dbe8ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.dete-contract-schedule h3 {
+  margin: 0 0 8px;
+  color: var(--navy);
+  font-size: 14px;
+}
+
+.dete-contract-schedule p:first-of-type {
+  margin-top: 0;
+}
+
+.dete-contract-signatures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  margin-top: 24px;
+  padding-top: 18px;
+}
+
+.dete-contract-signature-line {
+  height: 32px;
+  margin: 8px 0 7px;
+  border-bottom: 1px solid #9db3bd;
+}
+
+.dete-contract-signature-signed {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 4px;
+  font-family: 'Brush Script MT', 'Segoe Script', cursive;
+  font-size: 22px;
+  color: var(--navy);
+}
+
+.dete-contract-signatures strong {
+  display: block;
+  color: var(--navy);
+  font-size: 13px;
+}
+
+.dete-contract-signatures small {
+  display: block;
+  margin-top: 2px;
+  color: #5b7480;
+  font-size: 10px;
+}
+
+.dete-contract-placeholder {
+  display: inline;
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: #ecf8fb;
+  box-shadow: inset 0 0 0 1px #cae7ef;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.dete-contract-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid #dbe8ec;
+  color: #718096;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.dete-contract-footer > div {
+  display: grid;
+  gap: 2px;
+}
+
+.dete-contract-footer > div:last-child {
+  text-align: right;
+}
+
+.dete-contract-footer strong {
+  color: var(--navy);
+}
+
+@media (max-width: 920px) {
+  .dete-contract-header {
+    display: block;
+  }
+
+  .dete-contract-header-side {
+    min-width: 0;
+    justify-items: start;
+    margin-top: 14px;
+  }
+
+  .dete-contract-contact {
+    min-width: 0;
+    max-width: none;
+    text-align: left;
+    margin-top: 10px;
+  }
+
+  .dete-contract-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dete-contract-key-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .dete-contract-page {
+    padding: 16px 10px 34px;
+  }
+
+  .dete-contract-sheet {
+    padding: 20px 16px 24px;
+    border-radius: 14px;
+  }
+
+  .dete-contract-brand {
+    align-items: flex-start;
+  }
+
+  .dete-contract-logo img {
+    width: 165px;
+  }
+
+  .dete-contract-company {
+    font-size: 17px;
+  }
+
+  .dete-contract-actions,
+  .dete-contract-footer {
+    display: block;
+  }
+
+  .dete-contract-meta,
+  .dete-contract-key-facts,
+  .dete-contract-field-grid,
+  .dete-contract-signatures {
+    grid-template-columns: 1fr;
+  }
+
+  .dete-contract-footer > div:last-child {
+    margin-top: 6px;
+    text-align: left;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .dete-contract-page {
+    padding: 0;
+  }
+
+  .dete-contract-sheet {
+    max-width: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .dete-contract-actions button {
+    display: none !important;
+  }
+
+  .dete-contract-panel,
+  .dete-contract-schedule,
+  .dete-contract-key-facts > div {
+    break-inside: avoid;
+  }
+
+  .dete-contract-placeholder {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
