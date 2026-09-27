@@ -37,6 +37,8 @@ export type EmailType =
   | 'contract_ready_to_sign'
   | 'admin_contract_signed'
   | 'document_ready_to_sign'
+  | 'dete_permit_contract_ready_to_sign'
+  | 'admin_dete_permit_contract_signed'
   | 'admin_document_signed'
   | 'onboarding_pack'
   | 'recruitment_invite'

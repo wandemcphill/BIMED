@@ -7,10 +7,12 @@ export default function DeteEmploymentContractDocument({
   template,
   prefilledFor,
   employerSignatureDate,
+  employeeSignature,
 }: {
   template: ContractTemplate;
   prefilledFor?: { name: string; email: string };
   employerSignatureDate?: string | null;
+  employeeSignature?: { name: string; date: string | null } | null;
 }) {
   const employeeName = template.editableFields.find((field) => field.label === 'Employee name')?.value || 'Employee';
   const bimedId = template.editableFields.find((field) => field.label === 'BIMED ID')?.value;
@@ -140,9 +142,13 @@ export default function DeteEmploymentContractDocument({
           </div>
           <div>
             <span>Employee</span>
-            <div className="dete-contract-signature-line" />
-            <strong>{withPlaceholders(employeeName)}</strong>
-            <small>Date signed: ____________________</small>
+            <div className="dete-contract-signature-line dete-contract-signature-signed">
+              {employeeSignature?.name || ''}
+            </div>
+            <strong>{withPlaceholders(employeeSignature?.name || employeeName)}</strong>
+            <small>
+              Date signed: {employeeSignature?.date ? formatSignatureDate(employeeSignature.date) : 'Pending candidate signature'}
+            </small>
           </div>
         </section>
       </section>
