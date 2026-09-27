@@ -25,6 +25,7 @@ import {
   secondInterviewInviteEmail,
 } from './templates';
 import { sendTransactionalEmail, type SendResult } from './transport';
+import { adminDetePermitContractSignedEmail, detePermitContractReadyToSignEmail } from './dete-contract';
 
 export { isEmailConfigured, maskEmail, isValidRecipient, __setEmailSenderForTests } from './transport';
 export type { SendResult } from './transport';
@@ -188,3 +189,43 @@ type InterviewEmailInput = {
   reason?: string | null;
   revision?: number;
 };
+
+
+export async function sendDetePermitContractReadyToSignEmail(input: {
+  application: ApplicationEmailRecord;
+  signUrl: string;
+  primaryAssignment: string;
+  expiresAt: string;
+  signatureId: string;
+}, client?: SupabaseClient | null): Promise<SendResult> {
+  return sendTransactionalEmail({
+    to: input.application.email,
+    content: detePermitContractReadyToSignEmail(input),
+    emailType: 'dete_permit_contract_ready_to_sign',
+    dedupeKey: 'dete_permit_contract_ready_to_sign:' + input.signatureId,
+    applicationId: input.application.id,
+    client,
+    replyTo: recruitmentContacts.overseas,
+  });
+}
+
+export async function sendDetePermitContractSignedNotificationEmails(input: {
+  application: ApplicationEmailRecord;
+  signedName: string;
+  signedAt: string;
+  signatureId: string;
+}, client?: SupabaseClient | null): Promise<SendResult[]> {
+  const content = adminDetePermitContractSignedEmail(input);
+  return Promise.all(
+    [recruitmentContacts.admin].map((recipient) =>
+      sendTransactionalEmail({
+        to: recipient,
+        content,
+        emailType: 'admin_dete_permit_contract_signed',
+        dedupeKey: 'admin_dete_permit_contract_signed:' + input.signatureId + ':' + recipient,
+        applicationId: input.application.id,
+        client,
+      })
+    )
+  );
+}

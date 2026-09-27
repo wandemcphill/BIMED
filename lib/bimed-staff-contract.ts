@@ -215,7 +215,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
   const permit = permitResult.data;
 
   if (!permit) return { status: 'blocked', reason: 'The overseas employment-permit case has not been initialized.' };
-  if (!signatureResult.data && !externalContractResult.data) {
+  if (signatureResult.data?.status !== 'signed' && !externalContractResult.data) {
     return { status: 'blocked', reason: 'The initial BIMED onboarding contract must already be signed or administrator-verified before the separate permit-stage contract can be issued.' };
   }
   if (!permit.permit_submission_route) {
