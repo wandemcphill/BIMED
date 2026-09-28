@@ -18,6 +18,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const body = await request.json().catch(() => ({}));
   const mode = body?.mode === 'signed' ? 'signed' : 'unsigned';
+  const action = body?.action === 'send' ? 'send' : 'generate';
   const { id: applicationId } = await context.params;
   const client = db();
 
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'There is no signed contract available for this candidate.' }, { status: 409 });
   }
 
-  const selected = mode === 'signed' ? signed : (active || signed);
+  const selected = mode === 'signed' ? signed : active;
   const access = await createContractDocumentAccess({
     applicationId,
     signatureId: selected?.id || null,
@@ -49,12 +50,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     createdBy: session.email,
   });
 
-  const email = await sendContractDocumentCopyEmail({
-    application,
-    documentUrl: access.url,
-    signed: mode === 'signed',
-    accessId: access.record.id,
-  }, client);
+  const email = action === 'send'
+    ? await sendContractDocumentCopyEmail({
+        application,
+        documentUrl: access.url,
+        signed: mode === 'signed',
+        accessId: access.record.id,
+      }, client)
+    : null;
 
   return NextResponse.json({
     url: access.url,
@@ -62,5 +65,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     email,
     roleSlug,
     signature: selected,
+    action,
   });
 }
