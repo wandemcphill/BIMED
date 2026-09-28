@@ -35,6 +35,7 @@ export type EmailType =
   | 'admin_status_change'
   | 'admin_password_reset'
   | 'contract_ready_to_sign'
+  | 'contract_document_copy'
   | 'admin_contract_signed'
   | 'document_ready_to_sign'
   | 'dete_permit_contract_ready_to_sign'
