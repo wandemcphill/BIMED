@@ -644,11 +644,11 @@ export default function AdminApplicationDetail({
         <div className="toolbar">
           <a
             className="primary link-button"
-            href={`/contract-letterhead/${contractRoleSlug}?applicationId=${applicationId}`}
+            href={`/admin/applications/${applicationId}/contract`}
             target="_blank"
             rel="noreferrer"
           >
-            Open pre-filled contract
+            Open contract manager
           </a>
           <div className="notice" style={{ flex: 1 }}>
             <strong>Signing is managed through the complete onboarding pack.</strong>
