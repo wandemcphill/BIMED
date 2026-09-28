@@ -19,32 +19,76 @@ export default function StaffDashboard() {
 
   async function load() {
     setError('');
-    const [meResponse, rotaResponse, payResponse, noticeResponse] = await Promise.all([
-      fetch('/api/staff/me'),
-      fetch('/api/staff/rota'),
-      fetch('/api/staff/payslips'),
-      fetch('/api/staff/notifications'),
-    ]);
-    if (meResponse.status === 401) { router.replace('/staff/login'); return; }
-    const [me, rota, pay, notice] = await Promise.all([meResponse.json(), rotaResponse.json(), payResponse.json(), noticeResponse.json()]);
-    if (!meResponse.ok) { setError(me.error || 'Unable to load your BIMED profile.'); return; }
-    setStaff(me.staff); setPhotoFailed(false); setPps(me.staff.pps_number || ''); setAddress(me.staff.address_line_1 || ''); setPhone(me.staff.phone || ''); setShifts(rota.shifts || []); setRequests(rota.requests || []); setLeave(rota.leaveRequests || []); setPayslips(pay.payslips || []); setNotifications(notice.notifications || []);
-
-    if (me.staff.application_id) {
-      const [onboardingResponse, permitResponse] = await Promise.all([
-        fetch('/api/staff/onboarding', { cache: 'no-store' }),
-        me.staff.status === 'pre_arrival' ? fetch('/api/staff/permit', { cache: 'no-store' }) : Promise.resolve(null),
+    try {
+      const [meResponse, rotaResponse, payResponse, noticeResponse] = await Promise.all([
+        fetch('/api/staff/me'),
+        fetch('/api/staff/rota'),
+        fetch('/api/staff/payslips'),
+        fetch('/api/staff/notifications'),
       ]);
-      const onboardingData = await onboardingResponse.json().catch(() => null);
-      setOnboarding(onboardingResponse.ok ? onboardingData : null);
-      if (permitResponse) {
-        const permitData = await permitResponse.json().catch(() => null);
-        setPermitSummary(permitResponse.ok ? permitData : null);
+      if (meResponse.status === 401) { router.replace('/staff/login'); return; }
+
+      // Authentication/profile is the critical path. A secondary endpoint must not
+      // prevent the Staff Portal from opening when it is temporarily unavailable.
+      const me = await meResponse.json().catch(() => ({}));
+      if (!meResponse.ok || !me.staff) {
+        setError(me.error || 'Unable to load your BIMED profile.');
+        return;
+      }
+      setStaff(me.staff);
+      setPhotoFailed(false);
+      setPps(me.staff.pps_number || '');
+      setAddress(me.staff.address_line_1 || '');
+      setPhone(me.staff.phone || '');
+
+      const readJson = async (response: Response) => ({
+        ok: response.ok,
+        data: await response.json().catch(() => ({})),
+      });
+      const [rota, pay, notice] = await Promise.all([
+        readJson(rotaResponse),
+        readJson(payResponse),
+        readJson(noticeResponse),
+      ]);
+      if (rota.ok) {
+        setShifts(rota.data.shifts || []);
+        setRequests(rota.data.requests || []);
+        setLeave(rota.data.leaveRequests || []);
+      }
+      if (pay.ok) setPayslips(pay.data.payslips || []);
+      if (notice.ok) setNotifications(notice.data.notifications || []);
+
+      const secondaryErrors: string[] = [];
+      if (!rota.ok) secondaryErrors.push('rota');
+      if (!pay.ok) secondaryErrors.push('payslips');
+      if (!notice.ok) secondaryErrors.push('notifications');
+
+      if (me.staff.application_id) {
+        const [onboardingResponse, permitResponse] = await Promise.all([
+          fetch('/api/staff/onboarding', { cache: 'no-store' }),
+          me.staff.status === 'pre_arrival' ? fetch('/api/staff/permit', { cache: 'no-store' }) : Promise.resolve(null),
+        ]);
+        const onboardingData = await onboardingResponse.json().catch(() => null);
+        setOnboarding(onboardingResponse.ok ? onboardingData : null);
+        if (permitResponse) {
+          const permitData = await permitResponse.json().catch(() => null);
+          setPermitSummary(permitResponse.ok ? permitData : null);
+          if (!permitResponse.ok) secondaryErrors.push('employment permit');
+        } else {
+          setPermitSummary(null);
+        }
+        if (!onboardingResponse.ok) secondaryErrors.push('onboarding');
       } else {
+        setOnboarding(null);
         setPermitSummary(null);
       }
-    } else {
-      setOnboarding(null); setPermitSummary(null);
+
+      if (secondaryErrors.length) {
+        setError('Some Staff Portal sections are temporarily unavailable (' + secondaryErrors.join(', ') + '). Your profile remains accessible.');
+      }
+    } catch (loadError) {
+      console.error('Staff Portal load failed', loadError);
+      setError('Unable to load the Staff Portal right now. Please refresh the page and try again.');
     }
   }
   useEffect(() => { void load(); }, []);
