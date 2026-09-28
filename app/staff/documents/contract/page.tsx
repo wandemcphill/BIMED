@@ -27,7 +27,7 @@ export default async function StaffEmploymentContractCopyPage() {
     .from('recruitment_contract_signatures')
     .select('id,role_slug,employee_name,employee_address,start_date,status,signed_name,signed_at,issued_by,issued_at,expires_at,created_at')
     .eq('application_id', staff.application_id)
-    .eq('status', 'signed')
+    .in('status', ['signed', 'issued'])
     .order('created_at', { ascending: false });
 
   if (error || !signatures?.length) {
@@ -37,9 +37,9 @@ export default async function StaffEmploymentContractCopyPage() {
           <a href="/staff" style={{ color: '#0f766e', fontWeight: 800 }}>← Staff Portal</a>
           <section style={{ marginTop: 18, background: '#fff', border: '1px solid #e5eaf0', borderRadius: 18, padding: 24 }}>
             <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.2, color: '#0f766e' }}>EMPLOYMENT DOCUMENTS</div>
-            <h1 style={{ margin: '6px 0 10px' }}>Signed employment contract</h1>
+            <h1 style={{ margin: '6px 0 10px' }}>Employment contract</h1>
             <p style={{ color: '#627d98', lineHeight: 1.6 }}>
-              Your signed employment contract is not currently available in the Staff Portal. If you have already signed a BIMED employment contract and need another copy, contact the BIMED recruitment or HR team and they can review your document record.
+              Your employment contract is not currently available in the Staff Portal. If you have been issued a BIMED employment contract and need access to the signing link, contact the BIMED recruitment or HR team so they can review your document record.
             </p>
           </section>
         </div>
@@ -66,6 +66,29 @@ export default async function StaffEmploymentContractCopyPage() {
       startDate: signature.start_date,
     })
   );
+
+  if (signature.status === 'issued') {
+    return (
+      <main style={{ minHeight: '100vh', background: '#f4f7fb', color: '#102a43', padding: 28, fontFamily: 'system-ui' }}>
+        <div style={{ maxWidth: 860, margin: '0 auto' }}>
+          <a href="/staff" style={{ color: '#0f766e', fontWeight: 800 }}>← Staff Portal</a>
+          <section style={{ marginTop: 18, background: '#fff', border: '1px solid #e5eaf0', borderRadius: 18, padding: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.2, color: '#0f766e' }}>EMPLOYMENT DOCUMENTS</div>
+            <h1 style={{ margin: '6px 0 10px' }}>Employment contract ready for signature</h1>
+            <p style={{ color: '#627d98', lineHeight: 1.6 }}>
+              Your BIMED employment contract has been issued and is awaiting your signature. The secure signing link is sent to your recruitment email address. Please use that link to review and sign the contract.
+            </p>
+            {signature.issued_at ? (
+              <p style={{ color: '#627d98' }}>
+                Issued: {new Date(signature.issued_at).toLocaleDateString('en-IE', { dateStyle: 'long' })}
+                {signature.expires_at ? <> · Expires: {new Date(signature.expires_at).toLocaleDateString('en-IE', { dateStyle: 'long' })}</> : null}
+              </p>
+            ) : null}
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   const employeeSignatureSlot = (
     <>
