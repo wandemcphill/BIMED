@@ -67,7 +67,7 @@ export default function AdminContractManagerPage() {
       const response = await fetch('/api/admin/applications/' + id + '/contract-copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode, action: 'send' }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Unable to prepare the contract copy.');
@@ -92,7 +92,7 @@ export default function AdminContractManagerPage() {
       const response = await fetch('/api/admin/applications/' + id + '/contract-copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode, action: 'generate' }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Unable to generate contract copy.');
