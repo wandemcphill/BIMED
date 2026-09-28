@@ -26,6 +26,7 @@ import {
 } from './templates';
 import { sendTransactionalEmail, type SendResult } from './transport';
 import { adminDetePermitContractSignedEmail, detePermitContractReadyToSignEmail } from './dete-contract';
+import { contractDocumentCopyEmail } from './contract-copy';
 
 export { isEmailConfigured, maskEmail, isValidRecipient, __setEmailSenderForTests } from './transport';
 export type { SendResult } from './transport';
@@ -158,6 +159,23 @@ export async function sendSecondInterviewCompletedEmails(input: { application: A
 
 export async function sendOnboardingPackEmail(input: { application: ApplicationEmailRecord; contractSignUrl: string; jobDescriptionUrl: string; handbookUrl: string; packId: string }, client?: SupabaseClient | null): Promise<SendResult> {
   return sendTransactionalEmail({ to: input.application.email, content: onboardingPackEmail({ candidateName: input.application.full_name, role: input.application.role_applied, applicationId: input.application.id, contractSignUrl: input.contractSignUrl, jobDescriptionUrl: input.jobDescriptionUrl, handbookUrl: input.handbookUrl }), emailType: 'onboarding_pack', dedupeKey: `onboarding_pack:${input.packId}`, applicationId: input.application.id, client, replyTo: recruitmentContacts.ireland });
+}
+
+export async function sendContractDocumentCopyEmail(input: { application: ApplicationEmailRecord; documentUrl: string; signed: boolean; accessId: string }, client?: SupabaseClient | null): Promise<SendResult> {
+  return sendTransactionalEmail({
+    to: input.application.email,
+    content: contractDocumentCopyEmail({
+      candidateName: input.application.full_name,
+      role: input.application.role_applied,
+      documentUrl: input.documentUrl,
+      signed: input.signed,
+    }),
+    emailType: 'contract_document_copy',
+    dedupeKey: `contract_document_copy:${input.accessId}`,
+    applicationId: input.application.id,
+    client,
+    replyTo: recruitmentContacts.ireland,
+  });
 }
 
 export async function sendContractReadyToSignEmail(input: { application: ApplicationEmailRecord; signUrl: string; signatureId: string }, client?: SupabaseClient | null): Promise<SendResult> {
