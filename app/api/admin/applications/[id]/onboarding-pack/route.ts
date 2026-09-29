@@ -11,6 +11,7 @@ import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 import { getPreContractReadiness } from '@/lib/onboarding-readiness';
 import { resolveContractAddress, type ContractAddressResolution } from '@/lib/contract-accommodation';
+import { transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    if (!['Submitted', 'Offer Issued', 'Onboarding', 'Hired'].includes(currentApplication.status)) {
+    if (!['Submitted', 'Under Review', 'Offer Issued', 'Onboarding', 'Hired'].includes(currentApplication.status)) {
       return NextResponse.json(
         { error: `The complete onboarding pack cannot be issued from ${currentApplication.status}.` },
         { status: 409 },
@@ -148,6 +149,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       url: result.url,
     }));
 
+    let transitionedApplication = application;
+    if (currentApplication.status === 'Submitted' || currentApplication.status === 'Under Review') {
+      transitionedApplication = await transitionBimedApplicationStatus(client, {
+        applicationId: currentApplication.id,
+        toStatus: 'Offer Issued',
+        actor: session.email,
+        note: 'Complete onboarding pack issued.',
+      });
+    }
+
     const email = await sendFullOnboardingPackEmail({
       application,
       signingDocuments: [
@@ -161,10 +172,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }, client);
 
     const previousStatus = currentApplication.status;
-    const transitionedApplication = previousStatus === 'Submitted'
-      ? { ...application, status: 'Offer Issued' }
-      : application;
-
     await recordRecruitmentAudit(client, {
       applicationId: currentApplication.id,
       eventType: 'onboarding_pack_sent',
@@ -195,6 +202,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       packetLinks,
       international,
       email,
+      application: transitionedApplication,
     });
   } catch (error) {
     console.error(JSON.stringify({ level: 'error', event: 'onboarding_pack.send_failed', application_id: applicationId, reason: error instanceof Error ? error.message : 'unknown' }));
