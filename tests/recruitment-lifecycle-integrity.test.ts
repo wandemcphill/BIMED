@@ -56,21 +56,15 @@ describe('BIMED recruitment lifecycle policy', () => {
 
 
 describe('contract issuance lifecycle boundary', () => {
-  it('lets the contract issuance RPC own Submitted to Offer Issued when pre-contract checks are complete', async () => {
-    const fs = await import('node:fs/promises');
-    const migration = await fs.readFile(
-      'supabase/migrations/20260921192748_contract_issue_offer_transition_20260921.sql',
-      'utf8',
-    );
+  it('allows the onboarding pack to issue from Under Review and persist the Offer Issued transition', async () => {
     const packRoute = await fs.readFile(
       'app/api/admin/applications/[id]/onboarding-pack/route.ts',
       'utf8',
     );
 
-    expect(migration).toContain("if v_application.status = 'Submitted' then");
-    expect(migration).toContain("set status = 'Offer Issued'");
-    expect(migration).toContain('PRE_CONTRACT_VERIFICATION_BLOCKED');
-    expect(packRoute).toContain("previousStatus === 'Submitted'");
-    expect(packRoute).not.toContain('transitionBimedApplicationStatus');
+    expect(BIMED_STATUS_TRANSITIONS['Under Review']).toContain('Offer Issued');
+    expect(packRoute).toContain("currentApplication.status === 'Submitted' || currentApplication.status === 'Under Review'");
+    expect(packRoute).toContain('transitionBimedApplicationStatus');
+    expect(packRoute).toContain("toStatus: 'Offer Issued'");
   });
 });
