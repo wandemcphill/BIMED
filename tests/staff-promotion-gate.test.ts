@@ -133,6 +133,6 @@ describe('contract-first provisioning regression', () => {
     expect(contractRoute).toContain('Standalone contract signing requests are disabled.');
     expect(packRoute).toContain('getPreContractReadiness');
     expect(packRoute).toContain('Contract issuance is blocked until identity, qualification and references are verified or formally waived.');
-    expect(packRoute).toContain("['Submitted', 'Offer Issued', 'Onboarding', 'Hired']");
+    expect(packRoute).toContain("['Submitted', 'Under Review', 'Offer Issued', 'Onboarding', 'Hired']");
   });
 });
