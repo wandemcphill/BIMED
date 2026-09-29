@@ -33,7 +33,7 @@ export function isBimedRecruitmentStatus(value: string | null | undefined): valu
 
 export const BIMED_STATUS_TRANSITIONS: Record<BimedRecruitmentStatus, readonly BimedRecruitmentStatus[]> = {
   Submitted: ['Under Review', 'Interview', 'Rejected', 'Withdrawn'],
-  'Under Review': ['Interview', 'Documents Awaiting', 'Rejected', 'Withdrawn'],
+  'Under Review': ['Interview', 'Documents Awaiting', 'Offer Issued', 'Rejected', 'Withdrawn'],
   Interview: ['Selected', 'Documents Awaiting', 'Offer Issued', 'Rejected', 'Withdrawn'],
   Selected: ['Offer Issued', 'Documents Awaiting', 'Onboarding', 'Rejected', 'Withdrawn'],
   'Offer Issued': ['Documents Awaiting', 'Onboarding', 'Rejected', 'Withdrawn'],
