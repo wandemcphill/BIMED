@@ -198,7 +198,7 @@ export function invoiceHtml(input: { invoice: any; staff: any; account?: any; pu
     <main class="sheet"><div class="topline"></div><div class="inner">
       <header class="masthead">
         <div><div class="brand">BIMED HEALTHCARE LIMITED</div><div class="company">Bimed Healthcare Limited</div><div class="tagline">Love. Care. Comfort. · Accommodation Billing</div></div>
-        <div class="doc-title"><h1>Accommodation Invoice</h1><div class="doc-label">Invoice number</div><div class="doc-number">${e(input.invoice.invoice_number)}</div><div class="doc-label">Issue date</div><div>${e(dateOnly(input.invoice.issued_at || input.invoice.issue_date))}</div><div class="doc-label">Due date</div><div>${e(input.invoice.due_date ? dateOnly(input.invoice.due_date) : 'On receipt')}</div></div>
+        <div class="doc-title"><h1>Accommodation Invoice</h1><div class="doc-label">Invoice number</div><div class="doc-number">${e(input.invoice.invoice_number)}</div><div class="doc-label">Issue date</div><div>${e(dateOnly(input.invoice.issued_at || input.invoice.issue_date))}</div><div class="doc-label">Due date</div><div>${e(dateOnly(input.invoice.issued_at || input.invoice.issue_date))}</div></div>
       </header>
       <div class="rule"></div>
       <div class="meta-grid">
