@@ -108,7 +108,7 @@ function documentStyles() {
     .doc-label { margin-top:8px; color:#627d98; font-size:12px; font-weight:800; }
     .doc-number { margin-top:5px; font-weight:900; color:#0f766e; }
     .rule { height:1px; background:#dfe7ec; margin:28px 0; }
-    .meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+     .meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
     .panel { border:1px solid #dfe7ec; border-radius:12px; padding:16px; background:#f9fbfc; }
     .kicker { color:#627d98; font-size:11px; font-weight:900; letter-spacing:.08em; }
     .panel strong { display:block; margin-top:6px; font-size:15px; color:#163247; }
@@ -142,6 +142,18 @@ function documentStyles() {
     .footer { margin-top:28px; padding-top:14px; border-top:1px solid #e4eaee; color:#78909c; font-size:10px; line-height:1.5; }
     .button { display:inline-block; margin-top:22px; padding:11px 16px; border-radius:8px; background:#0f766e; color:#fff; text-decoration:none; font-size:12px; font-weight:800; }
     .payment-instructions { margin-top:22px; }
+    .india-payment-card { margin-top:16px; padding:18px; border:1px solid #b9d9df; border-radius:12px; background:#f1fbfd; }
+    .india-payment-kicker { color:#0a6b83; font-size:11px; font-weight:900; letter-spacing:.08em; }
+    .india-payment-card h3 { margin:7px 0 0; font-size:18px; color:#163247; }
+    .india-intro { margin:7px 0 14px; color:#334e68; font-size:12px; line-height:1.55; }
+    .india-amount { display:grid; grid-template-columns:1fr auto; gap:8px 16px; padding:12px 14px; margin-bottom:14px; border-radius:10px; background:#fff; border:1px solid #d9e7eb; }
+    .india-amount span { color:#627d98; font-size:11px; font-weight:800; }
+    .india-amount strong { color:#0f766e; font-size:15px; text-align:right; }
+    .india-details { display:grid; grid-template-columns:1fr 1fr; gap:0 20px; }
+    .india-details > div { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid #dcebed; font-size:11px; }
+    .india-details span { color:#627d98; }
+    .india-details strong { color:#163247; text-align:right; overflow-wrap:anywhere; }
+    .india-note { margin-top:14px; padding:11px 13px; border-radius:9px; background:#fff; border:1px solid #d9e7eb; color:#334e68; font-size:11px; line-height:1.5; }
     .payment-instructions .notice { margin-top:0; }
     @media (max-width:700px) { .inner { padding:28px 22px 30px; } .masthead { flex-direction:column; } .doc-title { text-align:left; } .meta-grid,.detail-grid { grid-template-columns:1fr; } }
     @media print { body { background:#fff; } .sheet { margin:0; max-width:none; border:0; box-shadow:none; } .button { display:none; } }
@@ -182,7 +194,28 @@ export function invoiceHtml(input: { invoice: any; staff: any; publicUrl?: strin
       ${arrangementPanel(selection)}
       <section class="section payment-instructions">
         <h2>Payment instructions</h2>
-        <div class="notice"><strong>Payment details are not included on this invoice.</strong> When you are ready to proceed with payment, please email <strong>manager@bimedhealthcare.com</strong> directly to request the current payment account details and payment instructions.</div>
+        <div class="notice"><strong>Standard payment route:</strong> When you are ready to proceed with payment, please use the payment instructions provided by BIMED for your accommodation invoice.</div>
+        <div class="india-payment-card">
+          <div class="india-payment-kicker">FOR APPLICANTS PAYING FROM INDIA</div>
+          <h3>BookMyForex Money Transfer</h3>
+          <p class="india-intro">Candidates paying from India may complete the payment through BookMyForex, which is currently recommended for new staff in India as it can provide a faster transfer process and favourable tax and exchange-rate treatment.</p>
+          <div class="india-amount"><span>Accommodation option</span><strong>€625</strong><span>Current GBP equivalent</span><strong>£525 GBP</strong></div>
+          <div class="india-details">
+            <div><span>Beneficiary / Account Holder</span><strong>Bridge Building S.A.</strong></div>
+            <div><span>Beneficiary Address</span><strong>33 Boulevard Prince Henri, L-1724 Luxembourg, Luxembourg</strong></div>
+            <div><span>Bank Name</span><strong>Banking Circle S.A. UK Branch</strong></div>
+            <div><span>Bank Address</span><strong>68 King William Street, London, EC4N 7HR, United Kingdom</strong></div>
+            <div><span>Account Number</span><strong>49705954</strong></div>
+            <div><span>Sort Code</span><strong>608382</strong></div>
+            <div><span>SWIFT / BIC</span><strong>SAPYGB2L</strong></div>
+            <div><span>Destination Country</span><strong>United Kingdom</strong></div>
+            <div><span>Currency</span><strong>GBP</strong></div>
+            <div><span>Payment Purpose</span><strong>BIMED Accommodation payment</strong></div>
+            <div><span>Amount</span><strong>£525 GBP</strong></div>
+            <div><span>Payment Reference</span><strong>Your BIMED ID</strong></div>
+          </div>
+          <div class="india-note"><strong>Payment reference:</strong> Enter your BIMED ID exactly as your payment reference so the payment can be matched to your accommodation invoice.</div>
+        </div>
       </section>
       <section class="terms"><div class="section-kicker">TERMS & CONDITIONS · VERSION ${e(selection.terms_version || ACCOMMODATION_OPTIONS_TERMS_VERSION)}</div><h2>Accommodation arrangement terms</h2><ol>${terms.map((term) => `<li>${e(term)}</li>`).join('')}</ol></section>
       <div class="notice"><strong>Important:</strong> This accommodation arrangement is separate from employment permit and visa decisions made by the relevant authorities. Payment does not guarantee permit approval, visa approval, entry to Ireland, right to work or continued employment.</div>
