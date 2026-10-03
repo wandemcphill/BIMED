@@ -43,7 +43,8 @@ export async function issueAccommodationInvoice(input: {
     };
   }
 
-  // Accommodation invoices are due on the date they are issued. There is no future expiry date.\n  const dueDate = String(invoice.issue_date || new Date().toISOString().slice(0, 10));
+  // Accommodation invoices are due on the date they are issued. There is no future expiry date.
+  const dueDate = String(invoice.issue_date || new Date().toISOString().slice(0, 10));
 
   const { data: atomicResult, error: invoiceError } = await client.rpc('bimed_issue_accommodation_invoice', {
     p_invoice_id: invoice.id,
