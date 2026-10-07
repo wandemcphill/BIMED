@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/admin-session';
-import { createStaffAudit, createStaffFromApplication } from '@/lib/staff';
+import { createStaffAudit, createStaffFromApplication, fastTrackApplicationToStaff } from '@/lib/staff';
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
 import { restrictRecruitmentStaffPortal, reactivateRecruitmentStaffPortal } from '@/lib/staff-portal-workflow';
@@ -37,6 +37,59 @@ export async function POST(request: NextRequest) {
       const { data: duplicate } = await client.from('recruitment_staff').select('id,bimed_id').eq('email', email).maybeSingle(); if (duplicate) return NextResponse.json({ error: `A BIMED staff account already exists for ${email}.` }, { status: 409 });
       const token = crypto.randomBytes(32).toString('base64url'); const tokenHash = crypto.createHash('sha256').update(token).digest('hex'); const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); const bimedId = createBimedId();
       const { data: staff, error } = await client.from('recruitment_staff').insert({ application_id: null, bimed_id: bimedId, status: 'active', full_name: fullName, email, phone: body.phone?.trim() || null, job_title: jobTitle, role: INTERNAL_ROLE_LABEL, employment_start_date: startDate, employment_type: employmentType, department, manager_name: body.managerName?.trim() || null, address_line_1: body.address?.trim() || null, city: body.city?.trim() || null, county: body.county?.trim() || null, eircode: body.eircode?.trim() || null, country: body.country?.trim() || 'Ireland', activation_token_hash: tokenHash, activation_expires_at: expires, auth_version: 1, session_version: 1 }).select('*').single(); if (error || !staff) throw error || new Error('Unable to create the BIMED staff account.'); await createStaffAudit(client, { staffId: staff.id, actor: session.email, eventType: 'internal_staff_created', metadata: { department, job_title: jobTitle, employment_type: employmentType } }); return NextResponse.json({ staff, activationUrl: createActivationUrl(request, token, staff.email) }, { status: 201 });
+    }
+    if (body.action === 'fast_track') {
+      const email = body.email?.trim().toLowerCase();
+      const reason = body.reason?.trim();
+      if (!email) return NextResponse.json({ error: 'Candidate email is required.' }, { status: 400 });
+      if (!reason || reason.length < 10) return NextResponse.json({ error: 'A fast-track reason of at least 10 characters is required.' }, { status: 400 });
+
+      const { data: application, error: applicationError } = await client
+        .from('recruitment_applications')
+        .select('id,full_name,email,status')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (applicationError) return NextResponse.json({ error: 'Unable to find the candidate application.' }, { status: 500 });
+      if (!application) return NextResponse.json({ error: 'No recruitment application was found for this email address.' }, { status: 404 });
+      if (application.status !== 'Rejected') {
+        return NextResponse.json(
+          { error: `Fast-track is only available for a previously rejected application. Current status: ${application.status}.` },
+          { status: 409 },
+        );
+      }
+
+      const result = await fastTrackApplicationToStaff(client, application.id, {
+        actor: session.email,
+        reason,
+      });
+
+      let welcomeEmailSent = false;
+      if (result.activationToken) {
+        const welcome = await sendStaffPortalActivationEmail(
+          client,
+          result.staff,
+          result.activationToken,
+          application.email,
+        );
+        welcomeEmailSent = welcome.status === 'sent';
+        if (!welcomeEmailSent) {
+          return NextResponse.json({
+            error: 'Candidate was fast-tracked, but the activation email could not be sent. The staff record remains provisioned for controlled follow-up.',
+            staff: result.staff,
+            provisioningWarning: result.provisioningWarning || welcome.reason || 'Activation email delivery failed.',
+          }, { status: 502 });
+        }
+      }
+
+      const activationUrl = result.activationToken ? createActivationUrl(request, result.activationToken, result.staff.email) : null;
+      return NextResponse.json({
+        staff: result.staff,
+        activationUrl,
+        welcomeEmailSent,
+        onboardingProvisioned: !result.provisioningWarning,
+        provisioningWarning: result.provisioningWarning || null,
+      });
     }
     if (body.action === 'promote') {
       if (!body.applicationId) return NextResponse.json({ error: 'applicationId is required.' }, { status: 400 });
