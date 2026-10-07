@@ -338,6 +338,211 @@ export async function createStaffFromApplication(
   return { staff, activationToken, provisioningWarning };
 }
 
+
+export async function fastTrackApplicationToStaff(
+  client: SupabaseClient,
+  applicationId: string,
+  options: { actor: string; reason: string },
+) {
+  const actor = options.actor?.trim();
+  const reason = options.reason?.trim();
+  if (!actor) throw new Error('ADMIN_ACTOR_REQUIRED');
+  if (!reason || reason.length < 10) throw new Error('A fast-track reason of at least 10 characters is required.');
+
+  const { data: application, error: applicationError } = await client
+    .from('recruitment_applications')
+    .select('*')
+    .eq('id', applicationId)
+    .single();
+  if (applicationError || !application) throw new Error('Application not found.');
+  if (application.status !== 'Rejected') {
+    throw new Error(`Fast-track override is only available for a previously rejected application. Current status: ${application.status}.`);
+  }
+
+  const { data: existing, error: existingError } = await client
+    .from('recruitment_staff')
+    .select('*')
+    .eq('application_id', applicationId)
+    .maybeSingle();
+  if (existingError) throw asStaffProvisioningError(existingError, 'Unable to check the existing staff identity.');
+
+  const activationToken = existing?.activated_at ? null : createActivationToken();
+  const residentialProfile = normalizeResidentialProfile({
+    address: application.address,
+    residenceCountry: application.country_of_residence,
+    currentCountry: application.current_country,
+    livingInIreland: application.living_in_ireland,
+  });
+  const effectiveStatus: StaffStatus = application.living_in_ireland === 'No' ? 'pre_arrival' : 'active';
+  const now = new Date().toISOString();
+
+  let staff: any;
+  if (existing) {
+    const updates: Record<string, unknown> = {
+      status: effectiveStatus,
+      full_name: application.preferred_name || application.full_name,
+      preferred_name: application.preferred_name,
+      phone: application.phone,
+      date_of_birth: application.date_of_birth,
+      nationality: application.nationality,
+      role: application.role_applied,
+      job_title: application.role_applied,
+      employment_type: application.employment_type,
+      employment_start_date: BIMED_DEFAULT_START_DATE_ISO,
+      employment_end_date: BIMED_DEFAULT_END_DATE_ISO,
+      country: residentialProfile.country || 'Ireland',
+      address_line_1: residentialProfile.address_line_1 || application.address || null,
+      updated_at: now,
+    };
+    if (activationToken) {
+      updates.activation_token_hash = hashActivationToken(activationToken);
+      updates.activation_expires_at = activationExpiresAt();
+    }
+    const { data, error } = await client
+      .from('recruitment_staff')
+      .update(updates)
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+    if (error || !data) throw asStaffProvisioningError(error, 'Unable to prepare the fast-track staff identity.');
+    staff = data;
+  } else {
+    const portalEmail = await generateBimedPortalEmail(client, application.preferred_name || application.full_name);
+    const token = createActivationToken();
+    const { data, error } = await client
+      .from('recruitment_staff')
+      .insert({
+        application_id: application.id,
+        full_name: application.full_name,
+        preferred_name: application.preferred_name,
+        email: portalEmail,
+        phone: application.phone,
+        date_of_birth: application.date_of_birth,
+        nationality: application.nationality,
+        role: application.role_applied,
+        job_title: application.role_applied,
+        employment_type: application.employment_type,
+        employment_start_date: BIMED_DEFAULT_START_DATE_ISO,
+        employment_end_date: BIMED_DEFAULT_END_DATE_ISO,
+        country: residentialProfile.country || 'Ireland',
+        status: effectiveStatus,
+        address_line_1: residentialProfile.address_line_1 || application.address || null,
+        activation_token_hash: hashActivationToken(token),
+        activation_expires_at: activationExpiresAt(),
+      })
+      .select('*')
+      .single();
+    if (error || !data) throw asStaffProvisioningError(error, 'Unable to create the fast-track staff identity.');
+    staff = data;
+  }
+
+  let provisioningWarning: string | null = null;
+  try {
+    await ensureOnboardingChecklist(client, application);
+    const checklistUpdate = await client
+      .from('recruitment_onboarding_checklist')
+      .update({
+        status: 'pending',
+        completed_at: null,
+        completed_by: null,
+        notes: null,
+        updated_at: now,
+      })
+      .eq('application_id', application.id)
+      .in('item_key', Array.from(POST_ACCESS_CHECK_KEYS));
+    if (checklistUpdate.error) throw checklistUpdate.error;
+    await ensureBimedStaffOnboardingPackage(client, staff.id, application);
+  } catch (error) {
+    provisioningWarning = error instanceof Error ? error.message : 'Staff onboarding package could not be completed.';
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'staff.fast_track_enrichment_failed',
+      application_id: applicationId,
+      staff_id: staff.id,
+      reason: provisioningWarning,
+    }));
+  }
+
+  const existingNotes = application.admin_notes?.trim();
+  const fastTrackNote = `FAST-TRACK OVERRIDE: ${reason}`;
+  const adminNotes = existingNotes ? `${existingNotes}\n\n${fastTrackNote}` : fastTrackNote;
+  const { data: updatedApplication, error: applicationUpdateError } = await client
+    .from('recruitment_applications')
+    .update({
+      bimed_id: staff.bimed_id,
+      status: 'Onboarding',
+      start_date: BIMED_DEFAULT_START_DATE_ISO,
+      admin_notes: adminNotes,
+      updated_at: now,
+    })
+    .eq('id', application.id)
+    .select('*')
+    .single();
+  if (applicationUpdateError || !updatedApplication) {
+    throw asStaffProvisioningError(applicationUpdateError, 'The staff identity was created, but the recruitment record could not be advanced to onboarding.');
+  }
+
+  if (effectiveStatus === 'pre_arrival') {
+    const { error: permitError } = await client.from('recruitment_staff_permit_cases').upsert({
+      staff_id: staff.id,
+      status: 'not_started',
+      accommodation_offered: true,
+      accommodation_period_months: 1,
+      accommodation_amount_eur: 625,
+      accommodation_currency: 'EUR',
+      accommodation_start_date: BIMED_DEFAULT_START_DATE_ISO,
+      accommodation_end_date: new Date(new Date(`${BIMED_DEFAULT_START_DATE_ISO}T12:00:00Z`).setMonth(new Date(`${BIMED_DEFAULT_START_DATE_ISO}T12:00:00Z`).getMonth() + 1)).toISOString().slice(0, 10),
+      accommodation_payment_status: 'not_due',
+      work_authorised: false,
+      shift_eligibility: 'blocked',
+      updated_at: now,
+    }, { onConflict: 'staff_id' });
+    if (permitError) {
+      provisioningWarning = provisioningWarning || permitError.message;
+      console.error(JSON.stringify({ level: 'error', event: 'staff.fast_track_permit_case_init_failed', staff_id: staff.id, reason: permitError.message }));
+    }
+  }
+
+  await createStaffNotification(client, {
+    staffId: staff.id,
+    category: 'welcome',
+    title: 'Welcome to the BIMED Staff Portal',
+    body: `Your BIMED staff account is ready. Your recruitment application has been fast-tracked by BIMED Admin. Activate your account using the secure activation link sent to your recruitment email, then sign in to review your onboarding workspace and recruitment-related next steps.`,
+    actionUrl: effectiveStatus === 'pre_arrival' ? '/staff/permit' : '/staff/onboarding',
+  });
+
+  await createStaffAudit(client, {
+    staffId: staff.id,
+    actor,
+    eventType: 'candidate_fast_tracked_to_staff',
+    metadata: {
+      application_id: application.id,
+      previous_status: application.status,
+      new_status: 'Onboarding',
+      promotion_override: true,
+      reason,
+      accommodation_amount_eur: 625,
+      accommodation_period_months: 1,
+    },
+  });
+
+  await recordRecruitmentAudit(client, {
+    applicationId: application.id,
+    inviteId: application.invite_id,
+    eventType: 'admin_application_fast_tracked',
+    actor,
+    metadata: {
+      previous_status: application.status,
+      new_status: 'Onboarding',
+      promotion_override: true,
+      reason,
+      bimed_id: staff.bimed_id,
+    },
+  });
+
+  return { staff, activationToken, provisioningWarning };
+}
+
 export async function createStaffNotification(
   client: SupabaseClient,
   input: { staffId: string; category: string; title: string; body: string; actionUrl?: string | null },
