@@ -366,7 +366,7 @@ export async function fastTrackApplicationToStaff(
     .maybeSingle();
   if (existingError) throw asStaffProvisioningError(existingError, 'Unable to check the existing staff identity.');
 
-  const activationToken = existing?.activated_at ? null : createActivationToken();
+  let activationToken = existing?.activated_at ? null : createActivationToken();
   const residentialProfile = normalizeResidentialProfile({
     address: application.address,
     residenceCountry: application.country_of_residence,
@@ -408,7 +408,7 @@ export async function fastTrackApplicationToStaff(
     staff = data;
   } else {
     const portalEmail = await generateBimedPortalEmail(client, application.preferred_name || application.full_name);
-    const token = createActivationToken();
+    activationToken = createActivationToken();
     const { data, error } = await client
       .from('recruitment_staff')
       .insert({
@@ -427,7 +427,7 @@ export async function fastTrackApplicationToStaff(
         country: residentialProfile.country || 'Ireland',
         status: effectiveStatus,
         address_line_1: residentialProfile.address_line_1 || application.address || null,
-        activation_token_hash: hashActivationToken(token),
+        activation_token_hash: hashActivationToken(activationToken),
         activation_expires_at: activationExpiresAt(),
       })
       .select('*')
