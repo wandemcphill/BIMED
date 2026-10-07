@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             error: 'Candidate was fast-tracked, but the activation email could not be sent. The staff record remains provisioned for controlled follow-up.',
             staff: result.staff,
-            provisioningWarning: result.provisioningWarning || welcome.reason || 'Activation email delivery failed.',
+            provisioningWarning: result.provisioningWarning || ('reason' in welcome ? welcome.reason : 'Activation email delivery failed.'),
           }, { status: 502 });
         }
       }
