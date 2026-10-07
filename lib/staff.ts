@@ -9,6 +9,7 @@ import {
 import { generateBimedPortalEmail } from './staff-email';
 import { ensureBimedStaffOnboardingPackage } from './staff-onboarding';
 import { normalizeResidentialProfile } from './residential-profile';
+import { recordRecruitmentAudit } from './recruitment-audit';
 
 export const STAFF_PHOTO_BUCKET = 'bimed-staff-photos';
 
