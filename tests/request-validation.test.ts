@@ -12,6 +12,31 @@ describe('request validation', () => {
     expect(MAX_JSON_BYTES.candidateApplication).toBe(20 * 1024 * 1024);
   });
 
+  it('accepts canonical recruitment role slugs from candidate clients', () => {
+    const roles = [
+      ['support-worker', 'Support Worker'],
+      ['healthcare-assistant', 'Healthcare Assistant'],
+      ['senior-support-worker', 'Senior Support Worker'],
+      ['physiotherapist', 'Physiotherapist'],
+    ] as const;
+
+    for (const [role, canonicalRole] of roles) {
+      const result = validateCandidateApplication({
+        token: 'abc',
+        full_name: 'Jane Doe',
+        email: 'jane@example.com',
+        country_of_residence: 'Ireland',
+        role_applied: role,
+        living_in_ireland: 'Yes',
+        supporting_documents: [],
+        consent: true,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.role_applied).toBe(canonicalRole);
+    }
+  });
+
   it('accepts a valid Ireland candidate payload', () => {
     const result = validateCandidateApplication({
       token: 'abc', full_name: 'Jane Doe', preferred_name: 'Jane', email: 'jane@example.com',
