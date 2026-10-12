@@ -194,7 +194,7 @@ export function invoiceHtml(input: { invoice: any; staff: any; publicUrl?: strin
       ${arrangementPanel(selection)}
       <section class="section payment-instructions">
         <h2>Payment instructions</h2>
-        <div class="notice"><strong>Payment details are not included on this invoice.</strong> When you are ready to proceed with payment, please use the payment instructions provided by BIMED for your accommodation invoice.</div>
+        <div class="notice"><strong>Payment details are not included on this invoice.</strong> When you are ready to proceed with payment, please use the payment instructions provided by BIMED for your accommodation invoice. For questions about this invoice, contact manager@bimedhealthcare.com.</div>
       </section>
       <section class="terms"><div class="section-kicker">TERMS & CONDITIONS · VERSION ${e(selection.terms_version || ACCOMMODATION_OPTIONS_TERMS_VERSION)}</div><h2>Accommodation arrangement terms</h2><ol>${terms.map((term) => `<li>${e(term)}</li>`).join('')}</ol></section>
       <div class="notice"><strong>Important:</strong> This accommodation arrangement is separate from employment permit and visa decisions made by the relevant authorities. Payment does not guarantee permit approval, visa approval, entry to Ireland, right to work or continued employment.</div>
