@@ -43,6 +43,11 @@ describe('accommodation invoice payment details', () => {
     expect(html).not.toContain('Pay online securely');
     expect(html).not.toContain('1–3 working days');
     expect(html).not.toContain('15 working days');
+    expect(html).not.toContain('BookMyForex');
+    expect(html).not.toContain('Bridge Building S.A.');
+    expect(html).not.toContain('49705954');
+    expect(html).not.toContain('608382');
+    expect(html).not.toContain('SAPYGB2L');
   });
 
   it('renders the selected one-month shared €625 terms instead of the legacy €4,000 terms', async () => {
