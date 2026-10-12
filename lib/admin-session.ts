@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import type { NextRequest, NextResponse } from 'next/server';
 import { db } from './db';
+import { hasAdminPermission, isKnownAdminRole, permissionForAdminPath } from './admin-rbac';
 
 export const ADMIN_SESSION_COOKIE_NAME = 'bimed_admin_session';
 const COOKIE_NAME = ADMIN_SESSION_COOKIE_NAME;
@@ -70,7 +71,7 @@ export function verifyAdminSessionToken(token: string | undefined | null) {
   try {
     const payload = decodePayload(encodedPayload);
     if (
-      payload.role !== 'admin' ||
+      !isKnownAdminRole(payload.role) ||
       payload.exp <= Date.now() ||
       !Number.isInteger(payload.session_version) ||
       payload.session_version < 1
@@ -95,7 +96,8 @@ export async function getAdminSessionFromToken(token: string | undefined | null)
       .maybeSingle();
 
     if (error || !account || !account.active) return null;
-    if (account.role !== 'admin') return null;
+    if (!isKnownAdminRole(account.role)) return null;
+    if (account.role !== tokenSession.role) return null;
     if (account.email !== tokenSession.email) return null;
     if (account.session_version !== tokenSession.session_version) return null;
 
@@ -106,7 +108,13 @@ export async function getAdminSessionFromToken(token: string | undefined | null)
 }
 
 export async function getAdminSession(request: NextRequest) {
-  return getAdminSessionFromToken(request.cookies.get(COOKIE_NAME)?.value);
+  const session = await getAdminSessionFromToken(request.cookies.get(COOKIE_NAME)?.value);
+  if (!session) return null;
+
+  const permission = permissionForAdminPath(request.nextUrl?.pathname || '');
+  if (!hasAdminPermission(session.role, permission)) return null;
+
+  return session;
 }
 
 export async function isAdminRequestAuthenticated(request: NextRequest) {
