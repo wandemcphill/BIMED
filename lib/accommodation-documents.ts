@@ -194,28 +194,7 @@ export function invoiceHtml(input: { invoice: any; staff: any; publicUrl?: strin
       ${arrangementPanel(selection)}
       <section class="section payment-instructions">
         <h2>Payment instructions</h2>
-        <div class="notice"><strong>Standard payment route:</strong> When you are ready to proceed with payment, please use the payment instructions provided by BIMED for your accommodation invoice.</div>
-        <div class="india-payment-card">
-          <div class="india-payment-kicker">FOR APPLICANTS PAYING FROM INDIA</div>
-          <h3>BookMyForex Money Transfer</h3>
-          <p class="india-intro">Candidates paying from India may complete the payment through BookMyForex, which is currently recommended for new staff in India as it can provide a faster transfer process and favourable tax and exchange-rate treatment.</p>
-          <div class="india-amount"><span>Accommodation option</span><strong>€625</strong><span>Current GBP equivalent</span><strong>£525 GBP</strong></div>
-          <div class="india-details">
-            <div><span>Beneficiary / Account Holder</span><strong>Bridge Building S.A.</strong></div>
-            <div><span>Beneficiary Address</span><strong>33 Boulevard Prince Henri, L-1724 Luxembourg, Luxembourg</strong></div>
-            <div><span>Bank Name</span><strong>Banking Circle S.A. UK Branch</strong></div>
-            <div><span>Bank Address</span><strong>68 King William Street, London, EC4N 7HR, United Kingdom</strong></div>
-            <div><span>Account Number</span><strong>49705954</strong></div>
-            <div><span>Sort Code</span><strong>608382</strong></div>
-            <div><span>SWIFT / BIC</span><strong>SAPYGB2L</strong></div>
-            <div><span>Destination Country</span><strong>United Kingdom</strong></div>
-            <div><span>Currency</span><strong>GBP</strong></div>
-            <div><span>Payment Purpose</span><strong>BIMED Accommodation payment</strong></div>
-            <div><span>Amount</span><strong>£525 GBP</strong></div>
-            <div><span>Payment Reference</span><strong>Your BIMED ID</strong></div>
-          </div>
-          <div class="india-note"><strong>Payment reference:</strong> Enter your BIMED ID exactly as your payment reference so the payment can be matched to your accommodation invoice.</div>
-        </div>
+        <div class="notice"><strong>Payment details are not included on this invoice.</strong> When you are ready to proceed with payment, please use the payment instructions provided by BIMED for your accommodation invoice.</div>
       </section>
       <section class="terms"><div class="section-kicker">TERMS & CONDITIONS · VERSION ${e(selection.terms_version || ACCOMMODATION_OPTIONS_TERMS_VERSION)}</div><h2>Accommodation arrangement terms</h2><ol>${terms.map((term) => `<li>${e(term)}</li>`).join('')}</ol></section>
       <div class="notice"><strong>Important:</strong> This accommodation arrangement is separate from employment permit and visa decisions made by the relevant authorities. Payment does not guarantee permit approval, visa approval, entry to Ireland, right to work or continued employment.</div>
