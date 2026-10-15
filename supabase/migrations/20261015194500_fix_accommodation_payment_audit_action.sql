@@ -92,6 +92,8 @@ begin
       paid_at = v_now,
       payment_reference = v_payment_reference,
       payment_method = v_payment_method,
+      admin_action_at = v_now,
+      admin_action_by = p_actor,
       updated_at = v_now
   where id = v_invoice.id
   returning * into v_invoice;
