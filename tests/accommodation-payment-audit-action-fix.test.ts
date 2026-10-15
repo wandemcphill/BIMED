@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 describe('atomic accommodation payment audit action fix', () => {
   it('populates both required audit dimensions for payment and receipt events', async () => {
     const migration = await fs.readFile(
-      'supabase/migrations/20261015194500_fix_accommodation_payment_audit_action.sql',
+      'supabase/migrations/20261015184606_fix_accommodation_payment_audit_action.sql',
       'utf8',
     );
 
@@ -19,7 +19,7 @@ describe('atomic accommodation payment audit action fix', () => {
 
   it('accepts the two statuses exposed as payable by the admin billing route', async () => {
     const migration = await fs.readFile(
-      'supabase/migrations/20261015194500_fix_accommodation_payment_audit_action.sql',
+      'supabase/migrations/20261015184606_fix_accommodation_payment_audit_action.sql',
       'utf8',
     );
 
