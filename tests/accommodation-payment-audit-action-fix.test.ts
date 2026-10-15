@@ -24,6 +24,8 @@ describe('atomic accommodation payment audit action fix', () => {
     );
 
     expect(migration).toContain("if v_invoice.status not in ('issued', 'payment_reported') then");
+    expect(migration).toContain('admin_action_at = v_now');
+    expect(migration).toContain('admin_action_by = p_actor');
     expect(migration).toContain(
       'grant execute on function public.bimed_record_accommodation_payment(uuid, text, text, text, text)',
     );
