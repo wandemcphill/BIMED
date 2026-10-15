@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { invoiceHtml } from '@/lib/accommodation-documents';
+import { invoiceHtml, receiptHtml } from '@/lib/accommodation-documents';
 
 describe('accommodation invoice payment details', () => {
   it('does not expose bank account details or an online payment link', () => {
@@ -125,6 +125,46 @@ describe('accommodation invoice payment details', () => {
     expect(html).toContain('BIMED-SHARE-TEST1234');
     expect(html).toContain('€4,000.00');
     expect(html).toContain('Partner Candidate');
+  });
+
+  it('includes agreed contract and employment permit next-step timelines on the payment receipt', () => {
+    const html = receiptHtml({
+      receipt: {
+        receipt_number: 'BIMED-RCP-20261015-TEST01',
+        amount_eur: 625,
+        currency: 'EUR',
+        paid_at: '2026-10-15T18:00:00.000Z',
+        issued_at: '2026-10-15T18:00:00.000Z',
+        payment_reference: 'PAYMENT-TEST',
+        payment_method: 'Card',
+        issued_by: 'BIMED Healthcare',
+      },
+      invoice: {
+        invoice_number: 'BIMED-ACC-2026-TEST',
+        public_token: 'receipt-test-token',
+        amount_eur: 625,
+        currency: 'EUR',
+        description: 'BIMED-arranged shared accommodation for the first month',
+        arrangement_snapshot: {
+          accommodation_plan: 'one_month_shared_625',
+          accommodation_amount_eur: 625,
+          accommodation_period_months: 1,
+          accommodation_refund_trigger: 'successful_three_month_probation',
+          permit_submission_route: 'bimed_legal_team',
+          permit_type: 'general_employment_permit',
+          permit_fee_eur: 1000,
+          permit_duration_months: 24,
+          terms_version: '2026-09-17-v2',
+        },
+      },
+      staff: { full_name: 'Ada Byron', email: 'ada@example.com', bimed_id: 'BH-001000' },
+      publicUrl: 'https://recruitment.bimedhealthcare.com/invoices/accommodation/receipt-test-token?receipt=1',
+    });
+
+    expect(html).toContain('Next steps and expected timelines');
+    expect(html).toContain('employment contract within 24 hours');
+    expect(html).toContain('employment permit application within 72 hours');
+    expect(html).toContain('As agreed');
   });
 
 });
