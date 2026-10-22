@@ -46,3 +46,31 @@ describe("BIMED candidate-specific contract addresses", () => {
     expect(defaultSharedAccommodationPartner("BH-001100")).toBe("");
   });
 });
+
+
+describe("DETE contract address readiness", () => {
+  it("requires a verified BIMED accommodation address before the final contract can be prepared", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const source = await readFile("lib/bimed-staff-contract.ts", "utf8");
+    expect(source).toContain("permit?.accommodation_address &&");
+    expect(source).toContain("permit?.accommodation_unit &&");
+    expect(source).toContain("permit?.accommodation_address_verified_at &&");
+    expect(source).toContain("permit?.accommodation_address_verified_by &&");
+    expect(source).toContain("String(permit.accommodation_address || '')");
+    expect(source).toContain("'Irish accommodation address': { value: accommodationAddress");
+    expect(source).not.toContain("BIMED accommodation address to be recorded in the relocation record");
+  });
+
+  it("keeps the work address and residential address distinct in the rendered contract", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const source = await readFile("components/DeteEmploymentContractDocument.tsx", "utf8");
+    expect(source).toContain("['Place of Primary Assignment', primaryAssignment");
+    expect(source).toContain("['Accommodation address in Ireland', accommodationAddress");
+  });
+
+  it("keeps the initial travel-itinerary safeguard in the DETE issuance resolver", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const source = await readFile("lib/bimed-staff-contract.ts", "utf8");
+    expect(source).toContain("The candidate has not yet submitted the required travel itinerary.");
+  });
+});
