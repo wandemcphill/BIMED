@@ -278,6 +278,17 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     };
   }
 
+  if (!accommodation.private) {
+    const sharedPlan = String(permit.accommodation_plan || '').includes('_shared_');
+    const hasSharingPartner = Boolean(permit.accommodation_shared_with_staff_id);
+    if (sharedPlan !== hasSharingPartner) {
+      return {
+        status: 'blocked',
+        reason: 'The accommodation plan and flat allocation disagree about whether the accommodation is shared. Reconcile the recorded plan and invoice with the confirmed flat allocation before issuing this contract; no payment record has been changed.',
+      };
+    }
+  }
+
   const { data: itinerary } = await client
     .from('recruitment_flight_itineraries')
     .select('id,departure_airport_code,departure_airport_name,destination_airport_code,destination_airport_name,travel_date,passenger_count,passengers,airport_pickup_included,booking_status')
