@@ -3,7 +3,8 @@ import { db } from '@/lib/db';
 import { ADMIN_SESSION_COOKIE_NAME, getAdminSessionFromToken } from '@/lib/admin-session';
 import { applyContractOverrides, getContractTemplate, type ContractTemplate } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
-import { applyBimedContractDefaults } from '@/lib/bimed-role-policy';
+import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE_ISO, recruitmentRoleSlug } from '@/lib/bimed-role-policy';
+import { getSocClassification, isAdultAtEmploymentStart } from '@/lib/soc-classification';
 import { resolveContractAddress, type ContractAddressResolution } from '@/lib/contract-accommodation';
 
 export type ContractPrefillResult =
@@ -36,13 +37,32 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
   try {
     const result = await db()
       .from('recruitment_applications')
-      .select('full_name,email,address,start_date,living_in_ireland,country_of_residence,current_country,contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by')
+      .select('full_name,email,address,start_date,date_of_birth,nationality,role_applied,living_in_ireland,country_of_residence,current_country,contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by')
       .eq('id', applicationId)
       .maybeSingle();
     if (result.error || !result.data) return { status: 'not_found' };
     application = result.data;
   } catch {
     return { status: 'not_found' };
+  }
+
+  const applicantRoleSlug = recruitmentRoleSlug(application.role_applied);
+  if (!applicantRoleSlug || applicantRoleSlug !== roleSlug) {
+    return { status: 'blocked', reason: 'The contract role must match the candidate’s role in their recruitment application.' };
+  }
+  if (!String(application.nationality || '').trim()) {
+    return { status: 'blocked', reason: 'Nationality is missing from the candidate’s recruitment application. Complete the application before preparing the contract.' };
+  }
+  if (!application.date_of_birth) {
+    return { status: 'blocked', reason: 'Date of birth is missing from the candidate’s recruitment application. Complete the application before preparing the contract.' };
+  }
+  const employmentStartDate = application.start_date || BIMED_DEFAULT_START_DATE_ISO;
+  if (!isAdultAtEmploymentStart(application.date_of_birth, employmentStartDate)) {
+    return { status: 'blocked', reason: 'The date of birth in the recruitment application is invalid or would make the candidate under 18 on the planned employment start date. Correct the application before preparing the contract.' };
+  }
+  const socClassification = getSocClassification(application.role_applied);
+  if (!socClassification) {
+    return { status: 'blocked', reason: 'A verified SOC 2010 classification could not be matched to the application role. Confirm the role duties and occupational code before preparing the contract.' };
   }
 
   const addressResolution: ContractAddressResolution = resolveContractAddress(application);
@@ -52,6 +72,10 @@ export async function resolveContractTemplate(roleSlug: string, applicationId?: 
 
   const templateWithCandidate = applyContractOverrides(baseTemplate, {
     employeeName: application.full_name,
+    dateOfBirth: new Date(application.date_of_birth + 'T12:00:00Z').toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' }),
+    nationality: String(application.nationality).trim(),
+    socClassification: socClassification.display,
+    socClassificationNote: socClassification.note + ' Source: ' + socClassification.sourceUrl,
     employeeAddress: addressResolution.employeeAddress,
     employeeAddressStatus:
       addressResolution.mode === 'private_verified'
