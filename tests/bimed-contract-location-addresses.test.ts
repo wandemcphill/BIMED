@@ -68,9 +68,14 @@ describe("DETE contract address readiness", () => {
     expect(source).toContain("['Accommodation address in Ireland', accommodationAddress");
   });
 
-  it("keeps the initial travel-itinerary safeguard in the DETE issuance resolver", async () => {
+  it("allows DETE contract preparation without a travel itinerary and leaves missing particulars unfilled", async () => {
     const { readFile } = await import("node:fs/promises");
     const source = await readFile("lib/bimed-staff-contract.ts", "utf8");
-    expect(source).toContain("The candidate has not yet submitted the required travel itinerary.");
+    expect(source).not.toContain("The candidate has not yet submitted the required travel itinerary.");
+    expect(source).toContain("const arrivalAirportCode = itinerary?.destination_airport_code || permit.flight_destination_airport_code || '';");
+    expect(source).toContain("const travelDate = itinerary?.travel_date || permit.flight_travel_date || null;");
+    expect(source).toContain("const travellingParty = passengerCount");
+    expect(source).toContain("'Travelling party': { value: travellingParty }");
+    expect(source).toContain(": 'To be confirmed';");
   });
 });

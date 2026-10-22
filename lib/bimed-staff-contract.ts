@@ -249,12 +249,9 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     .eq('permit_case_id', permit.id)
     .maybeSingle();
 
-  if (!itinerary?.id || !itinerary.departure_airport_code || !itinerary.departure_airport_name || !itinerary.destination_airport_code || !itinerary.travel_date || !itinerary.passenger_count || !Array.isArray(itinerary.passengers) || itinerary.passengers.length !== Number(itinerary.passenger_count)) {
-    return {
-      status: 'blocked',
-      reason: 'The candidate has not yet submitted the required travel itinerary. Submit the initial travel request before issuing the DETE permit-stage contract.',
-    };
-  }
+  // Travel particulars are operational and may be unavailable at permit-stage issue.
+  // Keep an absent itinerary absent and show missing details as "To be confirmed".
+  // Do not fabricate a flight, date, or passenger list to satisfy contract readiness.
 
   const startDate = staff.employment_start_date || BIMED_DEFAULT_START_DATE_ISO;
   const endDate = staff.employment_end_date || BIMED_DEFAULT_END_DATE_ISO;
@@ -284,13 +281,14 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     ? String(application?.verified_irish_residential_address || '')
     : String(permit.accommodation_address || '');
 
-  const departureAirportCode = itinerary.departure_airport_code || permit.flight_departure_airport_code || '';
-  const departureAirportName = itinerary.departure_airport_name || permit.flight_departure_airport_name || '';
-  const arrivalAirportCode = itinerary.destination_airport_code || permit.flight_destination_airport_code || 'DUB';
-  const arrivalAirportName = itinerary.destination_airport_name || permit.flight_destination_airport_name || 'Dublin Airport';
-  const passengerCount = itinerary.passenger_count || permit.flight_passenger_count;
-  const travelDate = itinerary.travel_date || permit.flight_travel_date;
-  const airportPickup = (itinerary.airport_pickup_included ?? permit.flight_airport_pickup_required) !== false;
+  const departureAirportCode = itinerary?.departure_airport_code || permit.flight_departure_airport_code || '';
+  const departureAirportName = itinerary?.departure_airport_name || permit.flight_departure_airport_name || '';
+  const arrivalAirportCode = itinerary?.destination_airport_code || permit.flight_destination_airport_code || '';
+  const arrivalAirportName = itinerary?.destination_airport_name || permit.flight_destination_airport_name || '';
+  const rawPassengerCount = Number(itinerary?.passenger_count || permit.flight_passenger_count || 0);
+  const passengerCount = Number.isFinite(rawPassengerCount) && rawPassengerCount > 0 ? rawPassengerCount : null;
+  const travelDate = itinerary?.travel_date || permit.flight_travel_date || null;
+  const airportPickup = (itinerary?.airport_pickup_included ?? permit.flight_airport_pickup_required) !== false;
   const departureAirport = departureAirportCode
     ? departureAirportCode + ' · ' + (departureAirportName || 'Departure airport')
     : 'To be confirmed';
@@ -298,8 +296,9 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     ? arrivalAirportCode + ' · ' + (arrivalAirportName || 'Arrival airport in Ireland')
     : 'To be confirmed';
   const travellingParty = passengerCount
-    ? String(passengerCount) + ' passenger' + (Number(passengerCount) === 1 ? '' : 's')
+    ? String(passengerCount) + ' passenger' + (passengerCount === 1 ? '' : 's')
     : 'To be confirmed';
+  const airportPickupLabel = airportPickup ? 'Included' : 'Not included';
 
   const rawTemplate = getContractTemplate(roleSlug);
   if (!rawTemplate) return { status: 'not_found', reason: 'Contract template not found.' };
@@ -370,8 +369,8 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     'Departure airport': { value: departureAirport },
     'Final airport in Ireland': { value: arrivalAirport },
     'Travel date': { value: formatDate(travelDate) },
-    'Travelling party': { value: String(passengerCount) + ' passenger' + (Number(passengerCount) === 1 ? '' : 's') },
-    'Airport pickup': { value: airportPickup ? 'Included' : 'Not included' },
+    'Travelling party': { value: travellingParty },
+    'Airport pickup': { value: airportPickupLabel },
     'Employee email': { value: staff.email },
     'Date of birth': { value: 'Recorded in BIMED personnel records and available to the permit application' },
     'Nationality': { value: 'Recorded in BIMED personnel records and available to the permit application' },
@@ -389,7 +388,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
       '4.2 Accommodation route: ' + accommodationRoute + '. ' + accommodationDetails,
       '4.3 Irish accommodation address: ' + accommodationAddress + '. This is the employee’s residential accommodation and is separate from the Place of Primary Assignment in clause 4.1.',
       '4.4 Initial travel support: BIMED will arrange the employee\'s initial economy air travel to Ireland and the related airport pickup, subject to immigration clearance, lawful entry and BIMED travel arrangements. BIMED travel support may cover up to 3 travellers where recorded in the travel request.',
-      '4.5 Travel particulars at permit-stage issue: Departure airport: ' + departureAirport + '. Final airport in Ireland: ' + arrivalAirport + '. Planned travel date: ' + formatDate(travelDate) + '. Travelling party: ' + passengerCount + ' passenger' + (Number(passengerCount) === 1 ? '' : 's') + '. Airport pickup: ' + (airportPickup ? 'Included' : 'Not included') + '.',
+      '4.5 Travel particulars at permit-stage issue: Departure airport: ' + departureAirport + '. Final airport in Ireland: ' + arrivalAirport + '. Planned travel date: ' + formatDate(travelDate) + '. Travelling party: ' + travellingParty + '. Airport pickup: ' + airportPickupLabel + '.',
       '4.6 Travel particulars are operational relocation arrangements and may be updated by BIMED before travel. Any travel update does not by itself amend the contractual employment terms or place of primary assignment.',
     ],
     bullets: [
@@ -449,8 +448,8 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
       departureAirport,
       arrivalAirport,
       travelDate: travelDate || '',
-      travellingParty: String(passengerCount) + ' passenger' + (Number(passengerCount) === 1 ? '' : 's'),
-      airportPickup: airportPickup ? 'Included' : 'Not included',
+      travellingParty,
+      airportPickup: airportPickupLabel,
       internationalHire,
       signedAt: signatureResult.data?.signed_at || null,
       issuedAt: signatureResult.data?.issued_at || null,
