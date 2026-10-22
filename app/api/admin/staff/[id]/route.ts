@@ -27,8 +27,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     client.from('recruitment_staff_audit_log').select('*').eq('staff_id', id).order('created_at', { ascending: false }).limit(50),
   ]);
 
+  const { data: permitCase } = await client
+    .from('recruitment_staff_permit_cases')
+    .select('accommodation_address,accommodation_unit,accommodation_address_verified_at,accommodation_address_verified_by,accommodation_shared_with_staff_id')
+    .eq('staff_id', id)
+    .maybeSingle();
+  const { data: sharingPartner } = permitCase?.accommodation_shared_with_staff_id
+    ? await client.from('recruitment_staff').select('bimed_id,full_name').eq('id', permitCase.accommodation_shared_with_staff_id).maybeSingle()
+    : { data: null };
+
   return NextResponse.json({
     staff: { ...staff, profile_photo_url: profilePhotoUrl },
+    permitCase: permitCase ? { ...permitCase, shared_with_bimed_id: sharingPartner?.bimed_id || null, shared_with_full_name: sharingPartner?.full_name || null } : null,
     shifts: shiftsResult.data || [],
     attendance: attendanceResult.data || [],
     leaveRequests: leaveResult.data || [],
