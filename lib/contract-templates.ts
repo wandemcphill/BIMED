@@ -97,6 +97,9 @@ function buildTemplate(
     ],
     editableFields: [
       { label: 'Employee name', value: '[Insert employee name]', note: 'Replace with the employee full legal name.' },
+      { label: 'Date of birth', value: '[Date of birth from recruitment application]', note: 'Taken from recruitment_applications.date_of_birth. Correct the source application if inaccurate.' },
+      { label: 'Nationality', value: '[Nationality from recruitment application]', note: 'Taken from recruitment_applications.nationality.' },
+      { label: 'SOC / occupation classification', value: '[SOC classification matched from the application role]', note: 'Matched to SOC 2010 using the applied role and official Irish DETE occupation information. The final classification depends on actual duties and DETE assessment.' },
       {
         label: 'Employee address',
         value: '[Insert Irish residential address if verified]',
@@ -401,6 +404,10 @@ export type ContractOverrides = {
   employeeAddressStatus?: string | null;
   startDate?: string | null;
   accommodationPermitRoute?: string | null;
+  dateOfBirth?: string | null;
+  nationality?: string | null;
+  socClassification?: string | null;
+  socClassificationNote?: string | null;
 };
 
 // Fills the employee-specific blanks in a contract template with real application data. Accommodation/permit route may be supplied after the candidate makes a route selection. Every
@@ -412,6 +419,15 @@ export function applyContractOverrides(template: ContractTemplate, overrides: Co
   if (overrides.employeeName) {
     replacements.push(['[Insert employee name]', overrides.employeeName]);
     replacements.push(['[Employee full name]', overrides.employeeName]);
+  }
+  if (overrides.dateOfBirth) {
+    replacements.push(['[Date of birth from recruitment application]', overrides.dateOfBirth]);
+  }
+  if (overrides.nationality) {
+    replacements.push(['[Nationality from recruitment application]', overrides.nationality]);
+  }
+  if (overrides.socClassification) {
+    replacements.push(['[SOC classification matched from the application role]', overrides.socClassification]);
   }
   if (overrides.employeeAddress !== undefined) {
     const address = overrides.employeeAddress?.trim() || '';
@@ -456,7 +472,13 @@ export function applyContractOverrides(template: ContractTemplate, overrides: Co
 
   return {
     ...template,
-    editableFields: template.editableFields.map((field) => ({ ...field, value: applyToText(field.value) })),
+    editableFields: template.editableFields.map((field) => ({
+      ...field,
+      value: applyToText(field.value),
+      note: field.label === 'SOC / occupation classification' && overrides.socClassificationNote
+        ? overrides.socClassificationNote
+        : field.note,
+    })),
     sections: template.sections.map(applyToSection),
     schedules: template.schedules.map(applyToSection),
     closingNote: applyToText(template.closingNote),
