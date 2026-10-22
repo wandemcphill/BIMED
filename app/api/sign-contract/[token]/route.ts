@@ -7,6 +7,8 @@ import { getContractSignatureByToken, markContractSignatureSigned } from '@/lib/
 import { createStaffFromApplication } from '@/lib/staff';
 import { sendStaffPortalActivationEmail } from '@/lib/email/staff-activation';
 import { MAX_JSON_BYTES, readJsonBody } from '@/lib/request-validation';
+import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
+import { getSocClassification, isAdultAtEmploymentStart } from '@/lib/soc-classification';
 
 type RouteContext = { params: Promise<{ token: string }> };
 
@@ -47,10 +49,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (signature.expires_at && new Date(signature.expires_at).getTime() < Date.now()) return NextResponse.json({ error: 'This signing link has expired. Ask Bimed to issue a new one.' }, { status: 410 });
 
     const client = db();
+    const { data: application, error: applicationError } = await client
+      .from('recruitment_applications')
+      .select('id, full_name, email, role_applied, date_of_birth, nationality')
+      .eq('id', signature.application_id)
+      .maybeSingle();
+    if (applicationError || !application) return NextResponse.json({ error: 'The linked recruitment application could not be loaded. Contact BIMED before signing.' }, { status: 409 });
+    if (!String(application.nationality || '').trim()) {
+      return NextResponse.json({ error: 'Nationality is missing from the source recruitment application. The contract cannot be signed until it is corrected.' }, { status: 409 });
+    }
+    if (!application.date_of_birth) {
+      return NextResponse.json({ error: 'Date of birth is missing from the source recruitment application. The contract cannot be signed until it is corrected.' }, { status: 409 });
+    }
+    if (!isAdultAtEmploymentStart(application.date_of_birth, signature.start_date || BIMED_DEFAULT_START_DATE_ISO)) {
+      return NextResponse.json({ error: 'The source application date of birth is invalid or would make the candidate under 18 on the planned start date. BIMED must verify and correct the application before this contract can be signed.' }, { status: 409 });
+    }
+    if (recruitmentRoleSlug(application.role_applied) !== signature.role_slug || !getSocClassification(application.role_applied)) {
+      return NextResponse.json({ error: 'The occupation classification or role in the recruitment application does not match this contract. BIMED must reconcile the role before signing.' }, { status: 409 });
+    }
+
     const updated = await markContractSignatureSigned(signature.id, signedName.trim(), corrections);
     if (!updated) return NextResponse.json({ error: 'This contract has already been signed.' }, { status: 409 });
-
-    const { data: application } = await client.from('recruitment_applications').select('id, full_name, email, role_applied').eq('id', updated.application_id).maybeSingle();
 
     await recordRecruitmentAudit(client, { applicationId: updated.application_id, eventType: 'contract_signed', actor: signedName.trim(), metadata: { signature_id: updated.id, role_slug: updated.role_slug, corrected_fields: Object.keys(corrections) } });
 
