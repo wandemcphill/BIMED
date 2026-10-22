@@ -97,9 +97,9 @@ function buildTemplate(
     ],
     editableFields: [
       { label: 'Employee name', value: '[Insert employee name]', note: 'Replace with the employee full legal name.' },
-      { label: 'Date of birth', value: '[Date of birth from recruitment application]', note: 'Taken from recruitment_applications.date_of_birth. Correct the source application if inaccurate.' },
-      { label: 'Nationality', value: '[Nationality from recruitment application]', note: 'Taken from recruitment_applications.nationality.' },
-      { label: 'SOC / occupation classification', value: '[SOC classification matched from the application role]', note: 'Matched to SOC 2010 using the applied role and official Irish DETE occupation information. The final classification depends on actual duties and DETE assessment.' },
+      { label: 'Date of birth', value: 'Date of birth to be confirmed before issue', note: 'Taken from recruitment_applications.date_of_birth. Correct the source application if inaccurate.' },
+      { label: 'Nationality', value: 'Nationality to be confirmed before issue', note: 'Taken from recruitment_applications.nationality.' },
+      { label: 'SOC / occupation classification', value: 'SOC classification to be confirmed before issue', note: 'Matched to SOC 2010 using the applied role and official Irish DETE occupation information. The final classification depends on actual duties and DETE assessment.' },
       {
         label: 'Employee address',
         value: '[Insert Irish residential address if verified]',
@@ -421,13 +421,13 @@ export function applyContractOverrides(template: ContractTemplate, overrides: Co
     replacements.push(['[Employee full name]', overrides.employeeName]);
   }
   if (overrides.dateOfBirth) {
-    replacements.push(['[Date of birth from recruitment application]', overrides.dateOfBirth]);
+    replacements.push(['Date of birth to be confirmed before issue', overrides.dateOfBirth]);
   }
   if (overrides.nationality) {
-    replacements.push(['[Nationality from recruitment application]', overrides.nationality]);
+    replacements.push(['Nationality to be confirmed before issue', overrides.nationality]);
   }
   if (overrides.socClassification) {
-    replacements.push(['[SOC classification matched from the application role]', overrides.socClassification]);
+    replacements.push(['SOC classification to be confirmed before issue', overrides.socClassification]);
   }
   if (overrides.employeeAddress !== undefined) {
     const address = overrides.employeeAddress?.trim() || '';
