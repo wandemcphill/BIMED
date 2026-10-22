@@ -29,7 +29,10 @@ function countryAppearsAsAddressComponent(address: string, country: string): boo
   return address
     .split(/[\n,;]+/)
     .map((part) => part.trim().replace(/^[.\s]+|[.\s]+$/g, ''))
-    .some((part) => normalizeCountry(part) === wanted);
+    .some((part) => {
+      const normalized = normalizeCountry(part);
+      return normalized === wanted || normalized.endsWith(wanted);
+    });
 }
 
 /**
@@ -58,15 +61,22 @@ export function buildCurrentResidentialAddress(
   if (application?.living_in_ireland === 'Yes') {
     country = 'Ireland';
   } else {
-    country = cleanCountry(application?.current_country)
-      || cleanCountry(application?.country_of_residence);
+    const currentCountry = cleanCountry(application?.current_country);
+    const residenceCountry = cleanCountry(application?.country_of_residence);
+    const isIrish = (value: string) => ['ireland', 'republicofireland'].includes(normalizeCountry(value));
 
-    // Only use the legacy staff country where the application does not mark
-    // the person as international. Never append Ireland to an explicitly
-    // overseas applicant merely because the staff record says Ireland.
+    // Prefer a non-Irish application country if the candidate says they live
+    // outside Ireland. This avoids a stale Ireland field overriding India or
+    // another actual residential country.
+    country = [currentCountry, residenceCountry].find((value) => value && !isIrish(value)) || '';
+
+    // Use legacy staff country only if the application does not explicitly
+    // identify the candidate as overseas, and never let a default Ireland
+    // value leak into an explicitly overseas address.
     if (!country && application?.living_in_ireland !== 'No') {
-      country = cleanCountry(staff.country);
+      country = currentCountry || residenceCountry || cleanCountry(staff.country);
     }
+    if (country && isIrish(country) && application?.living_in_ireland === 'No') country = '';
   }
 
   if (!country || countryAppearsAsAddressComponent(address, country)) return address;
