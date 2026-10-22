@@ -202,6 +202,12 @@ export function applyBimedContractDefaults(
   const sections = template.sections.map((section) => applySectionReplacements(section, replacements));
   const schedules = template.schedules.map((section) => applySectionReplacements(section, replacements));
 
+  const accommodationTimingClause = 'Where BIMED has agreed to arrange accommodation on your behalf, the arrangement begins on 1 January 2027 and BIMED accommodation ends on 31 January 2027. If you arrive before 1 January 2027, hotel accommodation is required until BIMED accommodation begins. From 1 February 2027, you must arrange your own accommodation because the BIMED contract arranged on your behalf has ended.';
+  const accommodationSchedule = schedules.find((section) => section.heading.startsWith('Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address'));
+  if (accommodationSchedule && !accommodationSchedule.paragraphs.some((paragraph) => paragraph.includes('BIMED accommodation ends on 31 January 2027'))) {
+    accommodationSchedule.paragraphs.push(accommodationTimingClause);
+  }
+
   if (roleSlug === 'physiotherapist') {
     const permitSchedule = schedules.find(
       (section) => section.heading === 'Schedule 1 - Employment Permit, Employee Information and Accommodation / Contract Address'
