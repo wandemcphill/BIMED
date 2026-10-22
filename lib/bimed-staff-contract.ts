@@ -268,6 +268,16 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     };
   }
 
+  if (!accommodation.private && (
+    Number(permit.accommodation_period_months || 0) !== 1 ||
+    !String(permit.accommodation_plan || '').startsWith('one_month_')
+  )) {
+    return {
+      status: 'blocked',
+      reason: 'The recorded BIMED accommodation plan does not match the contract period ending 31 January 2027. Reconcile the accommodation plan and its financial records to the one-month arrangement before issuing this contract; no payment record has been changed.',
+    };
+  }
+
   const { data: itinerary } = await client
     .from('recruitment_flight_itineraries')
     .select('id,departure_airport_code,departure_airport_name,destination_airport_code,destination_airport_name,travel_date,passenger_count,passengers,airport_pickup_included,booking_status')
