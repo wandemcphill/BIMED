@@ -17,6 +17,7 @@ type PermitCase = {
   accommodation_address_verified_at?: string | null;
   accommodation_address_verified_by?: string | null;
   accommodation_shared_with_staff_id?: string | null;
+  shared_with_bimed_id?: string | null;
 };
 
 type Props = {
@@ -88,7 +89,7 @@ export default function StaffContractAddressEditor({
     permitCase?.accommodation_unit === 'Other' ? permitCase.accommodation_address || '' : ''
   );
   const [sharedWithBimedId, setSharedWithBimedId] = useState(
-    defaultSharedAccommodationPartner(bimedId)
+    permitCase?.shared_with_bimed_id || defaultSharedAccommodationPartner(bimedId)
   );
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -105,11 +106,11 @@ export default function StaffContractAddressEditor({
     setOtherAddress(
       saved === 'Other' ? permitCase?.accommodation_address || '' : ''
     );
-    setSharedWithBimedId(defaultSharedAccommodationPartner(bimedId));
+    setSharedWithBimedId(permitCase?.shared_with_bimed_id || defaultSharedAccommodationPartner(bimedId));
     setConfirmed(false);
     setError('');
     setMessage('');
-  }, [bimedId, primaryLocation, permitCase?.accommodation_unit, permitCase?.accommodation_address]);
+  }, [bimedId, primaryLocation, permitCase?.accommodation_unit, permitCase?.accommodation_address, permitCase?.shared_with_bimed_id]);
 
   const address = useMemo(() => {
     if (!unit) return '';
