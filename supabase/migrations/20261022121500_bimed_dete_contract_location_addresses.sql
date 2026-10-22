@@ -56,7 +56,7 @@ begin
   if length(v_primary_assignment) < 5 or length(v_primary_assignment) > 500 then
     raise exception 'PRIMARY_ASSIGNMENT_ADDRESS_INVALID';
   end if;
-  if v_unit <> all (array['Flat 1','Flat 2','Flat 3','Flat 4','Flat 5','Flat 6','Flat 7','Flat 8','Other']::text[]) then
+  if v_unit not in ('Flat 1','Flat 2','Flat 3','Flat 4','Flat 5','Flat 6','Flat 7','Flat 8','Other') then
     raise exception 'ACCOMMODATION_UNIT_INVALID';
   end if;
   if length(v_address) < 10 or length(v_address) > 1000 then
@@ -64,7 +64,7 @@ begin
   end if;
 
   if v_unit <> 'Other' then
-    if v_address <> v_unit || ', 19 Pope’s Quay, Cork, T23 PXV5, Ireland' then
+    if v_address <> (v_unit || ', 19 Pope’s Quay, Cork, T23 PXV5, Ireland') then
       raise exception 'ACCOMMODATION_ADDRESS_DOES_NOT_MATCH_SELECTED_FLAT';
     end if;
   end if;
