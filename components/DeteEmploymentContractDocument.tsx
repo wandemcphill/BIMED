@@ -18,6 +18,7 @@ export default function DeteEmploymentContractDocument({
   const bimedId = template.editableFields.find((field) => field.label === 'BIMED ID')?.value;
   const primaryAssignment = template.editableFields.find((field) => field.label === 'Place of Primary Assignment')?.value;
   const accommodation = template.editableFields.find((field) => field.label === 'Accommodation arrangement')?.value;
+  const accommodationAddress = template.editableFields.find((field) => field.label === 'Irish accommodation address')?.value;
   const departureAirport = template.editableFields.find((field) => field.label === 'Departure airport')?.value;
   const arrivalAirport = template.editableFields.find((field) => field.label === 'Final airport in Ireland')?.value;
   const travellingParty = template.editableFields.find((field) => field.label === 'Travelling party')?.value;
@@ -63,6 +64,7 @@ export default function DeteEmploymentContractDocument({
           {[
             ['Place of Primary Assignment', primaryAssignment || 'To be confirmed'],
             ['Accommodation', accommodation || 'To be confirmed'],
+            ['Accommodation address in Ireland', accommodationAddress || 'To be confirmed'],
             ['Departure airport', departureAirport || 'To be confirmed'],
             ['Final airport in Ireland', arrivalAirport || 'To be confirmed'],
             ['Travelling party', travellingParty || 'To be confirmed'],
