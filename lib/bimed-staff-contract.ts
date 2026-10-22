@@ -17,6 +17,7 @@ import {
   normalizeRecruitmentRole,
 } from '@/lib/bimed-role-policy';
 import { getSocClassification, isAdultAtEmploymentStart } from '@/lib/soc-classification';
+import { buildCurrentResidentialAddress } from '@/lib/contract-current-address';
 
 export type BimedStaffContractContext = {
   staffId: string;
@@ -74,12 +75,6 @@ function formatDate(value: string | null | undefined): string {
   return Number.isNaN(date.getTime())
     ? value
     : date.toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' });
-}
-
-function joinAddress(staff: Record<string, any>): string {
-  return [staff.address_line_1, staff.address_line_2, staff.city, staff.county, staff.eircode, staff.country]
-    .filter(Boolean)
-    .join(', ');
 }
 
 function fixedTermText(start: string, end: string): string {
@@ -305,7 +300,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
   const primaryAssignment = (staff.primary_location || '').trim() || 'To be confirmed before employment-permit submission';
   const internationalHire = application?.living_in_ireland === 'No' || staff.country !== 'Ireland';
 
-  const currentEmployeeAddress = joinAddress(staff) || application?.address || 'Current residential address recorded in the BIMED recruitment record';
+  const currentEmployeeAddress = buildCurrentResidentialAddress(staff, application) || 'Current residential address recorded in the BIMED recruitment record';
   const employeeAddress = currentEmployeeAddress;
   const employeeAddressStatus = 'Current residential address from the BIMED recruitment/staff record. This is separate from the Irish accommodation address used for the permit-stage relocation record.';
   if (accommodation.private) {
