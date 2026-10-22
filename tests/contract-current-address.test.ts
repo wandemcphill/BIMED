@@ -46,6 +46,13 @@ describe('current residential country in contract addresses', () => {
     )).toBe('Example address');
   });
 
+  it('prefers a non-Irish residence country when the application country fields conflict', () => {
+    expect(buildCurrentResidentialAddress(
+      { address_line_1: 'Example address', country: 'Ireland' },
+      { address: 'Example address', living_in_ireland: 'No', country_of_residence: 'India', current_country: 'Ireland' },
+    )).toBe('Example address, India');
+  });
+
   it('builds an address from staff address lines but gets country from the application', () => {
     expect(buildCurrentResidentialAddress(
       { address_line_1: 'Example Road', city: 'Visakhapatnam', country: 'Ireland' },
