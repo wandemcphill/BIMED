@@ -5,7 +5,8 @@ import { getContractDocumentAccess } from '@/lib/contract-document-access';
 import { db } from '@/lib/db';
 import { getContractTemplate, applyContractOverrides } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
-import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
+import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE_ISO, recruitmentRoleSlug } from '@/lib/bimed-role-policy';
+import { getSocClassification, isAdultAtEmploymentStart } from '@/lib/soc-classification';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,11 +26,14 @@ export default async function ContractCopyPage({ params }: { params: Promise<{ t
   const client = db();
   const { data: application } = await client
     .from('recruitment_applications')
-    .select('id, full_name, email, role_applied')
+    .select('id, full_name, email, role_applied, date_of_birth, nationality')
     .eq('id', access.application_id)
     .maybeSingle();
 
   if (!application) return <ContractAccessGate reason="not_found" />;
+  if (!String(application.nationality || '').trim() || !application.date_of_birth) {
+    return <ContractAccessGate reason="not_found" />;
+  }
 
   const signature = access.signature_id
     ? (await client.from('recruitment_contract_signatures').select('*').eq('id', access.signature_id).maybeSingle()).data
@@ -43,6 +47,15 @@ export default async function ContractCopyPage({ params }: { params: Promise<{ t
     return 'healthcare-assistant';
   })();
 
+  const socClassification = getSocClassification(application.role_applied);
+  if (
+    !socClassification ||
+    recruitmentRoleSlug(application.role_applied) !== roleSlug ||
+    !isAdultAtEmploymentStart(application.date_of_birth, signature?.start_date || BIMED_DEFAULT_START_DATE_ISO)
+  ) {
+    return <ContractAccessGate reason="not_found" />;
+  }
+
   const raw = getContractTemplate(roleSlug);
   if (!raw) return <ContractAccessGate reason="not_found" />;
 
@@ -54,6 +67,10 @@ export default async function ContractCopyPage({ params }: { params: Promise<{ t
   const template = applyBimedContractDefaults(
     applyContractOverrides(base, {
       employeeName: signature?.employee_name || application.full_name,
+      dateOfBirth: new Date(application.date_of_birth + 'T12:00:00Z').toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' }),
+      nationality: String(application.nationality).trim(),
+      socClassification: socClassification.display,
+      socClassificationNote: socClassification.note + ' Source: ' + socClassification.sourceUrl,
       employeeAddress: signature?.employee_address || null,
       employeeAddressStatus: signature?.employee_address
         ? 'Verified Irish residential address included.'
