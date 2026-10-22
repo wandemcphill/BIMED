@@ -153,6 +153,10 @@ function accommodationReady(permit: any, invoice: any, application: any): { read
     permit?.accommodation_offered &&
     permit?.accommodation_plan &&
     permit?.accommodation_terms_acknowledged_at &&
+    permit?.accommodation_address &&
+    permit?.accommodation_unit &&
+    permit?.accommodation_address_verified_at &&
+    permit?.accommodation_address_verified_by &&
     (invoice?.status === 'issued' || invoice?.status === 'paid')
   );
 
@@ -190,7 +194,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
       .eq('id', staff.application_id)
       .maybeSingle(),
     client.from('recruitment_staff_permit_cases')
-      .select('id,permit_type,permit_application_id,permit_submission_route,accommodation_offered,accommodation_plan,accommodation_period_months,accommodation_terms_acknowledged_at,flight_request_status,flight_departure_airport_code,flight_departure_airport_name,flight_destination_airport_code,flight_destination_airport_name,flight_passenger_count,flight_travel_date,flight_airport_pickup_required')
+      .select('id,permit_type,permit_application_id,permit_submission_route,accommodation_offered,accommodation_plan,accommodation_period_months,accommodation_terms_acknowledged_at,accommodation_address,accommodation_unit,accommodation_address_verified_at,accommodation_address_verified_by,accommodation_shared_with_staff_id,flight_request_status,flight_departure_airport_code,flight_departure_airport_name,flight_destination_airport_code,flight_destination_airport_name,flight_passenger_count,flight_travel_date,flight_airport_pickup_required')
       .eq('staff_id', staffId)
       .maybeSingle(),
     client.from('recruitment_contract_signatures')
@@ -278,7 +282,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
 
   const accommodationAddress = accommodation.private
     ? String(application?.verified_irish_residential_address || '')
-    : '';
+    : String(permit.accommodation_address || '');
 
   const departureAirportCode = itinerary.departure_airport_code || permit.flight_departure_airport_code || '';
   const departureAirportName = itinerary.departure_airport_name || permit.flight_departure_airport_name || '';
@@ -362,7 +366,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     'DETE Work ID / application reference': { value: permit.permit_application_id || 'To be populated when allocated' },
     'Accommodation arrangement': { value: accommodationRoute },
     'Irish accommodation details': { value: accommodationDetails },
-    'Irish accommodation address': { value: accommodationAddress || 'BIMED accommodation address to be recorded in the relocation record; not inserted as the employee current address.' },
+    'Irish accommodation address': { value: accommodationAddress, note: accommodation.private ? 'Verified private Irish residential address, kept separate from the employee current address.' : 'Verified BIMED accommodation address and allocated flat, kept separate from the employee current address.' },
     'Departure airport': { value: departureAirport },
     'Final airport in Ireland': { value: arrivalAirport },
     'Travel date': { value: formatDate(travelDate) },
@@ -383,7 +387,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     paragraphs: [
       '4.1 Place of Primary Assignment: ' + primaryAssignment + '. The employee may be rostered at the assigned client home, care facility or other approved work location within the stated primary assignment, subject to BIMED operational requirements and the terms of this contract.',
       '4.2 Accommodation route: ' + accommodationRoute + '. ' + accommodationDetails,
-      '4.3 Irish accommodation address: ' + (accommodationAddress || 'Not stated in the employee address field. For BIMED-offered accommodation, the confirmed accommodation destination is maintained in the relocation record and may be updated before arrival.'),
+      '4.3 Irish accommodation address: ' + accommodationAddress + '. This is the employee’s residential accommodation and is separate from the Place of Primary Assignment in clause 4.1.',
       '4.4 Initial travel support: BIMED will arrange the employee\'s initial economy air travel to Ireland and the related airport pickup, subject to immigration clearance, lawful entry and BIMED travel arrangements. BIMED travel support may cover up to 3 travellers where recorded in the travel request.',
       '4.5 Travel particulars at permit-stage issue: Departure airport: ' + departureAirport + '. Final airport in Ireland: ' + arrivalAirport + '. Planned travel date: ' + formatDate(travelDate) + '. Travelling party: ' + passengerCount + ' passenger' + (Number(passengerCount) === 1 ? '' : 's') + '. Airport pickup: ' + (airportPickup ? 'Included' : 'Not included') + '.',
       '4.6 Travel particulars are operational relocation arrangements and may be updated by BIMED before travel. Any travel update does not by itself amend the contractual employment terms or place of primary assignment.',
