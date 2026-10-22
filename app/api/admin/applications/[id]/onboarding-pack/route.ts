@@ -11,6 +11,7 @@ import { db } from '@/lib/db';
 import { recruitmentRoleSlug, BIMED_DEFAULT_START_DATE, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
 import { getPreContractReadiness } from '@/lib/onboarding-readiness';
 import { resolveContractAddress, type ContractAddressResolution } from '@/lib/contract-accommodation';
+import { getSocClassification, isAdultAtEmploymentStart } from '@/lib/soc-classification';
 import { transitionBimedApplicationStatus } from '@/lib/bimed-lifecycle';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { data: application, error: applicationError } = await client
       .from('recruitment_applications')
-      .select('id, full_name, email, address, start_date, role_applied, status, living_in_ireland, contract_accommodation_option, verified_irish_residential_address, contract_accommodation_verified_at, contract_accommodation_verified_by')
+      .select('id, full_name, email, address, start_date, date_of_birth, nationality, role_applied, status, living_in_ireland, contract_accommodation_option, verified_irish_residential_address, contract_accommodation_verified_at, contract_accommodation_verified_by')
       .eq('id', applicationId).maybeSingle();
     if (applicationError) throw applicationError;
     if (!application) return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
@@ -43,6 +44,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const expectedRoleSlug = recruitmentRoleSlug(currentApplication.role_applied);
     if (!expectedRoleSlug) return NextResponse.json({ error: 'This application has an invalid recruitment role.' }, { status: 400 });
     if (requestedRoleSlug !== expectedRoleSlug) return NextResponse.json({ error: 'The onboarding pack role must match the candidate\'s applied role.' }, { status: 400 });
+
+    if (!String(currentApplication.nationality || '').trim()) {
+      return NextResponse.json({ error: 'Nationality is missing from the recruitment application. Complete the candidate record before issuing contracts.' }, { status: 409 });
+    }
+    if (!currentApplication.date_of_birth) {
+      return NextResponse.json({ error: 'Date of birth is missing from the recruitment application. Complete the candidate record before issuing contracts.' }, { status: 409 });
+    }
+    if (!isAdultAtEmploymentStart(currentApplication.date_of_birth, BIMED_DEFAULT_START_DATE_ISO)) {
+      return NextResponse.json({ error: 'The application date of birth is invalid or would make the candidate under 18 on the planned employment start date. Correct the source application before issuing contracts.' }, { status: 409 });
+    }
+    const socClassification = getSocClassification(currentApplication.role_applied);
+    if (!socClassification) {
+      return NextResponse.json({ error: 'A verified SOC 2010 classification could not be matched to the application role. Confirm the role duties and occupational code before issuing contracts.' }, { status: 409 });
+    }
 
     const readiness = await getPreContractReadiness(client, application);
     if (!readiness.ready) {
@@ -190,6 +205,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
         contract_address_mode: addressResolution.mode,
         contract_address_included: Boolean(addressResolution.employeeAddress),
         canonical_default_start_date: BIMED_DEFAULT_START_DATE,
+        applicant_nationality_present: Boolean(String(currentApplication.nationality || '').trim()),
+        applicant_date_of_birth_present: Boolean(currentApplication.date_of_birth),
+        soc_classification: socClassification.display,
+        soc_classification_source: socClassification.sourceUrl,
         email_status: email.status,
       },
     });

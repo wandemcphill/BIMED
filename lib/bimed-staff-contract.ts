@@ -16,6 +16,7 @@ import {
   recruitmentRoleSlug,
   normalizeRecruitmentRole,
 } from '@/lib/bimed-role-policy';
+import { getSocClassification, isAdultAtEmploymentStart } from '@/lib/soc-classification';
 
 export type BimedStaffContractContext = {
   staffId: string;
@@ -25,6 +26,9 @@ export type BimedStaffContractContext = {
   employeeEmail: string;
   employeeAddress: string;
   employeeAddressStatus: string;
+  dateOfBirth: string;
+  nationality: string;
+  socClassification: string;
   roleSlug: string;
   roleLabel: string;
   department: string;
@@ -190,7 +194,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
 
   const [applicationResult, permitResult, signatureResult, externalContractResult] = await Promise.all([
     client.from('recruitment_applications')
-      .select('contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by,living_in_ireland,country_of_residence,address')
+      .select('contract_accommodation_option,verified_irish_residential_address,contract_accommodation_verified_at,contract_accommodation_verified_by,living_in_ireland,country_of_residence,address,date_of_birth,nationality,role_applied')
       .eq('id', staff.application_id)
       .maybeSingle(),
     client.from('recruitment_staff_permit_cases')
@@ -218,6 +222,27 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
   const application = applicationResult.data;
   const permit = permitResult.data;
 
+  if (!application) {
+    return { status: 'blocked', reason: 'The linked recruitment application could not be found. Restore the application record before preparing this contract.' };
+  }
+  if (!String(application.nationality || '').trim()) {
+    return { status: 'blocked', reason: 'Nationality is missing from the recruitment application. Complete the application before issuing the DETE contract.' };
+  }
+  if (!application.date_of_birth) {
+    return { status: 'blocked', reason: 'Date of birth is missing from the recruitment application. Complete the application before issuing the DETE contract.' };
+  }
+  const contractStartDateForValidation = staff.employment_start_date || BIMED_DEFAULT_START_DATE_ISO;
+  if (!isAdultAtEmploymentStart(application.date_of_birth, contractStartDateForValidation)) {
+    return { status: 'blocked', reason: 'The date of birth in the recruitment application is invalid or would make the candidate under 18 on the planned employment start date. Correct the application before issuing the DETE contract.' };
+  }
+  const socClassification = getSocClassification(application.role_applied);
+  if (!socClassification) {
+    return { status: 'blocked', reason: 'A verified SOC 2010 classification could not be matched to the application role. Confirm the actual duties and occupational code before issuing the DETE contract.' };
+  }
+  if (recruitmentRoleSlug(application.role_applied) !== roleSlug) {
+    return { status: 'blocked', reason: 'The occupation in the recruitment application does not match the employment role recorded for this staff member. Reconcile the records before issuing the DETE contract.' };
+  }
+
   if (!permit) return { status: 'blocked', reason: 'The overseas employment-permit case has not been initialized.' };
   if (signatureResult.data?.status !== 'signed' && !externalContractResult.data) {
     return { status: 'blocked', reason: 'The initial BIMED onboarding contract must already be signed or administrator-verified before the separate permit-stage contract can be issued.' };
@@ -241,6 +266,27 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
       status: 'blocked',
       reason: 'Accommodation is not yet ready. The candidate must complete the applicable accommodation selection and BIMED must have the required confirmation before the DETE permit-stage contract can be issued.',
     };
+  }
+
+  if (!accommodation.private && (
+    Number(permit.accommodation_period_months || 0) !== 1 ||
+    !String(permit.accommodation_plan || '').startsWith('one_month_')
+  )) {
+    return {
+      status: 'blocked',
+      reason: 'The recorded BIMED accommodation plan does not match the contract period ending 31 January 2027. Reconcile the accommodation plan and its financial records to the one-month arrangement before issuing this contract; no payment record has been changed.',
+    };
+  }
+
+  if (!accommodation.private) {
+    const sharedPlan = String(permit.accommodation_plan || '').includes('_shared_');
+    const hasSharingPartner = Boolean(permit.accommodation_shared_with_staff_id);
+    if (sharedPlan !== hasSharingPartner) {
+      return {
+        status: 'blocked',
+        reason: 'The accommodation plan and flat allocation disagree about whether the accommodation is shared. Reconcile the recorded plan and invoice with the confirmed flat allocation before issuing this contract; no payment record has been changed.',
+      };
+    }
   }
 
   const { data: itinerary } = await client
@@ -275,7 +321,7 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
 
   const accommodationDetails = accommodation.private
     ? 'BIMED does not provide the accommodation under the selected private-accommodation route.'
-    : accommodationPlanText(permit.accommodation_plan) + ' · ' + String(permit.accommodation_period_months || 'initial') + ' month arrangement recorded by BIMED.';
+    : accommodationPlanText(permit.accommodation_plan) + ' · ' + String(permit.accommodation_period_months || 'initial') + ' month arrangement recorded by BIMED. BIMED-offered accommodation starts on 1 January 2027 and covers 1–31 January 2027. If you arrive before 1 January 2027, hotel accommodation is required until BIMED accommodation begins. From 1 February 2027, you must arrange your own accommodation because BIMED’s accommodation contract arranged on your behalf expires on 31 January 2027.';
 
   const accommodationAddress = accommodation.private
     ? String(application?.verified_irish_residential_address || '')
@@ -372,9 +418,13 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
     'Travelling party': { value: travellingParty },
     'Airport pickup': { value: airportPickupLabel },
     'Employee email': { value: staff.email },
-    'Date of birth': { value: 'Recorded in BIMED personnel records and available to the permit application' },
-    'Nationality': { value: 'Recorded in BIMED personnel records and available to the permit application' },
-    'SOC / occupation classification': { value: 'To be confirmed in Employment Permits Online before submission' },
+    'Date of birth': { value: formatDate(application.date_of_birth), note: 'Taken directly from the candidate’s recruitment application.' },
+    'Nationality': { value: String(application.nationality).trim(), note: 'Taken directly from the candidate’s recruitment application.' },
+    'Accommodation start date': { value: accommodation.private ? 'Not applicable — private accommodation' : '1 January 2027' },
+    'BIMED accommodation contract expires': { value: accommodation.private ? 'Not applicable — private accommodation' : '31 January 2027' },
+    'Employee-arranged accommodation begins': { value: accommodation.private ? 'Not applicable — private accommodation' : '1 February 2027' },
+    'Early arrival accommodation': { value: accommodation.private ? 'Arrange accommodation under the private-accommodation route' : 'Hotel accommodation is required for arrivals before 1 January 2027' },
+    'SOC / occupation classification': { value: socClassification.display, note: socClassification.note + ' Source: ' + socClassification.sourceUrl },
     'Pay reference period': { value: BIMED_DEFAULT_PAY_FREQUENCY },
     'Collective agreement / ERO / SEO': { value: 'No separate collective agreement recorded by BIMED; applicable Irish statutory terms and any applicable ERO/SEO will apply' },
     'Social insurance': { value: 'PRSI and other statutory social insurance contributions as required by Irish law' },
@@ -390,6 +440,9 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
       '4.4 Initial travel support: BIMED will arrange the employee\'s initial economy air travel to Ireland and the related airport pickup, subject to immigration clearance, lawful entry and BIMED travel arrangements. BIMED travel support may cover up to 3 travellers where recorded in the travel request.',
       '4.5 Travel particulars at permit-stage issue: Departure airport: ' + departureAirport + '. Final airport in Ireland: ' + arrivalAirport + '. Planned travel date: ' + formatDate(travelDate) + '. Travelling party: ' + travellingParty + '. Airport pickup: ' + airportPickupLabel + '.',
       '4.6 Travel particulars are operational relocation arrangements and may be updated by BIMED before travel. Any travel update does not by itself amend the contractual employment terms or place of primary assignment.',
+      ...(accommodation.private ? [] : [
+        '4.7 BIMED accommodation timing: BIMED-offered accommodation starts on 1 January 2027 and covers 1–31 January 2027. If you arrive before 1 January 2027, hotel accommodation is required until BIMED accommodation begins. From 1 February 2027, you must arrange your own accommodation because BIMED’s accommodation contract arranged on your behalf expires on 31 January 2027.',
+      ]),
     ],
     bullets: [
       'BIMED arranges and pays for the initial economy flight under the overseas new-hire travel process.',
@@ -400,8 +453,11 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
 
   const allSections = template.sections.map((section) => replaceSection(section, replacements));
   const allSchedules = template.schedules.map((schedule) => replaceSchedule(schedule, replacements));
-  if (!allSchedules.some((schedule) => schedule.heading.startsWith('Schedule 4'))) {
+  const scheduleFour = allSchedules.find((schedule) => schedule.heading.startsWith('Schedule 4'));
+  if (!scheduleFour) {
     allSchedules.push(relocationSchedule);
+  } else if (!accommodation.private && !scheduleFour.paragraphs.some((paragraph) => paragraph.startsWith('4.7 BIMED accommodation timing:'))) {
+    scheduleFour.paragraphs.push('4.7 BIMED accommodation timing: BIMED-offered accommodation starts on 1 January 2027 and covers 1–31 January 2027. If you arrive before 1 January 2027, hotel accommodation is required until BIMED accommodation begins. From 1 February 2027, you must arrange your own accommodation because BIMED’s accommodation contract arranged on your behalf expires on 31 January 2027.');
   }
 
   const dynamicTemplate: ContractTemplate = {
@@ -427,6 +483,9 @@ export async function resolveStaffContractTemplate(staffId: string): Promise<Res
       employeeEmail: staff.email,
       employeeAddress,
       employeeAddressStatus,
+      dateOfBirth: formatDate(application.date_of_birth),
+      nationality: String(application.nationality).trim(),
+      socClassification: socClassification.display,
       roleSlug,
       roleLabel,
       department: staff.department || roleGroup,

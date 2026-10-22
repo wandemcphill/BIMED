@@ -4,7 +4,9 @@ import SignContractForm from '@/components/SignContractForm';
 import { getContractSignatureByToken } from '@/lib/contract-signature';
 import { applyContractOverrides, getContractTemplate } from '@/lib/contract-templates';
 import { getDocumentOverride, mergeContractTemplate } from '@/lib/document-overrides';
-import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE_ISO } from '@/lib/bimed-role-policy';
+import { applyBimedContractDefaults, BIMED_DEFAULT_START_DATE_ISO, recruitmentRoleSlug } from '@/lib/bimed-role-policy';
+import { db } from '@/lib/db';
+import { getSocClassification, isAdultAtEmploymentStart } from '@/lib/soc-classification';
 
 export const metadata: Metadata = {
   title: 'Bimed Healthcare | Sign Your Employment Contract',
@@ -64,6 +66,38 @@ export default async function SignContractPage({ params }: PageProps) {
     return <GateMessage title="Link expired" body="This contract signing link has expired. Please contact the Bimed recruitment team to have it reissued." />;
   }
 
+  let application;
+  try {
+    const { data, error } = await db()
+      .from('recruitment_applications')
+      .select('id,full_name,email,date_of_birth,nationality,role_applied')
+      .eq('id', signature.application_id)
+      .maybeSingle();
+    if (error || !data) {
+      return <GateMessage title="Application details unavailable" body="We could not retrieve the applicant's source details needed for this contract. Please contact the Bimed recruitment team." />;
+    }
+    application = data;
+  } catch {
+    return <GateMessage title="Application details unavailable" body="We could not retrieve the applicant's source details needed for this contract. Please contact the Bimed recruitment team." />;
+  }
+
+  if (!String(application.nationality || '').trim()) {
+    return <GateMessage title="Contract details incomplete" body="Nationality is missing from the recruitment application. The contract cannot be signed until the application record is completed." />;
+  }
+  if (!application.date_of_birth) {
+    return <GateMessage title="Contract details incomplete" body="Date of birth is missing from the recruitment application. The contract cannot be signed until the application record is completed." />;
+  }
+  if (!isAdultAtEmploymentStart(application.date_of_birth, signature.start_date || BIMED_DEFAULT_START_DATE_ISO)) {
+    return <GateMessage title="Contract requires correction" body="The date of birth in the recruitment application appears invalid or would make the candidate under 18 on the planned employment start date. Please contact Bimed recruitment to verify the application against an identity document before signing." />;
+  }
+  if (recruitmentRoleSlug(application.role_applied) !== signature.role_slug) {
+    return <GateMessage title="Contract role mismatch" body="The contract role does not match the role recorded in your recruitment application. Please contact Bimed recruitment before signing." />;
+  }
+  const socClassification = getSocClassification(application.role_applied);
+  if (!socClassification) {
+    return <GateMessage title="Occupation classification unavailable" body="Bimed recruitment must confirm the SOC occupation classification for your role before this contract can be signed." />;
+  }
+
   const rawTemplate = getContractTemplate(signature.role_slug);
   if (!rawTemplate) {
     return <GateMessage title="Contract unavailable" body="The contract for this role could not be found. Please contact the Bimed recruitment team." />;
@@ -80,6 +114,10 @@ export default async function SignContractPage({ params }: PageProps) {
   const template = applyBimedContractDefaults(
     applyContractOverrides(baseTemplate, {
       employeeName: signature.employee_name,
+      dateOfBirth: new Date(application.date_of_birth + 'T12:00:00Z').toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' }),
+      nationality: String(application.nationality).trim(),
+      socClassification: socClassification.display,
+      socClassificationNote: socClassification.note + ' Source: ' + socClassification.sourceUrl,
       employeeAddress: signature.employee_address,
       employeeAddressStatus: signature.employee_address
         ? 'Verified Irish residential address included.'

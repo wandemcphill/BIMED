@@ -38,7 +38,7 @@ export default function DeteEmploymentContractDocument({
           <div className="dete-contract-prefill" role="status">
             <strong>Populated from BIMED Staff Portal</strong>
             <span>
-              This permit-stage contract is generated only after the prerequisite onboarding contract, accommodation route and initial travel itinerary have been recorded.
+              This permit-stage contract is generated after the prerequisite onboarding contract, verified accommodation route and required permit details are recorded. Travel particulars are included only when supplied; otherwise they remain marked “To be confirmed”.
             </span>
           </div>
         ) : null}
