@@ -182,30 +182,31 @@ export default function CandidateForm({
 
       if (!active) return;
 
-      if (parsedDraft?.form) {
+      const restoredDraft = parsedDraft;
+      if (restoredDraft?.form) {
         // The invitation is authoritative for the role. Never let an older local draft
         // overwrite the canonical role selected by the recruiter for this invitation.
         const canonicalInviteRole = normalizeRecruitmentRole(invite?.role) ?? '';
         setForm((current) => ({
           ...current,
-          ...parsedDraft.form,
+          ...restoredDraft.form,
           role_applied: canonicalInviteRole || current.role_applied,
-          supporting_documents: Array.isArray(parsedDraft.form?.supporting_documents)
-            ? parsedDraft.form.supporting_documents
+          supporting_documents: Array.isArray(restoredDraft.form?.supporting_documents)
+            ? restoredDraft.form.supporting_documents
             : current.supporting_documents,
           // Text answers live in localStorage; larger voice payloads are restored from IndexedDB.
           interview_responses: mergeInterviewAudioDraft(
             {
               ...current.interview_responses,
-              ...(parsedDraft.form?.interview_responses ?? {}),
+              ...(restoredDraft.form?.interview_responses ?? {}),
             },
             audioDraft
           ),
         }));
-        if (typeof parsedDraft.step === 'number') {
-          setStep(Math.max(0, Math.min(parsedDraft.step, candidateStepTitles.length - 1)));
+        if (typeof restoredDraft.step === 'number') {
+          setStep(Math.max(0, Math.min(restoredDraft.step, candidateStepTitles.length - 1)));
         }
-        if (parsedDraft.lastSavedAt) setLastSavedAt(parsedDraft.lastSavedAt);
+        if (restoredDraft.lastSavedAt) setLastSavedAt(restoredDraft.lastSavedAt);
       } else if (Object.keys(audioDraft).length) {
         setForm((current) => ({
           ...current,
