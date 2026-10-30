@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   candidateStepTitles,
   candidateSupportDocuments,
@@ -17,6 +17,12 @@ import { getFirstInterviewQuestions, pickRandomAudioQuestionIds, findAudioInterv
 import { normalizeRecruitmentRole } from '@/lib/bimed-role-policy';
 import InterviewAnswerInput, { type InterviewAnswerValue } from '@/components/InterviewAnswerInput';
 import SpeakQuestionButton from '@/components/SpeakQuestionButton';
+import {
+  clearInterviewAudioDraft,
+  loadInterviewAudioDraft,
+  mergeInterviewAudioDraft,
+  saveInterviewAudioDraft,
+} from '@/lib/interview-draft-storage';
 
 type Invite = {
   candidate_name?: string | null;
@@ -122,6 +128,8 @@ export default function CandidateForm({
   const [form, setForm] = useState<FormValues>(() => initialForm(invite));
   const [draftState, setDraftState] = useState<DraftState>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const draftHydratedRef = useRef(false);
+  const audioDraftStorageReadyRef = useRef(false);
   const draftKey = `${draftStoragePrefix}:${token}`;
 
   const setField = <K extends keyof FormValues>(key: K, value: FormValues[K]) => {
@@ -136,53 +144,96 @@ export default function CandidateForm({
       return;
     }
 
+    let active = true;
     let restoreTimer: number | undefined;
+    draftHydratedRef.current = false;
+    audioDraftStorageReadyRef.current = false;
 
-    try {
-      const raw = window.localStorage.getItem(draftKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as {
-          token?: string;
-          step?: number;
-          form?: Partial<FormValues>;
-          lastSavedAt?: string | null;
-        };
+    const restoreDraft = async () => {
+      let parsedDraft: {
+        token?: string;
+        step?: number;
+        form?: Partial<FormValues>;
+        lastSavedAt?: string | null;
+      } | null = null;
 
-        if (parsed.token === token && parsed.form) {
-          // The invitation is authoritative for the role. Never let an older local draft
-          // overwrite the canonical role selected by the recruiter for this invitation.
-          const canonicalInviteRole = normalizeRecruitmentRole(invite?.role) ?? '';
-          setForm((current) => ({
-            ...current,
-            ...parsed.form,
-            role_applied: canonicalInviteRole || current.role_applied,
-            supporting_documents: Array.isArray(parsed.form?.supporting_documents)
-              ? parsed.form.supporting_documents
-              : current.supporting_documents,
-          }));
-          if (typeof parsed.step === 'number') {
-            setStep(Math.max(0, Math.min(parsed.step, candidateStepTitles.length - 1)));
-          }
-          if (parsed.lastSavedAt) {
-            setLastSavedAt(parsed.lastSavedAt);
-          }
-          setDraftState('restored');
+      try {
+        const raw = window.localStorage.getItem(draftKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as {
+            token?: string;
+            step?: number;
+            form?: Partial<FormValues>;
+            lastSavedAt?: string | null;
+          };
+          if (parsed.token === token && parsed.form) parsedDraft = parsed;
         }
+      } catch {
+        if (active) setDraftState('error');
       }
-    } catch {
-      setDraftState('error');
-    }
 
-    restoreTimer = window.setTimeout(() => {
-      setDraftState((current) => (current === 'restored' ? 'saved' : current));
-    }, 0);
+      let audioDraft: Record<string, { audio_base64: string; mime_type: string }> = {};
+      try {
+        audioDraft = await loadInterviewAudioDraft(token);
+        audioDraftStorageReadyRef.current = true;
+      } catch {
+        audioDraftStorageReadyRef.current = false;
+      }
+
+      if (!active) return;
+
+      const restoredDraft = parsedDraft;
+      if (restoredDraft?.form) {
+        // The invitation is authoritative for the role. Never let an older local draft
+        // overwrite the canonical role selected by the recruiter for this invitation.
+        const canonicalInviteRole = normalizeRecruitmentRole(invite?.role) ?? '';
+        setForm((current) => ({
+          ...current,
+          ...restoredDraft.form,
+          role_applied: canonicalInviteRole || current.role_applied,
+          supporting_documents: Array.isArray(restoredDraft.form?.supporting_documents)
+            ? restoredDraft.form.supporting_documents
+            : current.supporting_documents,
+          // Text answers live in localStorage; larger voice payloads are restored from IndexedDB.
+          interview_responses: mergeInterviewAudioDraft(
+            {
+              ...current.interview_responses,
+              ...(restoredDraft.form?.interview_responses ?? {}),
+            },
+            audioDraft
+          ),
+        }));
+        if (typeof restoredDraft.step === 'number') {
+          setStep(Math.max(0, Math.min(restoredDraft.step, candidateStepTitles.length - 1)));
+        }
+        if (restoredDraft.lastSavedAt) setLastSavedAt(restoredDraft.lastSavedAt);
+      } else if (Object.keys(audioDraft).length) {
+        setForm((current) => ({
+          ...current,
+          interview_responses: mergeInterviewAudioDraft(current.interview_responses, audioDraft),
+        }));
+      }
+
+      draftHydratedRef.current = true;
+      if (!audioDraftStorageReadyRef.current) {
+        setDraftState('error');
+      } else if (parsedDraft || Object.keys(audioDraft).length) {
+        setDraftState('restored');
+      }
+
+      restoreTimer = window.setTimeout(() => {
+        setDraftState((current) => (current === 'restored' ? 'saved' : current));
+      }, 0);
+    };
+
+    void restoreDraft();
 
     return () => {
-      if (restoreTimer) {
-        window.clearTimeout(restoreTimer);
-      }
+      active = false;
+      draftHydratedRef.current = false;
+      if (restoreTimer) window.clearTimeout(restoreTimer);
     };
-  }, [draftKey, token]);
+  }, [draftKey, token, invite?.role]);
 
   useEffect(() => {
     if (!furthestStep || step > furthestStep) {
@@ -197,40 +248,50 @@ export default function CandidateForm({
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (done) {
+    if (typeof window === 'undefined' || done || !draftHydratedRef.current) {
       return;
     }
 
     setDraftState('saving');
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      try {
-        const savedAt = new Date().toISOString();
-        // Voice notes are excluded from the saved draft - base64 audio would quickly blow past
-        // localStorage's quota. A reload loses recorded answers; typed answers are unaffected.
-        const draftInterviewResponses = Object.fromEntries(
-          Object.entries(form.interview_responses).filter(([, answer]) => !answer.audio_base64)
-        );
-        window.localStorage.setItem(
-          draftKey,
-          JSON.stringify({
-            token,
-            step,
-            form: { ...form, interview_responses: draftInterviewResponses },
-            lastSavedAt: savedAt,
-          })
-        );
-        setLastSavedAt(savedAt);
-        setDraftState('saved');
-      } catch {
-        setDraftState('error');
-      }
+      const saveDraft = async () => {
+        try {
+          const savedAt = new Date().toISOString();
+          // Keep text and form fields in localStorage, but persist larger voice payloads in
+          // IndexedDB so recordings survive refreshes without hitting the localStorage quota.
+          const draftInterviewResponses = Object.fromEntries(
+            Object.entries(form.interview_responses).filter(([, answer]) => !answer.audio_base64)
+          );
+          window.localStorage.setItem(
+            draftKey,
+            JSON.stringify({
+              token,
+              step,
+              form: { ...form, interview_responses: draftInterviewResponses },
+              lastSavedAt: savedAt,
+            })
+          );
+
+          if (audioDraftStorageReadyRef.current) {
+            await saveInterviewAudioDraft(token, form.interview_responses);
+          }
+
+          if (cancelled) return;
+          setLastSavedAt(savedAt);
+          setDraftState(audioDraftStorageReadyRef.current ? 'saved' : 'error');
+        } catch {
+          if (!cancelled) setDraftState('error');
+        }
+      };
+
+      void saveDraft();
     }, 250);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [draftKey, done, form, step, token]);
 
   const setInterviewAnswer = (id: string, value: InterviewAnswerValue) => {
@@ -378,6 +439,7 @@ export default function CandidateForm({
       return;
     }
 
+    void clearInterviewAudioDraft(token).catch(() => undefined);
     setDone(true);
   };
 
